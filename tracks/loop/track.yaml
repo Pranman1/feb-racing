@@ -1,0 +1,9 @@
+name: FEB Loop
+direction: ccw
+checkpoints: 20
+walls:
+  diameter: 0.33
+resolution: 0.05
+origin:
+- -4.1
+- -2.475

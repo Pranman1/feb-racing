@@ -1,0 +1,7 @@
+name: Porto (legacy RoboRacer)
+resolution: 0.05
+origin: [-12.825, -12.825]
+direction: ccw
+checkpoints: 20
+walls:
+  diameter: 0.254
