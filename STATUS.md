@@ -13,9 +13,17 @@ Newest first.
 - Repos pushed: github.com/Pranman1/feb-racing (main) and github.com/Pranman1/feb-sim (feb).
   Site live at https://pranman1.github.io/feb-racing/. Devkit image built by Actions
   (ghcr.io/pranman1/feb-devkit, still private until flipped in the package settings).
-- Open: two-car mode - both containers get telemetry through the RCT but the simulator sends no
-  vehicle data with --cars 2 (diagnostic build in progress). Windowed runs need a reboot of the PC
-  (NVIDIA driver/library mismatch: `nvidia-smi` fails, GLX context creation fails).
+- Two-car head-to-head verified: two starter-driver containers, our proxy (`febrace/proxy.py`),
+  simulator with `--cars 2`; both cars finished warm-up + 2 laps with no contact, positions by
+  finish time. Two lessons: the official Race Control Tower freezes both cars after any contact
+  until a human rules in its UI (kept as an option for stewarded finals, not used by the harness),
+  and containers on one Docker network discover each other's ROS topics, so every container now
+  runs with ROS_LOCALHOST_ONLY=1.
+- Windows player builds after dropping the NVIDIA (DLSS) module. All three players rebuilt from
+  the final code; archives go to a GitHub release of feb-racing.
+- Still needs a reboot of the PC: any windowed simulator run (NVIDIA driver/library mismatch:
+  `nvidia-smi` fails, GLX context creation fails). Headless runs are unaffected. After the reboot,
+  run `./feb-sim run --track loop_cones --cars 2` once to eyeball walls, cones, ghost and the menu.
 
 ## 2026-09-13 - M1 to M4 code complete; builds blocked on the Unity licence
 
