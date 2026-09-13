@@ -20,7 +20,8 @@ Newest first.
   and containers on one Docker network discover each other's ROS topics, so every container now
   runs with ROS_LOCALHOST_ONLY=1.
 - Windows player builds after dropping the NVIDIA (DLSS) module. All three players rebuilt from
-  the final code; archives go to a GitHub release of feb-racing.
+  the final code and published: https://github.com/Pranman1/feb-racing/releases/tag/v0.1.0
+  (`feb-sim setup` downloads from there).
 - Still needs a reboot of the PC: any windowed simulator run (NVIDIA driver/library mismatch:
   `nvidia-smi` fails, GLX context creation fails). Headless runs are unaffected. After the reboot,
   run `./feb-sim run --track loop_cones --cars 2` once to eyeball walls, cones, ghost and the menu.
