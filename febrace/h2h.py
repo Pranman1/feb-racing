@@ -73,7 +73,7 @@ class Race:
 
     def _start_proxy(self):
         ports = [str(car.port) for car in self.cars]
-        subprocess.run(["docker", "run", "-d", "--rm", "--name", self.proxy, "--network=host",
+        subprocess.run(["docker", "run", "-d", "--name", self.proxy, "--network=host",
                         "-v", f"{PROXY}:/tmp/proxy.py:ro", "--entrypoint", "python3", PROXY_IMAGE,
                         "-u", "/tmp/proxy.py", "--port", str(self.proxy_port), "--devkits", *ports], check=True, stdout=subprocess.DEVNULL)
         time.sleep(3)

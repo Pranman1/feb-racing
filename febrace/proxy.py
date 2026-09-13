@@ -12,6 +12,7 @@ no redaction. Runs inside the devkit image (python-socketio 4 + gevent + websock
 import argparse
 import re
 import threading
+import time
 
 import socketio
 from gevent import pywsgi
@@ -31,10 +32,19 @@ class Proxy:
         self.server.on("Bridge", self.from_simulator)
         self.clients = [self.connect_devkit(i, port) for i, port in enumerate(devkit_ports)]
 
-    def connect_devkit(self, index, port):
+    def connect_devkit(self, index, port, timeout=90.0):
+        """The container's port opens before the bridge inside listens: keep trying."""
         client = socketio.Client(reconnection=True)
         client.on("Bridge", lambda data: self.from_devkit(index, data))
-        client.connect(f"http://127.0.0.1:{port}", transports=["websocket"])
+        deadline = time.time() + timeout
+        while True:
+            try:
+                client.connect(f"http://127.0.0.1:{port}", transports=["websocket"])
+                break
+            except socketio.exceptions.ConnectionError:
+                if time.time() > deadline:
+                    raise
+                time.sleep(1.0)
         print(f"devkit {index + 1} connected on port {port}", flush=True)
         return client
 

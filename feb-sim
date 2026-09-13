@@ -91,7 +91,7 @@ def start_container(stack_cmd, noise=""):
     if container_running():
         subprocess.run(["docker", "rm", "-f", CONTAINER], capture_output=True)
     STACK.mkdir(exist_ok=True)
-    cmd = ["docker", "run", "-d", "--rm", "--name", CONTAINER, "-p", f"{PORT}:{PORT}",
+    cmd = ["docker", "run", "-d", "--rm", "--name", CONTAINER, "-p", f"{PORT}:{PORT}", "-e", "ROS_LOCALHOST_ONLY=1",
            "-v", f"{STACK}:/home/autodrive_devkit/src/stack",
            "-v", f"{TRACKS}:/home/autodrive_devkit/tracks:ro",
            "-e", f"FEB_LAUNCH={stack_cmd or ''}", "-e", f"FEB_NOISE={noise}", IMAGE]

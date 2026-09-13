@@ -54,7 +54,9 @@ class Attempt:
         return result
 
     def _start_container(self):
-        cmd = ["docker", "run", "-d", "--rm", "--name", self.container, "-p", f"{self.port}:4567"]
+        # ROS_LOCALHOST_ONLY: containers on the same Docker network would otherwise discover each
+        # other's identically named topics (two cars, two bridges) and drive each other's car.
+        cmd = ["docker", "run", "-d", "--rm", "--name", self.container, "-p", f"{self.port}:4567", "-e", "ROS_LOCALHOST_ONLY=1"]
         if self.stack_dir:
             cmd += ["-v", f"{pathlib.Path(self.stack_dir).resolve()}:/home/autodrive_devkit/src/stack",
                     "-e", f"FEB_LAUNCH={self.stack_cmd}"]

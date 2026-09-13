@@ -45,7 +45,7 @@ def audit():
     return found
 
 
-def settle_lap_time(node, state, before, wait=1.0):
+def settle_lap_time(node, state, before, wait=2.0):
     """last_lap_time arrives on its own topic and may lag lap_count by a message; wait for it
     to change from the raw value seen at the previous lap. The simulator reports +inf until the
     first lap, which JSON cannot carry: use None."""
