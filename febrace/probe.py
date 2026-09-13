@@ -10,6 +10,7 @@ increment). The audit lists which nodes subscribe to the restricted ground-truth
 """
 import argparse
 import json
+import math
 import subprocess
 import time
 
@@ -44,6 +45,17 @@ def audit():
     return found
 
 
+def settle_lap_time(node, state, before, wait=1.0):
+    """last_lap_time arrives on its own topic and may lag lap_count by a message; wait for it
+    to change from the raw value seen at the previous lap. The simulator reports +inf until the
+    first lap, which JSON cannot carry: use None."""
+    deadline = time.time() + wait
+    while time.time() < deadline and state.get("last_lap_time") in (before, None):
+        rclpy.spin_once(node, timeout_sec=0.05)
+    t = state.get("last_lap_time")
+    return t if t is not None and math.isfinite(t) else None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--laps", type=int, default=11, help="stop after this many laps (incl. warm-up)")
@@ -62,6 +74,7 @@ def main():
     seen_lap = seen_col = None
     audited = False
     lap_times = []
+    raw_lap_time = None
     while time.time() - t0 < args.timeout:
         rclpy.spin_once(node, timeout_sec=0.1)
         if "lap_count" not in state or "collision_count" not in state:
@@ -73,8 +86,10 @@ def main():
             emit(event="start", t=now, lap_count=base[0], collision_count=base[1])
         if state["lap_count"] != seen_lap:
             seen_lap = state["lap_count"]
-            lap_times.append(state.get("last_lap_time"))
-            emit(event="lap", t=now, lap=seen_lap - base[0], lap_time=state.get("last_lap_time"))
+            raw_lap_time = settle_lap_time(node, state, raw_lap_time)
+            lap_time = round(raw_lap_time, 4) if raw_lap_time is not None else None
+            lap_times.append(lap_time)
+            emit(event="lap", t=now, lap=seen_lap - base[0], lap_time=lap_time)
             if seen_lap - base[0] >= args.laps:
                 break
         if state["collision_count"] != seen_col:
