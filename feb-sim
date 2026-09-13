@@ -1,0 +1,174 @@
+#!/usr/bin/env python3
+"""feb-sim: one command to run the FEB simulator with your racing stack.
+
+    ./feb-sim run                        bridge + simulator, drive with the keyboard
+    ./feb-sim run --track loop --stack "ros2 launch feb_driver drive.launch.py"
+    ./feb-sim shell                      a ROS 2 shell inside the running devkit container
+    ./feb-sim stop                       stop the devkit container
+    ./feb-sim setup                      check Docker and fetch the simulator app for this OS
+
+The devkit (ROS 2 bridge + your packages) runs in Docker and publishes port 4567.
+The simulator is a native app for your OS and connects to that port. Packages under
+./stack are mounted into the container and built when it starts.
+
+Environment overrides: FEB_SIM_APP (simulator executable), FEB_DEVKIT_IMAGE.
+"""
+import argparse
+import os
+import pathlib
+import platform
+import shutil
+import socket
+import subprocess
+import sys
+import time
+
+ROOT = pathlib.Path(__file__).resolve().parent
+TRACKS = ROOT / "tracks"
+STACK = ROOT / "stack"
+APP_DIR = pathlib.Path.home() / ".feb-sim" / "app"
+IMAGE = os.environ.get("FEB_DEVKIT_IMAGE", "ghcr.io/pranman1/feb-devkit:latest")
+CONTAINER = "feb-devkit"
+PORT = 4567
+RELEASES = "https://github.com/Pranman1/feb-racing/releases/latest/download"
+
+
+def fail(msg):
+    sys.exit(f"feb-sim: {msg}")
+
+
+# ------------------------------------------------------------------ simulator app
+
+def app_executable():
+    """Path of the simulator executable for this OS, or None."""
+    env = os.environ.get("FEB_SIM_APP")
+    if env:
+        return pathlib.Path(env)
+    system = platform.system()
+    candidates = {
+        "Linux": APP_DIR / "linux" / "FEB Simulator.x86_64",
+        "Darwin": APP_DIR / "mac" / "FEB Simulator.app" / "Contents" / "MacOS" / "FEB Simulator",
+        "Windows": APP_DIR / "windows" / "FEB Simulator.exe",
+    }
+    exe = candidates.get(system)
+    return exe if exe and exe.exists() else None
+
+
+def app_archive_name():
+    return {"Linux": "FEB-Simulator-linux.tar.gz", "Darwin": "FEB-Simulator-mac.zip",
+            "Windows": "FEB-Simulator-windows.zip"}[platform.system()]
+
+
+def cmd_setup(_):
+    if not shutil.which("docker"):
+        fail("Docker is not installed. Install Docker Desktop (Mac/Windows) or docker.io (Linux) first.")
+    subprocess.run(["docker", "pull", IMAGE], check=True)
+    if app_executable():
+        print(f"simulator app present: {app_executable()}")
+        return
+    import tarfile
+    import urllib.request
+    import zipfile
+    name = app_archive_name()
+    APP_DIR.mkdir(parents=True, exist_ok=True)
+    archive = APP_DIR / name
+    print(f"downloading {RELEASES}/{name} ...")
+    urllib.request.urlretrieve(f"{RELEASES}/{name}", archive)
+    if name.endswith(".zip"):
+        zipfile.ZipFile(archive).extractall(APP_DIR)
+    else:
+        tarfile.open(archive).extractall(APP_DIR)
+    archive.unlink()
+    exe = app_executable()
+    if exe is None:
+        fail(f"unpacked the app but did not find the executable under {APP_DIR}")
+    exe.chmod(0o755)
+    print(f"simulator app installed: {exe}")
+
+
+# ------------------------------------------------------------------ devkit container
+
+def container_running():
+    out = subprocess.run(["docker", "ps", "-q", "-f", f"name=^{CONTAINER}$"], capture_output=True, text=True)
+    return bool(out.stdout.strip())
+
+
+def start_container(stack_cmd):
+    if container_running():
+        subprocess.run(["docker", "rm", "-f", CONTAINER], capture_output=True)
+    STACK.mkdir(exist_ok=True)
+    cmd = ["docker", "run", "-d", "--rm", "--name", CONTAINER, "-p", f"{PORT}:{PORT}",
+           "-v", f"{STACK}:/home/autodrive_devkit/src/stack",
+           "-v", f"{TRACKS}:/home/autodrive_devkit/tracks:ro",
+           "-e", f"FEB_LAUNCH={stack_cmd or ''}", IMAGE]
+    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
+    deadline = time.time() + 120
+    while time.time() < deadline:
+        if not container_running():
+            subprocess.run(["docker", "logs", CONTAINER])
+            fail("devkit container exited, see log above")
+        with socket.socket() as s:
+            s.settimeout(0.5)
+            if s.connect_ex(("127.0.0.1", PORT)) == 0:
+                return
+        time.sleep(1)
+    fail("bridge did not open port 4567 within 120 s (docker logs feb-devkit)")
+
+
+def cmd_stop(_):
+    subprocess.run(["docker", "rm", "-f", CONTAINER], capture_output=True)
+    print("devkit stopped")
+
+
+def cmd_shell(_):
+    if not container_running():
+        fail("devkit is not running; start it with `feb-sim run`")
+    os.execvp("docker", ["docker", "exec", "-it", CONTAINER, "bash", "-c",
+                         "source /opt/ros/humble/setup.bash; source install/setup.bash; exec bash"])
+
+
+# ------------------------------------------------------------------ run
+
+def resolve_track(name):
+    """A track folder in ./tracks, an explicit folder, or a name the app knows."""
+    for candidate in (pathlib.Path(name), TRACKS / name):
+        if (candidate / "track.json").exists():
+            return str(candidate.resolve())
+    return name
+
+
+def cmd_run(args):
+    exe = app_executable()
+    if exe is None:
+        fail("simulator app not found; run `feb-sim setup` or set FEB_SIM_APP")
+    print(f"starting devkit ({IMAGE}) ...")
+    start_container(args.stack)
+    sim = [str(exe), "--track", resolve_track(args.track), "--connect", f"127.0.0.1:{PORT}",
+           "--mode", args.mode]
+    if args.headless:
+        sim += ["-batchmode", "-nographics"]
+    print("starting simulator:", " ".join(sim[1:]))
+    try:
+        subprocess.run(sim)
+    finally:
+        cmd_stop(args)
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="feb-sim", description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="command", required=True)
+    run = sub.add_parser("run", help="start devkit + simulator")
+    run.add_argument("--track", default="loop", help="track folder name in ./tracks, or a path")
+    run.add_argument("--mode", choices=["manual", "autonomous"], default="manual")
+    run.add_argument("--stack", default="", help='command started after the bridge, e.g. "ros2 launch feb_driver drive.launch.py"')
+    run.add_argument("--headless", action="store_true", help="no window (organiser harness)")
+    run.set_defaults(func=cmd_run)
+    for name, func in (("setup", cmd_setup), ("shell", cmd_shell), ("stop", cmd_stop)):
+        sub.add_parser(name).set_defaults(func=func)
+    args = ap.parse_args()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()

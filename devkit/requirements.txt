@@ -1,0 +1,13 @@
+# Pinned to the official AutoDRIVE devkit image. numpy must stay < 1.23: newer
+# numpy breaks the bridge's cv_bridge import (_ARRAY_API not found).
+attrdict==2.0.1
+numpy==1.22.2
+pillow==9.0.1
+opencv-contrib-python==4.10.0.84
+python-socketio==4.2.0
+python-engineio==3.13.0
+greenlet==1.1.0
+gevent==21.12.0
+gevent-websocket==0.10.1
+transforms3d==0.4.2
+pyyaml==6.0.1
