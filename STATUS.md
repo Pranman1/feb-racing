@@ -2,6 +2,21 @@
 
 Newest first.
 
+## 2026-09-13 (evening) - simulator built and racing; repos and site live
+
+- Unity licensed (Hub sign-in), `feb-sim` scene generated and Linux + Mac players built.
+  Windows build first failed on HDRP's DLSS code (NVIDIA module); retrying without the module.
+- End to end on this PC: `feb-race run` with the starter-kit image on `tracks/loop` -> the car
+  drives, laps count on the generated checkpoints, wall hits count, lap times match the sim's
+  timer, a result JSON and a bag are written. Fixed on the way: spawn pose must be applied to the
+  rigidbody too; the probe must wait for last_lap_time to change (it lags lap_count by a message).
+- Repos pushed: github.com/Pranman1/feb-racing (main) and github.com/Pranman1/feb-sim (feb).
+  Site live at https://pranman1.github.io/feb-racing/. Devkit image built by Actions
+  (ghcr.io/pranman1/feb-devkit, still private until flipped in the package settings).
+- Open: two-car mode - both containers get telemetry through the RCT but the simulator sends no
+  vehicle data with --cars 2 (diagnostic build in progress). Windowed runs need a reboot of the PC
+  (NVIDIA driver/library mismatch: `nvidia-smi` fails, GLX context creation fails).
+
 ## 2026-09-13 - M1 to M4 code complete; builds blocked on the Unity licence
 
 **Done and verified on this PC**
