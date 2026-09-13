@@ -11,3 +11,4 @@ gevent==21.12.0
 gevent-websocket==0.10.1
 transforms3d==0.4.2
 pyyaml==6.0.1
+websocket-client==1.6.4

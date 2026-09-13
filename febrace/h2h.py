@@ -1,14 +1,19 @@
 """Head-to-head races: N cars in one simulator, one racing container per car.
 
-The official Race Control Tower (RCT) proxy sits between the simulator and the
-containers: every container still sees its own car as roboracer_1 while the simulator
-runs V1..VN. Each container is probed separately, so every car gets a normal result
-record plus its finishing position. Positions: most laps first, then finishing time
-including collision penalties.
+A small proxy (febrace/proxy.py, run inside the devkit image) sits between the
+simulator and the containers: every container still sees its own car as roboracer_1
+while the simulator runs V1..VN. Each container is probed separately, so every car gets
+a normal result record plus its finishing position. Positions: most laps first, then
+finishing time including collision penalties.
+
+The official Race Control Tower does the same id rewriting but freezes both cars after
+any contact until a race director rules in its web UI; use it for stewarded live events,
+not for automated brackets.
 """
 import datetime as dt
 import json
 import pathlib
+import os
 import subprocess
 import threading
 import time
@@ -16,7 +21,8 @@ import time
 from . import results
 from .runner import Attempt
 
-RCT_IMAGE = "feb-rct"   # built from github.com/AutoDRIVE-Ecosystem/AutoDRIVE-RoboRacer-Race-Control-Tower
+PROXY = pathlib.Path(__file__).with_name("proxy.py")
+PROXY_IMAGE = os.environ.get("FEB_DEVKIT_IMAGE", "ghcr.io/pranman1/feb-devkit:latest")
 
 
 class Race:
@@ -30,7 +36,7 @@ class Race:
             car.id = f"{stamp}-{race_id}-{car.team.replace(' ', '_')}"
             car.dir = pathlib.Path(runs_dir) / f"{stamp}-{race_id}" / f"car{i + 1}"
             car.container = f"feb-h2h-{stamp}-{i + 1}"
-        self.race_id, self.rct_port, self.rct = race_id, rct_port, f"feb-rct-{stamp}"
+        self.race_id, self.proxy_port, self.proxy = race_id, rct_port, f"feb-proxy-{stamp}"
 
     def run(self, on_event=print):
         started = dt.datetime.now(dt.timezone.utc)
@@ -41,13 +47,13 @@ class Race:
                 car.dir.mkdir(parents=True, exist_ok=True)
                 car._start_container()
                 car._wait_port()
-            self._start_rct()
+            self._start_proxy()
             for car in self.cars:
                 car._exec_detached("ros2 bag record -o /tmp/feb_bag /autodrive/roboracer_1/lidar /autodrive/roboracer_1/ips "
                                    "/autodrive/roboracer_1/steering_command /autodrive/roboracer_1/throttle_command "
                                    "/autodrive/roboracer_1/lap_count /autodrive/roboracer_1/collision_count")
             lead = self.cars[0]
-            sim = subprocess.Popen([str(lead.sim_exe), "--track", str(lead.track), "--connect", f"127.0.0.1:{self.rct_port}",
+            sim = subprocess.Popen([str(lead.sim_exe), "--track", str(lead.track), "--connect", f"127.0.0.1:{self.proxy_port}",
                                     "--mode", "autonomous", "--cars", str(len(self.cars)),
                                     "-logFile", str(lead.dir.parent / "sim.log")] + (["-batchmode", "-nographics"] if lead.headless else []))
             threads = [threading.Thread(target=self._watch, args=(car, events[i], on_event)) for i, car in enumerate(self.cars)]
@@ -58,17 +64,18 @@ class Race:
         finally:
             if sim is not None:
                 sim.terminate()
-            subprocess.run(["docker", "rm", "-f", self.rct], capture_output=True)
+            with open(self.cars[0].dir.parent / "proxy.log", "w") as log:
+                subprocess.run(["docker", "logs", self.proxy], stdout=log, stderr=subprocess.STDOUT)
+            subprocess.run(["docker", "rm", "-f", self.proxy], capture_output=True)
             for car in self.cars:
                 car._collect_and_stop()
         return self._results(events, started)
 
-    def _start_rct(self):
-        urls = ",".join(f"ws://127.0.0.1:{car.port}" for car in self.cars)
-        ids = ",".join(str(i + 1) for i in range(len(self.cars)))
-        subprocess.run(["docker", "run", "-d", "--rm", "--name", self.rct, "--network=host",
-                        "-e", f"RCT_PORT={self.rct_port}", "-e", f"RCT_DEVKIT_URLS={urls}",
-                        "-e", f"RCT_DEVKIT_VEHICLE_IDS={ids}", RCT_IMAGE], check=True, stdout=subprocess.DEVNULL)
+    def _start_proxy(self):
+        ports = [str(car.port) for car in self.cars]
+        subprocess.run(["docker", "run", "-d", "--rm", "--name", self.proxy, "--network=host",
+                        "-v", f"{PROXY}:/tmp/proxy.py:ro", "--entrypoint", "python3", PROXY_IMAGE,
+                        "-u", "/tmp/proxy.py", "--port", str(self.proxy_port), "--devkits", *ports], check=True, stdout=subprocess.DEVNULL)
         time.sleep(3)
 
     def _watch(self, car, sink, on_event):
