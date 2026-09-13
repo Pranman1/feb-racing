@@ -13,7 +13,10 @@ to the RoboRacer Sim Racing League and to the real 1:10 cars.
 | Devkit image (ROS 2 Humble + AutoDRIVE bridge) | `devkit/` |
 | Tracks (PNG in, geometry out) | `tracks/`, `tools/track_design.py`, `tools/track_build.py` |
 | One-command launcher | `./feb-sim` |
-| Competition harness, leaderboard site, starter kit | `harness/`, `site/`, `starter_kit/` (M2, M3) |
+| Organiser harness (time-attack, nightly reruns, head-to-head brackets) | `./feb-race`, `febrace/` |
+| Leaderboard site (GitHub Pages) | `site/`, `results/`, `events/`, `submissions.yaml` |
+| Starter kit (reactive driver, sysid probe, submission Dockerfile) | `starter_kit/` |
+| Docs | `docs/`: build, tracks, competition, starter-kit, head-to-head, semester, unity-licence |
 
 ## Quick start (members)
 
@@ -22,6 +25,7 @@ git clone https://github.com/Pranman1/feb-racing && cd feb-racing
 ./feb-sim setup                 # checks Docker, pulls the devkit, downloads the simulator app
 ./feb-sim run                   # simulator + bridge, drive with the keyboard
 ./feb-sim run --stack "ros2 launch feb_driver drive.launch.py"   # your stack (see starter_kit/)
+./feb-sim practice --stack "..."                                 # scored attempt, then ./feb-sim submit
 ```
 
 Your ROS 2 packages live in `stack/` and are mounted into the container and built on start.

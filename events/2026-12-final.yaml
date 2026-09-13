@@ -1,0 +1,13 @@
+id: 2026-12-final
+title: Fall 2026 Final (head-to-head)
+date: 2026-12-05
+mode: head-to-head
+status: upcoming
+track: ~/feb-secret-tracks/final-2026-12
+rules:
+  laps: 10
+  warmup_laps: 1
+  collision_penalty_s: 10
+  max_collisions: 10
+  timeout_s: 300
+# run with: ./feb-race bracket 2026-12-final --seed-from 2026-10-qualification

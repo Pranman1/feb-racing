@@ -87,14 +87,14 @@ def container_running():
     return bool(out.stdout.strip())
 
 
-def start_container(stack_cmd):
+def start_container(stack_cmd, noise=""):
     if container_running():
         subprocess.run(["docker", "rm", "-f", CONTAINER], capture_output=True)
     STACK.mkdir(exist_ok=True)
     cmd = ["docker", "run", "-d", "--rm", "--name", CONTAINER, "-p", f"{PORT}:{PORT}",
            "-v", f"{STACK}:/home/autodrive_devkit/src/stack",
            "-v", f"{TRACKS}:/home/autodrive_devkit/tracks:ro",
-           "-e", f"FEB_LAUNCH={stack_cmd or ''}", IMAGE]
+           "-e", f"FEB_LAUNCH={stack_cmd or ''}", "-e", f"FEB_NOISE={noise}", IMAGE]
     subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
     deadline = time.time() + 120
     while time.time() < deadline:
@@ -136,9 +136,11 @@ def cmd_run(args):
     if exe is None:
         fail("simulator app not found; run `feb-sim setup` or set FEB_SIM_APP")
     print(f"starting devkit ({IMAGE}) ...")
-    start_container(args.stack)
+    start_container(args.stack, args.noise)
     sim = [str(exe), "--track", resolve_track(args.track), "--connect", f"127.0.0.1:{PORT}",
-           "--mode", args.mode]
+           "--mode", args.mode, "--cars", str(args.cars)]
+    if args.lidar_hz:
+        sim += ["--lidar-hz", str(args.lidar_hz)]
     if args.headless:
         sim += ["-batchmode", "-nographics"]
     print("starting simulator:", " ".join(sim[1:]))
@@ -206,6 +208,9 @@ def main():
     run.add_argument("--mode", choices=["manual", "autonomous"], default="manual")
     run.add_argument("--stack", default="", help='command started after the bridge, e.g. "ros2 launch feb_driver drive.launch.py"')
     run.add_argument("--headless", action="store_true", help="no window (organiser harness)")
+    run.add_argument("--lidar-hz", type=float, default=0, help="lidar scan rate override (default: the car's 40 Hz)")
+    run.add_argument("--noise", default="", help='sensor noise, "1" for defaults or e.g. "range_sigma:=0.03 beam_dropout:=0.05 latency:=0.05"')
+    run.add_argument("--cars", type=int, default=1, help="number of cars (head-to-head practice)")
     run.set_defaults(func=cmd_run)
     practice = sub.add_parser("practice", help="scored attempt under competition rules")
     practice.add_argument("--track", default="loop")

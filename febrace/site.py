@@ -25,6 +25,14 @@ def standings(rows):
     return sorted(best.values(), key=lambda r: (not r.get("verified"), rules_mod.rank_key(r)))
 
 
+def h2h_standings(rows):
+    """Teams by the furthest round reached, then by position in their last race."""
+    last = {}
+    for r in sorted(rows, key=lambda r: r.get("race", "")):
+        last[r["team"]] = r
+    return sorted(last.values(), key=lambda r: (-int(r.get("race", "r0").split("-")[0].lstrip("r") or 0), r.get("position", 9)))
+
+
 def build():
     teams = yaml.safe_load((ROOT / "submissions.yaml").read_text())["teams"]
     events = [yaml.safe_load(p.read_text()) for p in sorted((ROOT / "events").glob("*.yaml"))]
@@ -46,7 +54,9 @@ def build():
 
     for e in events:
         rows = [r for r in all_results if r["event"] == e["id"]]
-        e["standings"] = standings(rows)
+        e["standings"] = h2h_standings(rows) if e.get("mode") == "head-to-head" else standings(rows)
+        e["races"] = sorted({r["race"] for r in rows if r.get("race")}) if e.get("mode") == "head-to-head" else []
+        e["results"] = rows if e.get("mode") == "head-to-head" else []
         e["attempts"] = len(rows)
         e["track"] = pathlib.Path(str(e["track"])).name
 

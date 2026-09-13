@@ -6,6 +6,8 @@
     ./feb-race nightly                                              rerun all teams on all practice tracks
     ./feb-race verify results/practice/loop/Team-....json           rerun a self-reported result
     ./feb-race standings 2026-10-qualification                      print an event's table
+    ./feb-race h2h --teams "Team A" "Team B" --track tracks/loop      one head-to-head race
+    ./feb-race bracket 2026-11-final --seed-from 2026-10-qualification  knockout tournament
     ./feb-race site                                                 build the leaderboard site
 
 Results land in results/ (commit and push them; GitHub Pages renders the leaderboard).
@@ -96,6 +98,46 @@ def cmd_standings(args):
         print(f"{i:>2}  {r['team']:24} {r['status']:9} {str(r['total_s']):>8} {str(r['best_lap_s']):>9} {r['collisions']:>4}")
 
 
+def race(spec_teams, track, event, race_id, rules, gui):
+    from febrace.h2h import Race
+    entries = [(t["name"], t["image"]) for t in spec_teams]
+    print(f"== race {race_id}: " + " vs ".join(n for n, _ in entries))
+    rows = Race(entries, track, sim_exe(), event, race_id, rules, headless=not gui, runs_dir=ROOT / "runs").run()
+    for r in rows:
+        results.save(r)
+        print(f"   P{r['position']} {r['team']:24} laps={r['laps_completed']} finish={r['finish_s']} collisions={r['collisions']}")
+    return rows
+
+
+def cmd_h2h(args):
+    by_name = {t["name"]: t for t in teams()}
+    missing = [n for n in args.teams if n not in by_name]
+    if missing:
+        sys.exit(f"feb-race: unknown team(s) {missing}; add them to submissions.yaml")
+    race([by_name[n] for n in args.teams], track_path(args.track), args.event, args.race, rules_mod.Rules(laps=args.laps), args.gui)
+
+
+def cmd_bracket(args):
+    from febrace.h2h import bracket
+    spec = yaml.safe_load((ROOT / "events" / f"{args.event}.yaml").read_text())
+    rules = rules_mod.Rules(**spec.get("rules", {}))
+    track = track_path(spec["track"])
+    by_name = {t["name"]: t for t in teams()}
+    seeded = [r["team"] for r in sorted((r for r in results.load_all() if r["event"] == args.seed_from), key=rules_mod.rank_key)]
+    seeded = list(dict.fromkeys(t for t in seeded if t in by_name))
+    if len(seeded) < 2:
+        sys.exit(f"feb-race: need at least two seeded teams from {args.seed_from}")
+    round_no = 1
+    while len(seeded) > 1:
+        pairs, byes = bracket(seeded)
+        winners = list(byes)
+        for match, (a, b) in enumerate(pairs, 1):
+            rows = race([by_name[a], by_name[b]], track, spec["id"], f"r{round_no}-m{match}", rules, args.gui)
+            winners.append(rows[0]["team"])
+        seeded, round_no = winners, round_no + 1
+    print(f"\nwinner: {seeded[0]}")
+
+
 def cmd_site(args):
     from febrace import site
     print("site built at", site.build())
@@ -114,6 +156,18 @@ def main():
     run.add_argument("--timeout", type=float, default=300)
     run.add_argument("--port", type=int, default=4568)
     run.set_defaults(func=cmd_run)
+
+    h2h = sub.add_parser("h2h")
+    h2h.add_argument("--teams", nargs="+", required=True)
+    h2h.add_argument("--track", required=True)
+    h2h.add_argument("--event", default="practice")
+    h2h.add_argument("--race", default="race")
+    h2h.add_argument("--laps", type=int, default=10)
+    h2h.set_defaults(func=cmd_h2h)
+    br = sub.add_parser("bracket")
+    br.add_argument("event")
+    br.add_argument("--seed-from", required=True, help="time-attack event whose standings seed the bracket")
+    br.set_defaults(func=cmd_bracket)
 
     for name, func, extra in (("event", cmd_event, "event"), ("standings", cmd_standings, "event"),
                               ("verify", cmd_verify, "result"), ("nightly", cmd_nightly, None), ("site", cmd_site, None)):

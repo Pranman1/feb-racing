@@ -15,9 +15,12 @@ COPY requirements.txt /tmp/requirements.txt
 RUN pip3 install --no-cache-dir -r /tmp/requirements.txt
 
 COPY autodrive_devkit /home/autodrive_devkit/src/autodrive_devkit
+COPY feb_tools /home/autodrive_devkit/src/feb_tools
 RUN cd /home/autodrive_devkit && . /opt/ros/humble/setup.sh && colcon build
 
 COPY entrypoint.sh /home/autodrive_devkit.sh
+# the members' stack is bind-mounted; do not litter it with root-owned bytecode
+ENV PYTHONDONTWRITEBYTECODE=1
 WORKDIR /home/autodrive_devkit
 EXPOSE 4567
 ENTRYPOINT ["/home/autodrive_devkit.sh"]

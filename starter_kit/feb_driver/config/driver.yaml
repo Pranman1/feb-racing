@@ -1,0 +1,15 @@
+# Tune these. Every value has a comment in reactive_driver.py.
+reactive_driver:
+  ros__parameters:
+    bubble: 0.40          # m, safety radius zeroed around the nearest return
+    gap_fov: 1.60         # rad, half field of view considered for gaps
+    range_cap: 6.0        # m, ranges are clipped here before choosing a gap
+    steer_gain: 0.85      # steering = gain * angle to the gap target
+    max_speed: 2.5        # m/s on an open straight
+    min_speed: 0.9        # m/s floor in tight corners
+    lat_accel: 6.0        # m/s^2 cornering limit used for the speed target
+    brake_margin: 0.40    # m, stopping distance margin before the clearance ahead
+    decel_limit: 6.0      # m/s^2 assumed braking for the clearance-based speed cap
+    speed_per_throttle: 23.0  # m/s per unit throttle at steady state (see sysid_probe)
+    throttle_kp: 0.06     # proportional speed correction, throttle per m/s
+    throttle_ki: 0.10     # integral speed correction

@@ -56,6 +56,13 @@ function table(rows, showVerified) {
       <td class="num">${r.collisions}</td><td class="muted">${esc(r.started_at.slice(0, 10))} <code>${esc(r.id)}</code></td></tr>`).join('') + '</tbody></table></div>';
 }
 
+function races(e) {
+  if (!e.races || !e.races.length) return '';
+  return '<h3>Races</h3><div class="wrap"><table><thead><tr><th>Race</th><th>Team</th><th class="num">Pos</th><th class="num">Laps</th><th class="num">Finish</th><th class="num">Collisions</th></tr></thead><tbody>' +
+    e.races.map(id => e.results.filter(r => r.race === id).sort((a, b) => a.position - b.position).map(r =>
+      `<tr><td>${esc(id)}</td><td>${esc(r.team)}${statusBadge(r)}</td><td class="num">${r.position}</td><td class="num">${r.laps_completed}</td><td class="num">${secs(r.finish_s)}</td><td class="num">${r.collisions}</td></tr>`).join('')).join('') + '</tbody></table></div>';
+}
+
 const pages = {
   '/': (d) => `
     <h2>Competitions</h2>
@@ -72,7 +79,7 @@ const pages = {
   '/events/:id': (d, id) => { const e = d.events.find(e => e.id === id); if (!e) return 'Unknown event';
     const r = e.rules || {};
     return `<h2>${esc(e.title)} <span class="badge info">${esc(e.status)}</span></h2><p class="muted">${esc(e.date)} · ${esc(e.mode)} · track ${esc(e.track)} · ${e.attempts ?? 1} attempt(s) per team, best counts.<br>
-      Rules: ${r.warmup_laps ?? 1} warm-up + ${r.laps ?? 10} timed laps, +${r.collision_penalty_s ?? 10} s per collision, DSQ above ${r.max_collisions ?? 10} collisions, ${r.timeout_s ?? 300} s limit.</p>${table(e.standings, false)}`; },
+      Rules: ${r.warmup_laps ?? 1} warm-up + ${r.laps ?? 10} timed laps, +${r.collision_penalty_s ?? 10} s per collision, DSQ above ${r.max_collisions ?? 10} collisions, ${r.timeout_s ?? 300} s limit.</p>${table(e.standings, false)}${races(e)}`; },
   '/teams': (d) => `<h2>Teams</h2><div class="wrap"><table><thead><tr><th>Team</th><th>Members</th><th>Image</th></tr></thead><tbody>${d.teams.map(t => `<tr><td>${esc(t.name)}</td><td>${(t.members || []).map(esc).join(', ')}</td><td><code>${esc(t.image)}</code></td></tr>`).join('')}</tbody></table></div>`,
   '/docs': () => `<h2>How to enter</h2>
     <ol>
