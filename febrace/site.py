@@ -4,6 +4,7 @@ data.json holds everything the page renders: teams, tracks, events, and per-trac
 per-event standings. Practice standings prefer verified results; self-reported ones are
 shown with an "unverified" badge.
 """
+import datetime as dt
 import json
 import pathlib
 import shutil
@@ -50,7 +51,7 @@ def build():
         e["track"] = pathlib.Path(str(e["track"])).name
 
     data = {"teams": teams, "tracks": tracks, "events": events,
-            "generated": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(timespec="seconds")}
+            "generated": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")}
     (OUT / "data.json").write_text(json.dumps(data, indent=1, default=str))
     shutil.copy(ROOT / "site" / "index.html", OUT / "index.html")
     shutil.copy(ROOT / "assets" / "feb_logo.svg", OUT / "logo.svg")
