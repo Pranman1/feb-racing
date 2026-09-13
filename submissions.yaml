@@ -1,0 +1,6 @@
+# Teams and their racing images. Members register by adding themselves here (pull request).
+# image: a public Docker image built FROM the FEB devkit, whose entrypoint starts the stack.
+teams:
+  - name: Example Team
+    members: [Pranman1]
+    image: ghcr.io/pranman1/feb-devkit:latest

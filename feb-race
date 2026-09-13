@@ -1,0 +1,132 @@
+#!/usr/bin/env python3
+"""feb-race: the organiser's competition runner (Linux PC with the headless simulator).
+
+    ./feb-race run --image IMG --team NAME --track tracks/loop      one attempt, prints the score
+    ./feb-race event 2026-10-qualification                          run every entry of an event
+    ./feb-race nightly                                              rerun all teams on all practice tracks
+    ./feb-race verify results/practice/loop/Team-....json           rerun a self-reported result
+    ./feb-race standings 2026-10-qualification                      print an event's table
+    ./feb-race site                                                 build the leaderboard site
+
+Results land in results/ (commit and push them; GitHub Pages renders the leaderboard).
+Secret competition tracks live outside the repo (see events/*.yaml) and are never shipped.
+"""
+import argparse
+import json
+import pathlib
+import sys
+
+import yaml
+
+ROOT = pathlib.Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT))
+from febrace import results, rules as rules_mod, sim  # noqa: E402
+from febrace.runner import Attempt  # noqa: E402
+
+
+def sim_exe():
+    exe = sim.executable()
+    if exe is None:
+        sys.exit("feb-race: simulator app not found; build it (feb-sim/build.sh linux) or set FEB_SIM_APP")
+    return exe
+
+
+def track_path(name):
+    p = pathlib.Path(name).expanduser()
+    if (p / "track.json").exists():
+        return p
+    if (ROOT / "tracks" / name / "track.json").exists():
+        return ROOT / "tracks" / name
+    sys.exit(f"feb-race: no track at {name}")
+
+
+def teams():
+    return yaml.safe_load((ROOT / "submissions.yaml").read_text())["teams"]
+
+
+def attempt(image, team, track, event, rules, gui=False, port=4568):
+    a = Attempt(image=image, track=track, sim_exe=sim_exe(), team=team, event=event, rules=rules,
+                port=port, headless=not gui, runs_dir=ROOT / "runs")
+    print(f"== {team}  {image}  track={track.name}  event={event}")
+    result = a.run()
+    path = results.save(result)
+    print(f"   {result['status']}  laps={result['laps_completed']}  collisions={result['collisions']}  "
+          f"total={result['total_s']}  best={result['best_lap_s']}  -> {path.relative_to(ROOT)}")
+    return result
+
+
+def cmd_run(args):
+    rules = rules_mod.Rules(laps=args.laps, timeout_s=args.timeout)
+    attempt(args.image, args.team, track_path(args.track), args.event, rules, args.gui, args.port)
+
+
+def cmd_event(args):
+    spec = yaml.safe_load((ROOT / "events" / f"{args.event}.yaml").read_text())
+    rules = rules_mod.Rules(**spec.get("rules", {}))
+    track = track_path(spec["track"])
+    entries = teams() if spec.get("entries", "all") == "all" else [t for t in teams() if t["name"] in spec["entries"]]
+    for team in entries:
+        for _ in range(int(spec.get("attempts", 1))):
+            attempt(team["image"], team["name"], track, spec["id"], rules, args.gui)
+    cmd_standings(args)
+
+
+def cmd_nightly(args):
+    tracks = [p.parent for p in sorted((ROOT / "tracks").glob("*/track.json"))]
+    for team in teams():
+        for track in tracks:
+            attempt(team["image"], team["name"], track, "practice", rules_mod.Rules(), args.gui)
+
+
+def cmd_verify(args):
+    original = json.loads(pathlib.Path(args.result).read_text())
+    result = attempt(original["image"], original["team"], track_path(original["track"]), "practice", rules_mod.Rules(**original["rules"]), args.gui)
+    result["verified"] = True
+    result["verifies"] = original["id"]
+    results.save(result)
+
+
+def cmd_standings(args):
+    rows = [r for r in results.load_all() if r["event"] == args.event]
+    best = {}
+    for r in sorted(rows, key=rules_mod.rank_key):
+        best.setdefault(r["team"], r)
+    print(f"\n{'#':>2}  {'team':24} {'status':9} {'total':>8} {'best lap':>9} {'coll':>4}")
+    for i, r in enumerate(best.values(), 1):
+        print(f"{i:>2}  {r['team']:24} {r['status']:9} {str(r['total_s']):>8} {str(r['best_lap_s']):>9} {r['collisions']:>4}")
+
+
+def cmd_site(args):
+    from febrace import site
+    print("site built at", site.build())
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="feb-race", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="command", required=True)
+
+    run = sub.add_parser("run")
+    run.add_argument("--image", required=True)
+    run.add_argument("--team", required=True)
+    run.add_argument("--track", required=True)
+    run.add_argument("--event", default="practice")
+    run.add_argument("--laps", type=int, default=10)
+    run.add_argument("--timeout", type=float, default=300)
+    run.add_argument("--port", type=int, default=4568)
+    run.set_defaults(func=cmd_run)
+
+    for name, func, extra in (("event", cmd_event, "event"), ("standings", cmd_standings, "event"),
+                              ("verify", cmd_verify, "result"), ("nightly", cmd_nightly, None), ("site", cmd_site, None)):
+        p = sub.add_parser(name)
+        if extra:
+            p.add_argument(extra)
+        p.set_defaults(func=func)
+    for p in sub.choices.values():
+        p.add_argument("--gui", action="store_true", help="show the simulator window")
+
+    args = ap.parse_args()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()

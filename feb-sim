@@ -3,6 +3,8 @@
 
     ./feb-sim run                        bridge + simulator, drive with the keyboard
     ./feb-sim run --track loop --stack "ros2 launch feb_driver drive.launch.py"
+    ./feb-sim practice --stack "..."      scored attempt (warm-up + 10 laps, 10 s per collision)
+    ./feb-sim submit                     post the latest practice result to the leaderboard
     ./feb-sim shell                      a ROS 2 shell inside the running devkit container
     ./feb-sim stop                       stop the devkit container
     ./feb-sim setup                      check Docker and fetch the simulator app for this OS
@@ -14,6 +16,7 @@ The simulator is a native app for your OS and connects to that port. Packages un
 Environment overrides: FEB_SIM_APP (simulator executable), FEB_DEVKIT_IMAGE.
 """
 import argparse
+import json
 import os
 import pathlib
 import platform
@@ -24,9 +27,12 @@ import sys
 import time
 
 ROOT = pathlib.Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT))
+from febrace import sim  # noqa: E402
+
 TRACKS = ROOT / "tracks"
 STACK = ROOT / "stack"
-APP_DIR = pathlib.Path.home() / ".feb-sim" / "app"
+CONFIG = pathlib.Path.home() / ".feb-sim" / "config.json"
 IMAGE = os.environ.get("FEB_DEVKIT_IMAGE", "ghcr.io/pranman1/feb-devkit:latest")
 CONTAINER = "feb-devkit"
 PORT = 4567
@@ -40,26 +46,14 @@ def fail(msg):
 # ------------------------------------------------------------------ simulator app
 
 def app_executable():
-    """Path of the simulator executable for this OS, or None."""
-    env = os.environ.get("FEB_SIM_APP")
-    if env:
-        return pathlib.Path(env)
-    system = platform.system()
-    candidates = {
-        "Linux": APP_DIR / "linux" / "FEB Simulator.x86_64",
-        "Darwin": APP_DIR / "mac" / "FEB Simulator.app" / "Contents" / "MacOS" / "FEB Simulator",
-        "Windows": APP_DIR / "windows" / "FEB Simulator.exe",
-    }
-    exe = candidates.get(system)
-    return exe if exe and exe.exists() else None
+    return sim.executable()
 
 
-def app_archive_name():
-    return {"Linux": "FEB-Simulator-linux.tar.gz", "Darwin": "FEB-Simulator-mac.zip",
-            "Windows": "FEB-Simulator-windows.zip"}[platform.system()]
-
-
-def cmd_setup(_):
+def cmd_setup(args):
+    if args.team:
+        CONFIG.parent.mkdir(parents=True, exist_ok=True)
+        CONFIG.write_text(json.dumps({"team": args.team}))
+        print(f"team set to '{args.team}'")
     if not shutil.which("docker"):
         fail("Docker is not installed. Install Docker Desktop (Mac/Windows) or docker.io (Linux) first.")
     subprocess.run(["docker", "pull", IMAGE], check=True)
@@ -69,19 +63,19 @@ def cmd_setup(_):
     import tarfile
     import urllib.request
     import zipfile
-    name = app_archive_name()
-    APP_DIR.mkdir(parents=True, exist_ok=True)
-    archive = APP_DIR / name
+    name = sim.archive_name()
+    sim.APP_DIR.mkdir(parents=True, exist_ok=True)
+    archive = sim.APP_DIR / name
     print(f"downloading {RELEASES}/{name} ...")
     urllib.request.urlretrieve(f"{RELEASES}/{name}", archive)
     if name.endswith(".zip"):
-        zipfile.ZipFile(archive).extractall(APP_DIR)
+        zipfile.ZipFile(archive).extractall(sim.APP_DIR)
     else:
-        tarfile.open(archive).extractall(APP_DIR)
+        tarfile.open(archive).extractall(sim.APP_DIR)
     archive.unlink()
     exe = app_executable()
     if exe is None:
-        fail(f"unpacked the app but did not find the executable under {APP_DIR}")
+        fail(f"unpacked the app but did not find the executable under {sim.APP_DIR}")
     exe.chmod(0o755)
     print(f"simulator app installed: {exe}")
 
@@ -154,6 +148,55 @@ def cmd_run(args):
         cmd_stop(args)
 
 
+# ------------------------------------------------------------------ practice and submit
+
+def team_name():
+    try:
+        return json.loads(CONFIG.read_text())["team"]
+    except (OSError, KeyError, ValueError):
+        fail("no team name yet; run `feb-sim setup --team \"Your Team\"` (as listed in submissions.yaml)")
+
+
+def cmd_practice(args):
+    """A scored attempt under competition rules, on your own machine."""
+    from febrace import rules
+    from febrace.runner import Attempt
+    exe = app_executable()
+    if exe is None:
+        fail("simulator app not found; run `feb-sim setup` or set FEB_SIM_APP")
+    if not args.stack:
+        fail("practice needs your stack, e.g. --stack \"ros2 launch feb_driver drive.launch.py\"")
+    cmd_stop(args)
+    attempt = Attempt(image=IMAGE, track=resolve_track(args.track), sim_exe=exe, team=team_name(),
+                      rules=rules.Rules(laps=args.laps), port=PORT, headless=args.headless,
+                      stack_dir=STACK, stack_cmd=args.stack, runs_dir=ROOT / "runs")
+    result = attempt.run()
+    print(f"\n{result['status']}: laps {result['laps_completed']}, collisions {result['collisions']}, "
+          f"total {result['total_s']} s, best lap {result['best_lap_s']} s")
+    print(f"saved to {attempt.dir}. Post it with: ./feb-sim submit")
+
+
+def cmd_submit(args):
+    """Post the latest practice result to the leaderboard as a pull request (needs the gh CLI)."""
+    from febrace import results
+    if not shutil.which("gh"):
+        fail("the GitHub CLI is required: https://cli.github.com (then `gh auth login`)")
+    run_dir = pathlib.Path(args.run) if args.run else max((ROOT / "runs").glob("*/result.json"), key=os.path.getmtime).parent
+    result = json.loads((run_dir / "result.json").read_text())
+    path = results.save(result).relative_to(ROOT)
+    branch = f"result/{result['id']}"
+    git = lambda *a: subprocess.run(["git", "-C", str(ROOT), *a], check=True)
+    git("checkout", "-B", branch)
+    git("add", str(path))
+    git("commit", "-m", f"Practice result: {result['team']} on {result['track']} ({result['status']}, total {result['total_s']} s)")
+    if subprocess.run(["git", "-C", str(ROOT), "push", "-u", "origin", branch]).returncode != 0:
+        subprocess.run(["gh", "repo", "fork", "--remote", "--remote-name", "fork"], cwd=ROOT, check=True)
+        git("push", "-u", "fork", branch)
+    subprocess.run(["gh", "pr", "create", "--fill", "--head", branch], cwd=ROOT, check=True)
+    git("checkout", "-")
+    print("pull request opened; it merges automatically once the checks pass")
+
+
 def main():
     ap = argparse.ArgumentParser(prog="feb-sim", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -164,7 +207,19 @@ def main():
     run.add_argument("--stack", default="", help='command started after the bridge, e.g. "ros2 launch feb_driver drive.launch.py"')
     run.add_argument("--headless", action="store_true", help="no window (organiser harness)")
     run.set_defaults(func=cmd_run)
-    for name, func in (("setup", cmd_setup), ("shell", cmd_shell), ("stop", cmd_stop)):
+    practice = sub.add_parser("practice", help="scored attempt under competition rules")
+    practice.add_argument("--track", default="loop")
+    practice.add_argument("--stack", required=True, help='e.g. "ros2 launch feb_driver drive.launch.py"')
+    practice.add_argument("--laps", type=int, default=10)
+    practice.add_argument("--headless", action="store_true")
+    practice.set_defaults(func=cmd_practice)
+    submit = sub.add_parser("submit", help="post the latest practice result as a pull request")
+    submit.add_argument("--run", help="a runs/<id> folder (default: newest)")
+    submit.set_defaults(func=cmd_submit)
+    setup = sub.add_parser("setup", help="install prerequisites, optionally set your team name")
+    setup.add_argument("--team")
+    setup.set_defaults(func=cmd_setup)
+    for name, func in (("shell", cmd_shell), ("stop", cmd_stop)):
         sub.add_parser(name).set_defaults(func=func)
     args = ap.parse_args()
     args.func(args)

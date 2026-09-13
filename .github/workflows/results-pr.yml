@@ -1,0 +1,43 @@
+# Members post practice results as pull requests. This checks each added file with the
+# repo's own validator (the PR's code is never executed), confirms the author belongs to
+# the team named in the result, and merges automatically.
+name: Practice result
+on:
+  pull_request_target:
+    paths: [results/practice/**]
+permissions: { contents: write, pull-requests: write }
+jobs:
+  check-and-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install pyyaml
+      - name: Validate added result files
+        env: { GH_TOKEN: "${{ github.token }}", PR: "${{ github.event.pull_request.number }}", AUTHOR: "${{ github.event.pull_request.user.login }}" }
+        run: |
+          set -e
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate > files.json
+          python3 - <<'PY'
+          import json, os, subprocess, sys, yaml
+          from febrace import results
+          files = json.load(open("files.json"))
+          teams = yaml.safe_load(open("submissions.yaml"))["teams"]
+          for f in files:
+              path, status = f["filename"], f["status"]
+              if not path.startswith("results/practice/") or not path.endswith(".json") or status != "added":
+                  sys.exit(f"only new files under results/practice/ may be added, got {status} {path}")
+              raw = subprocess.run(["curl", "-sL", f["raw_url"]], capture_output=True, text=True).stdout
+              r = json.loads(raw)
+              results.validate(r)
+              if r["event"] != "practice" or r.get("verified"):
+                  sys.exit("self-reported results must be event=practice and unverified")
+              team = next((t for t in teams if t["name"] == r["team"]), None)
+              if not team or os.environ["AUTHOR"] not in team.get("members", []):
+                  sys.exit(f"{os.environ['AUTHOR']} is not listed as a member of team '{r['team']}' in submissions.yaml")
+              print("ok", path)
+          PY
+      - name: Merge
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh pr merge "${{ github.event.pull_request.number }}" --squash --delete-branch || gh pr merge "${{ github.event.pull_request.number }}" --squash

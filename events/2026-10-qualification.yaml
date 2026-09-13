@@ -1,0 +1,15 @@
+# One competition. The organiser runs it with `feb-race event 2026-10-qualification`.
+id: 2026-10-qualification
+title: Fall 2026 Qualification
+date: 2026-10-15
+mode: time-attack
+status: upcoming          # upcoming | live | done
+track: ~/feb-secret-tracks/qual-2026-10     # secret until the event; released into tracks/ afterwards
+attempts: 2               # best attempt counts
+rules:
+  laps: 10
+  warmup_laps: 1
+  collision_penalty_s: 10
+  max_collisions: 10
+  timeout_s: 300
+entries: all              # or a list of team names
