@@ -47,5 +47,5 @@ contact before you use it for anything that counts.
 
 ## Practice
 
-Members can put a second car on the grid locally: `./feb-sim run --cars 2`. The second car
-is driven by nobody unless a second bridge feeds it; it still makes a useful static obstacle.
+Members race the stock starter driver locally: `./feb-sim run --stack "..." --opponent normal`
+(`slow` 1.5 m/s, `normal` 2.5, `fast` 4.0). `--cars 2` alone puts an undriven second car on the grid.
