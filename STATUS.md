@@ -21,7 +21,10 @@ Newest first.
   avoid each other, so 3+ cars stays experimental.
 - Porto: walls are now built by offsetting each boundary along its normals, so the thin island
   is one loop (dilation used to split it into two).
-- All three players rebuilt and the release assets replaced.
+- Starter driver: same throttle law as the house driver (feed-forward + bounded trim, low-passed
+  steering/clearance/target, slew limit): five clean laps headless, throttle never drops to zero.
+- Dropped the unused LLMUnity plugin from the fork: it injected 780 MB of native libraries into
+  every player. Players are now 296 MB (Linux), 261 MB (Mac), 360 MB (Windows); release refreshed.
 
 ## 2026-09-13 (night) - seen on screen, opponent mode, handbook
 
