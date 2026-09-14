@@ -121,6 +121,8 @@ def start_opponent(level, track):
     smooth lidar driver from the starter kit at a conservative pace (the thing to overtake);
     "map" runs the map-following driver instead."""
     subprocess.run(["docker", "rm", "-f", OPPONENT, PROXY], capture_output=True)
+    if not json.loads((pathlib.Path(track) / "track.json").read_text()).get("walls"):
+        level = "map"   # no walls to follow: the lidar racer would wander; the map follower knows the lane
     if level == "map":
         launch = f"ros2 run feb_tools house_driver --ros-args -p track:=/track -p max_speed:={MAP_OPPONENT_SPEED}"
         speed = MAP_OPPONENT_SPEED
