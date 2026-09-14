@@ -11,5 +11,8 @@ reactive_driver:
     brake_margin: 0.40    # m, stopping distance margin before the clearance ahead
     decel_limit: 6.0      # m/s^2 assumed braking for the clearance-based speed cap
     speed_per_throttle: 23.0  # m/s per unit throttle at steady state (see sysid_probe)
-    throttle_kp: 0.06     # proportional speed correction, throttle per m/s
-    throttle_ki: 0.10     # integral speed correction
+    throttle_kp: 0.02     # proportional speed trim, throttle per m/s (bounded to half the feed-forward)
+    throttle_ki: 0.03     # integral speed trim
+    steer_tau: 0.25       # s, steering low-pass (raw gap targets jump beam to beam)
+    target_tau: 0.30      # s, clearance and speed-target low-pass
+    throttle_slew: 0.8    # throttle units per second

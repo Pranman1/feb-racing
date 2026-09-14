@@ -6,7 +6,12 @@ Per lidar scan:
      through a gap that passes too close to a wall
   3. aim at the middle of the widest remaining gap
   4. pick a speed from the room ahead and from how hard we are steering
-  5. turn the speed target into a throttle with a feed-forward + PI loop
+  5. turn the speed target into a throttle: feed-forward plus a bounded trim
+
+Throttle 0 is a hard brake in this simulator, so a plain PI speed loop that cuts to zero
+surges and stops in a 0.8 s cycle. The command is feed-forward (v / speed_per_throttle)
+plus a trim clipped to half of it, so it never reaches zero while speed is wanted; the
+clearance, steering and speed target are low-passed and the throttle is slew-limited.
 
 Inputs: lidar and wheel encoders only. ips/odom/tf are barred at race time.
 Steering command is normalised [-1, 1] = [-0.5236, 0.5236] rad. Throttle 0 brakes hard.
@@ -32,13 +37,17 @@ class ReactiveDriver(Node):
         super().__init__(name)
         defaults = dict(bubble=0.40, gap_fov=1.60, range_cap=6.0, steer_gain=0.85, max_speed=2.5, min_speed=0.9,
                         lat_accel=6.0, brake_margin=0.40, decel_limit=6.0, speed_per_throttle=23.0,
-                        throttle_kp=0.06, throttle_ki=0.10)
+                        throttle_kp=0.02, throttle_ki=0.03, steer_tau=0.25, target_tau=0.30, throttle_slew=0.8)
         for key, value in defaults.items():
             self.declare_parameter(key, value)
         self.p = {k: self.get_parameter(k).value for k in defaults}
 
         self.speed = 0.0            # m/s from the encoders
         self.integral = 0.0
+        self.steer = 0.0            # low-passed steering command
+        self.clearance = 0.0        # low-passed range ahead
+        self.v_target = 0.0         # low-passed speed target
+        self.throttle = 0.0
         self.last_scan_t = None
         self.encoder_hist = {}      # frame_id -> (t, angle)
 
@@ -80,10 +89,12 @@ class ReactiveDriver(Node):
         angles = msg.angle_min + np.arange(len(ranges)) * msg.angle_increment
 
         target_angle, clearance = self.choose_gap(ranges, angles)
-        steer = float(np.clip(self.p["steer_gain"] * target_angle, -MAX_STEER, MAX_STEER))
-        speed_target = self.speed_target(steer, clearance)
-        throttle = self.throttle_for(speed_target, dt)
-        self.publish(throttle, steer)
+        a = min(1.0, dt / self.p["steer_tau"])
+        self.steer += (float(np.clip(self.p["steer_gain"] * target_angle, -MAX_STEER, MAX_STEER)) - self.steer) * a
+        self.clearance += (clearance - self.clearance) * min(1.0, dt / self.p["target_tau"])
+        self.v_target += (self.speed_target(self.steer, self.clearance) - self.v_target) * min(1.0, dt / self.p["target_tau"])
+        self.throttle = self.throttle_for(self.v_target, dt)
+        self.publish(self.throttle, self.steer)
 
     def choose_gap(self, ranges, angles):
         """Angle to aim at and the range straight ahead after the safety bubble."""
@@ -110,11 +121,15 @@ class ReactiveDriver(Node):
         return float(np.clip(min(v_corner, v_clear), self.p["min_speed"], self.p["max_speed"]))
 
     def throttle_for(self, v_target, dt):
-        """Feed-forward from the steady-state gain plus a PI correction on measured speed."""
+        """Feed-forward from the steady-state gain plus a trim bounded to half of it, so the
+        command never drops to zero (a hard brake) while speed is wanted; slew-limited."""
+        ff = v_target / self.p["speed_per_throttle"]
         error = v_target - self.speed
         self.integral = float(np.clip(self.integral + error * dt, -0.8, 0.8))
-        throttle = v_target / self.p["speed_per_throttle"] + self.p["throttle_kp"] * error + self.p["throttle_ki"] * self.integral
-        return float(np.clip(throttle, 0.0, 1.0))
+        trim = float(np.clip(self.p["throttle_kp"] * error + self.p["throttle_ki"] * self.integral, -0.5 * ff, 0.5 * ff))
+        wanted = float(np.clip(ff + trim, 0.0, 1.0))
+        slew = self.p["throttle_slew"] * dt
+        return float(np.clip(wanted, self.throttle - slew, self.throttle + slew)) if self.throttle > 0.0 else wanted
 
     def publish(self, throttle, steer):
         self.pub_throttle.publish(Float32(data=throttle))
