@@ -2,6 +2,19 @@
 
 Newest first.
 
+## 2026-09-14 - ego car and camera are the same car; nothing drives without a stack
+
+- Bug: cloning car one for the grid also cloned its viewing cameras (Driver's Eye etc.), so the
+  screen followed car two while the mode button drove car one. Fix: clones keep only their
+  sensor cameras (render-to-texture); viewing cameras and audio listener are disabled on clones.
+  Verified on screen: with the starter kit on car one and car two idle, the Driver's Eye moves
+  with car one.
+- Confirmed behaviour: `./feb-sim run` with no `--stack` starts no driver and no opponent. Car
+  one stood still for the whole check (same `ips` twice, 4 s apart); car two is not even on the
+  bridge (the devkit publishes `roboracer_1` only) until `--opponent` attaches a driver to it.
+  The earlier demos drove because I had copied the starter kit into `stack/`; that copy is gone.
+- Players rebuilt (Linux, Mac, Windows) and the v0.1.0 release assets refreshed.
+
 ## 2026-09-14 (early) - bridge rate is the root cause; fixed 10 Hz scoring; drivers rate-robust
 
 - Finding: with a window open the simulator exchanges data at ~10 Hz on Linux (camera readback

@@ -101,6 +101,9 @@ and flags the result. Everything must start from the container's entrypoint, not
 - *Bridge rate*: with a window open the simulator exchanges data at about 10 Hz on Linux
   (each exchange reads the cameras back from the GPU); headless it is 20 to 40 Hz. Drivers must
   cope with 10 Hz: the starter kit and the house driver do, a plain PI speed loop does not.
-- *Two cars follow the keyboard*: only car one takes the keyboard; extra cars need a bridge.
+- *Nothing drives*: correct. Without `--stack` the launcher starts no driver and no opponent;
+  car one answers the keyboard in Manual mode, and extra cars are props until `--opponent`
+  (or the harness) puts a driver behind them. Car one is always the ego car: the mode button
+  and the Driver's Eye camera both belong to it.
 - *No window on the organiser PC after a driver update*: reboot (GPU driver mismatch).
 - *Cones or walls missing*: the track folder has no `track.json`; run `tools/track_build.py`.
