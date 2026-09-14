@@ -166,6 +166,8 @@ def cmd_run(args):
            "--mode", args.mode, "--cars", str(cars)]
     if args.lidar_hz:
         sim += ["--lidar-hz", str(args.lidar_hz)]
+    if args.camera:
+        sim += ["--camera", args.camera]
     if args.headless:
         sim += ["-batchmode", "-nographics"]
     print("starting simulator:", " ".join(sim[1:]))
@@ -237,6 +239,7 @@ def main():
     run.add_argument("--noise", default="", help='sensor noise, "1" for defaults or e.g. "range_sigma:=0.03 beam_dropout:=0.05 latency:=0.05"')
     run.add_argument("--cars", type=int, default=1, help="number of cars (head-to-head practice)")
     run.add_argument("--opponent", choices=list(OPPONENT_SPEED), help="race the stock driver in car 2 at this pace")
+    run.add_argument("--camera", help="starting camera: \"God's Eye\", Trackcam, \"Driver's Eye\", ...")
     run.set_defaults(func=cmd_run)
     practice = sub.add_parser("practice", help="scored attempt under competition rules")
     practice.add_argument("--track", default="loop")
