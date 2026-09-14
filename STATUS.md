@@ -2,6 +2,17 @@
 
 Newest first.
 
+## 2026-09-13 (night) - seen on screen, opponent mode, handbook
+
+- After the reboot the simulator runs on the PC's GPU. Fixed from what we saw: cones (upstream
+  cone is a SketchUp asset with no mesh on Linux; cones are now generated in code, striped),
+  manual mode drives car one only, Track and Cars dropdowns replace the Scene Light row, FEB rear
+  decal, `--camera` option, duct colour per track (`walls.color`).
+- `feb-sim run --opponent slow|normal|fast` races the stock starter driver in car two through the
+  proxy; verified on screen with both cars lapping.
+- `docs/handbook.md` is the single guide for competitors and the organiser.
+- Mac/Windows rebuilt with these changes; release v0.1.0 assets refreshed.
+
 ## 2026-09-13 (evening) - simulator built and racing; repos and site live
 
 - Unity licensed (Hub sign-in), `feb-sim` scene generated and Linux + Mac players built.

@@ -18,6 +18,8 @@ to the RoboRacer Sim Racing League and to the real 1:10 cars.
 | Starter kit (reactive driver, sysid probe, submission Dockerfile) | `starter_kit/` |
 | Docs | `docs/`: build, tracks, competition, starter-kit, head-to-head, semester, unity-licence |
 
+**Start with [docs/handbook.md](docs/handbook.md)**: the whole flow for competitors and the organiser.
+
 ## Quick start (members)
 
 ```bash
