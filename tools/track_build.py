@@ -16,6 +16,7 @@ track.yaml::
     origin: [0.0, 0.0]        # map-frame position of the bottom-left pixel (m)
     direction: ccw            # driving direction, ccw or cw
     checkpoints: 20           # number of lap checkpoints (checkpoint 0 = finish line)
+    max_cars: 4               # optional; 1 for tracks too narrow to race side by side
     start: [3.0, 1.0]         # optional finish-line position (m); default: longest straight
     walls:
       diameter: 0.33          # air-duct diameter (m); omit the key for no walls
@@ -251,6 +252,7 @@ def build_track(folder):
         "version": 1,
         "name": cfg.get("name", folder.name),
         "direction": "ccw" if ccw else "cw",
+        "max_cars": int(cfg.get("max_cars", 4)),
         "length": round(float(len(xy) * CENTRELINE_SPACING), 2),
         "centreline": xy.round(3).flatten().tolist(),
         "checkpoints": checkpoints,

@@ -3,5 +3,6 @@ resolution: 0.05
 origin: [-12.825, -12.825]
 direction: ccw
 checkpoints: 20
+max_cars: 1               # the corridor narrows to 1.3 m: practice only
 walls:
-  diameter: 0.254
+  diameter: 0.33

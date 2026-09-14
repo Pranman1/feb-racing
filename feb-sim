@@ -3,7 +3,7 @@
 
     ./feb-sim run                        bridge + simulator, drive with the keyboard
     ./feb-sim run --track loop --stack "ros2 launch feb_driver drive.launch.py"
-    ./feb-sim run --stack "..." --opponent normal    race the stock driver (slow | normal | fast)
+    ./feb-sim run --stack "..." --opponent normal    race the house racer (slow | normal | fast | map)
     ./feb-sim practice --stack "..."      scored attempt (warm-up + 10 laps, 10 s per collision)
     ./feb-sim submit                     post the latest practice result to the leaderboard
     ./feb-sim shell                      a ROS 2 shell inside the running devkit container
@@ -41,7 +41,8 @@ PROXY = "feb-proxy"
 PORT = 4567
 OPPONENT_PORT = 4566
 PROXY_PORT = 4565
-OPPONENT_SPEED = {"slow": 1.5, "normal": 2.5, "fast": 3.5}
+OPPONENT_SPEED = {"slow": 1.5, "normal": 2.0, "fast": 2.5}   # the lidar house racer's max_speed
+MAP_OPPONENT_SPEED = 2.5                                      # --opponent map: the map-following driver
 RELEASES = "https://github.com/Pranman1/feb-racing/releases/latest/download"
 
 
@@ -116,18 +117,24 @@ def start_container(stack_cmd, noise=""):
 
 
 def start_opponent(level, track):
-    """The house driver (centreline follower, knows the map) in its own container, plus the
-    proxy that feeds car 2 to it."""
+    """The house racer in its own container, plus the proxy that feeds car 2 to it. Default: the
+    smooth lidar driver from the starter kit at a conservative pace (the thing to overtake);
+    "map" runs the map-following driver instead."""
     subprocess.run(["docker", "rm", "-f", OPPONENT, PROXY], capture_output=True)
-    speed = OPPONENT_SPEED[level]
-    launch = f"ros2 run feb_tools house_driver --ros-args -p track:=/track -p max_speed:={speed}"
+    if level == "map":
+        launch = f"ros2 run feb_tools house_driver --ros-args -p track:=/track -p max_speed:={MAP_OPPONENT_SPEED}"
+        speed = MAP_OPPONENT_SPEED
+    else:
+        speed = OPPONENT_SPEED[level]
+        launch = f"ros2 run feb_driver reactive_driver --ros-args -p max_speed:={speed} -p bubble:=0.45"
     subprocess.run(["docker", "run", "-d", "--rm", "--name", OPPONENT, "-p", f"{OPPONENT_PORT}:4567", "-e", "ROS_LOCALHOST_ONLY=1",
-                    "-v", f"{track}:/track:ro", "-e", f"FEB_LAUNCH={launch}", IMAGE], check=True, stdout=subprocess.DEVNULL)
+                    "-v", f"{track}:/track:ro", "-v", f"{ROOT / 'starter_kit'}:/home/autodrive_devkit/src/stack:ro",
+                    "-e", f"FEB_LAUNCH={launch}", IMAGE], check=True, stdout=subprocess.DEVNULL)
     proxy = ROOT / "febrace" / "proxy.py"
     subprocess.run(["docker", "run", "-d", "--rm", "--name", PROXY, "--network=host", "-v", f"{proxy}:/tmp/proxy.py:ro",
                     "--entrypoint", "python3", IMAGE, "-u", "/tmp/proxy.py", "--verbose", "--port", str(PROXY_PORT),
                     "--devkits", str(PORT), str(OPPONENT_PORT), "--rate", "10"], check=True, stdout=subprocess.DEVNULL)
-    print(f"opponent: stock driver at {speed} m/s")
+    print(f"opponent: {'map-following' if level == 'map' else 'lidar'} house racer at {speed} m/s")
 
 
 def cmd_stop(_):
@@ -166,6 +173,8 @@ def cmd_run(args):
             fail("--opponent races your stack, so it needs --stack \"ros2 launch ...\" as well")
         if not pathlib.Path(track).is_dir():
             fail("--opponent needs a track folder with track.json (a name from ./tracks or a path)")
+        if json.loads((pathlib.Path(track) / "track.json").read_text()).get("max_cars", 4) < 2:
+            fail(f"{pathlib.Path(track).name} is a single-car track (too narrow to race side by side)")
         start_opponent(args.opponent, track)
         cars, port = max(cars, 2), PROXY_PORT
     sim = [str(exe), "--track", track, "--connect", f"127.0.0.1:{port}",
@@ -244,7 +253,7 @@ def main():
     run.add_argument("--lidar-hz", type=float, default=0, help="lidar scan rate override (default: the car's 40 Hz)")
     run.add_argument("--noise", default="", help='sensor noise, "1" for defaults or e.g. "range_sigma:=0.03 beam_dropout:=0.05 latency:=0.05"')
     run.add_argument("--cars", type=int, default=1, help="number of cars (head-to-head practice)")
-    run.add_argument("--opponent", choices=list(OPPONENT_SPEED), help="race the stock driver in car 2 at this pace")
+    run.add_argument("--opponent", choices=list(OPPONENT_SPEED) + ["map"], help="house racer in car 2: slow | normal | fast (lidar driver) or map")
     run.add_argument("--camera", help="starting camera: \"God's Eye\", Trackcam, \"Driver's Eye\", ...")
     run.set_defaults(func=cmd_run)
     practice = sub.add_parser("practice", help="scored attempt under competition rules")
