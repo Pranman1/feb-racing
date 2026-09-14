@@ -1,0 +1,256 @@
+\documentclass[11pt,a4paper]{article}
+\input{preamble}
+
+\begin{document}
+\febtitle{Competitor manual}{%
+  \textbf{Part I} & The platform and the rules\\[3pt]
+  \textbf{Part II} & From nothing to a leaderboard entry\\[3pt]
+  \textbf{Part III} & Learning path and reference\\}
+
+\input{platform}
+
+% =====================================================================
+\part{From nothing to a leaderboard entry}
+% =====================================================================
+
+\section{Install (once, about 15 minutes)}
+
+\subsection{Prerequisites}
+
+\begin{tabularx}{\linewidth}{lX}
+\toprule
+OS & Install\\
+\midrule
+macOS & Docker Desktop (\url{https://docker.com}), Python~3 (comes with the Xcode command line tools: \cmd{xcode-select --install}), GitHub CLI (\cmd{brew install gh})\\
+Windows & Docker Desktop with the WSL~2 backend, Python~3 from python.org, GitHub CLI (\cmd{winget install GitHub.cli}). Run the commands below in Git Bash or WSL.\\
+Linux & \cmd{sudo apt install docker.io python3 gh}, then add yourself to the \texttt{docker} group and log in again\\
+\bottomrule
+\end{tabularx}
+
+\medskip
+Start Docker Desktop before anything else. Then log the GitHub CLI in once: \cmd{gh auth login}.
+
+\subsection{Get the repo and the simulator}
+
+\begin{lstlisting}
+git clone https://github.com/Pranman1/feb-racing
+cd feb-racing
+./feb-sim setup --team "Your Team"
+\end{lstlisting}
+
+\cmd{setup} checks Docker, pulls the devkit image, and downloads the simulator app for your
+OS into \file{\textasciitilde/.feb-sim/app/}. The team name is what your results are posted under;
+use the name your team registers in \file{submissions.yaml}.
+
+\subsection{First drive: manual}
+
+\begin{lstlisting}
+./feb-sim run
+\end{lstlisting}
+
+A window opens on the \emph{FEB Loop} track in Driver's Eye view. Nothing drives by itself:
+with no stack given, the launcher starts no driver and no opponent. Arrow keys steer and
+throttle. The menu in the top-left has the Manual/Autonomous button, the Track button (cycles
+the built-in tracks), the Cars button (more cars on the grid) and the camera choices.
+
+\medskip
+\textbf{macOS, if the app does not open} (``damaged'' or ``cannot be opened''): the app is not
+signed by Apple. Run once:
+\begin{lstlisting}
+xattr -dr com.apple.quarantine ~/.feb-sim/app/mac/"FEB Simulator.app"
+codesign --force --deep -s - ~/.feb-sim/app/mac/"FEB Simulator.app"
+\end{lstlisting}
+
+\section{Write your driver}
+
+\subsection{Where the code lives}
+
+Copy the starter kit into your own folder. \file{stack/} is yours and is ignored by git in
+this repo, so nothing you do there conflicts with updates.
+
+\begin{lstlisting}
+cp -r starter_kit/feb_driver stack/
+\end{lstlisting}
+
+\begin{lstlisting}
+stack/feb_driver/
+    feb_driver/reactive_driver.py    THE DRIVER. Subscribes to lidar + encoders, publishes steering + throttle
+    config/driver.yaml               its tuning knobs (speeds, gap bubble, filters, throttle law)
+    launch/drive.launch.py           starts the driver with the yaml
+    feb_driver/sysid_probe.py        stage 2: drives test inputs and records a bag
+    tools/sysid_fit.py               stage 2: fits the recorded bag
+    package.xml, setup.py            standard ROS 2 Python package files
+\end{lstlisting}
+
+\file{reactive\_driver.py} is about 170 lines. Per lidar scan it cleans the scan, zeroes a safety
+bubble around the nearest return, aims into the widest gap, picks a speed from the room ahead
+and the steering angle, and turns that into a throttle as feed-forward plus a bounded trim.
+Everything is commented. \file{driver.yaml} exposes every number.
+
+You can add more packages next to \file{feb\_driver}, more nodes, C++ packages, anything
+that builds with \cmd{colcon}. The container builds everything under \file{stack/} on start.
+
+\subsection{Run it on the simulator}
+
+\begin{lstlisting}
+./feb-sim run --stack "ros2 launch feb_driver drive.launch.py"
+\end{lstlisting}
+
+What happens, in order: the launcher starts the devkit container with \file{stack/} mounted
+inside it; the container builds your packages and starts the bridge; the simulator starts,
+connects to the bridge, and is put in Autonomous mode; the container starts your launch
+command. The car drives.
+
+Edit, save, run the same command again. Each run is a fresh build (a few seconds for Python).
+
+\subsection{Useful options}
+
+\begin{tabularx}{\linewidth}{lX}
+\toprule
+Option & Effect\\
+\midrule
+\texttt{--track porto} & another built-in track (\texttt{loop}, \texttt{loop\_cones}, \texttt{porto}), or a path to any track folder\\
+\texttt{--mode manual} & keep the keyboard even with a stack running\\
+\texttt{--opponent normal} & the house racer in car two (\texttt{slow} 1.5, \texttt{normal} 2.0, \texttt{fast} 2.5~m/s, or \texttt{map}). Needs \texttt{--stack}. Not on Porto (single-car track).\\
+\texttt{--cars 2} & a second, undriven car on the grid\\
+\texttt{--noise 1} & lidar range noise and dropouts; \texttt{--noise "range\_sigma:=0.05 latency:=0.05"} sets them\\
+\texttt{--lidar-hz 10} & slower lidar, as a real bridge often delivers\\
+\texttt{--camera Trackcam} & start in another view (\texttt{"God's Eye"}, \texttt{Trackcam}, \texttt{"Driver's Eye"})\\
+\bottomrule
+\end{tabularx}
+
+Car one is always \emph{your} car: the Manual/Autonomous button, the keyboard, the Driver's
+Eye camera and topic namespace \texttt{roboracer\_1} all belong to it. Your container never sees
+any other car.
+
+\subsection{Debug}
+
+\begin{lstlisting}
+./feb-sim shell                 # a ROS 2 shell inside the running container
+ros2 node list
+ros2 topic hz /autodrive/roboracer_1/lidar
+ros2 topic echo /autodrive/roboracer_1/throttle_command
+rqt
+./feb-sim stop                  # stop the container(s) and the simulator
+\end{lstlisting}
+
+The container log (build errors, your node's output) is \cmd{docker logs feb-devkit}.
+
+\section{Score yourself and post it}
+
+\begin{lstlisting}
+./feb-sim practice --stack "ros2 launch feb_driver drive.launch.py" --track loop
+./feb-sim submit
+\end{lstlisting}
+
+\cmd{practice} runs one attempt under competition rules: warm-up plus 10 timed laps, 10~s per
+collision, DNF after 300~s, through the 10~Hz proxy. It prints the result and saves
+\file{runs/<id>/} with \file{result.json}, logs and a ROS bag.
+
+\cmd{submit} opens a pull request with the result file. A check validates it and merges it,
+and you appear on that track's practice board as \emph{unverified}. The organiser's nightly
+rerun of your image turns it \emph{verified}.
+
+\section{Race the house racer}
+
+\begin{lstlisting}
+./feb-sim run --stack "ros2 launch feb_driver drive.launch.py" --opponent normal
+\end{lstlisting}
+
+The house racer starts in car two only when your stack starts your car. It is the smooth
+lidar driver at a conservative pace with zero wall contact: the thing a new stack has to
+overtake. It follows a car ahead rather than ramming it. \texttt{--opponent map} runs the
+map-following driver instead (it knows the track and the car's true pose; faster, less
+smooth). On cone-only tracks the launcher always uses the map follower, since a gap
+follower has no walls to follow there.
+
+\section{Enter competitions}
+
+Competitions run on the organiser's PC from a Docker image you publish. Build it from the
+starter Dockerfile, which starts from the devkit image, copies \file{stack/} in, builds it and
+sets the launch command:
+
+\begin{lstlisting}
+docker build -t <dockerhub-user>/feb-racer:v1 -f starter_kit/Dockerfile stack/
+docker push <dockerhub-user>/feb-racer:v1
+\end{lstlisting}
+
+If your launch command differs from the starter's, change the \texttt{FEB\_LAUNCH} line in a
+copy of the Dockerfile. Then register: add your team, GitHub logins and image to
+\file{submissions.yaml} in a pull request:
+
+\begin{lstlisting}
+teams:
+  - name: Your Team
+    members: [github-login-1, github-login-2]
+    image: docker.io/<dockerhub-user>/feb-racer:v1
+\end{lstlisting}
+
+Competitions and nightly reruns pull that image. Update the tag and the yaml whenever you
+want a new version raced. In a head-to-head final your container runs unchanged: a proxy
+between the simulator and the containers makes every car look like \texttt{roboracer\_1} to
+its own stack.
+
+% =====================================================================
+\part{Learning path and reference}
+% =====================================================================
+
+\section{Learning path}
+
+Every stage ends with a number on the leaderboard.
+
+\begin{enumerate}
+  \item \textbf{Read the car.} \cmd{./feb-sim shell}, then \cmd{ros2 topic hz} and \cmd{ros2 topic echo} on the topics in Part~I. Steering lags about 0.25~s; throttle 0 brakes hard.
+  \item \textbf{Reactive driving.} Tune \file{driver.yaml}: bubble, gap field of view, the deep-beam weight, speed limits, braking margin, filter time constants. Target: 10 clean laps on \texttt{loop} under 100~s.
+  \item \textbf{System identification.} \cmd{ros2 launch feb\_driver sysid.launch.py} drives throttle steps, a coast and a chirp while recording a bag into \file{stack/sysid\_bag}. Inside the container, \cmd{python3 tools/sysid\_fit.py stack/sysid\_bag} gives the steady-state gain (m/s per throttle), the idle-brake deceleration and the throttle and steering lags. Put the gain into \texttt{speed\_per\_throttle}. Expect the tyres to be a knife edge: lateral grip peaks at 1\,\% slip and halves by 10\,\%.
+  \item \textbf{Localisation and a map.} Build a map of the track from lidar (scan matching, or SLAM Toolbox in the container), then localise on it at race time. Check against \texttt{ips} while developing; never subscribe to it at race time.
+  \item \textbf{Raceline and controller.} A minimum-curvature line on your map with a speed profile from your sysid numbers, tracked by pure pursuit, then MAP or MPC. Lap times halve here.
+  \item \textbf{Realism.} \texttt{--noise}, \texttt{--lidar-hz 10}, \texttt{--opponent}, and the cone track (\texttt{loop\_cones}: blue cones left, yellow right, a camera perception project).
+\end{enumerate}
+
+\section{If something goes wrong}
+
+\begin{tabularx}{\linewidth}{lX}
+\toprule
+Symptom & Cause and fix\\
+\midrule
+Nothing drives & Correct without \texttt{--stack}. With a stack: the build failed or the node crashed, see \cmd{docker logs feb-devkit}; or the mode button says Manual.\\
+Port 4567 in use & Another bridge container is running: \cmd{./feb-sim stop}.\\
+Car surges and stops & Throttle reaching zero (a hard brake). Keep feed-forward plus a bounded trim; see the starter's throttle law.\\
+Car weaves at full lock & Raw beam-to-beam targets at 10~Hz. Low-pass and rate-limit steering; the starter shows how.\\
+Docker pull denied & Docker Desktop not running, or the image is private; ask the organiser.\\
+Mac app will not open & See the \cmd{xattr} and \cmd{codesign} commands in the install section.\\
+Cones or walls missing & The track folder has no \file{track.json}; run \cmd{tools/track\_build.py <folder>}.\\
+\bottomrule
+\end{tabularx}
+
+\section{Command reference}
+
+\begin{tabularx}{\linewidth}{p{7.2cm}X}
+\toprule
+Command & What it does\\
+\midrule
+\cmd{feb-sim setup --team T} & pull the devkit image, download the app, set the team name\\
+\cmd{feb-sim run [--track] [--stack] [--mode] [--opponent] [--cars] [--noise] [--lidar-hz] [--camera]} & start the container and the simulator, connected\\
+\cmd{feb-sim practice --stack S [--track] [--laps]} & one scored attempt into \file{runs/<id>/}\\
+\cmd{feb-sim submit [--run DIR]} & pull request with the newest (or given) result\\
+\cmd{feb-sim shell} & ROS~2 shell inside the running container\\
+\cmd{feb-sim stop} & stop containers and the simulator\\
+\bottomrule
+\end{tabularx}
+
+\newpage
+\section{Repository layout}
+
+\begin{lstlisting}
+feb-racing/
+    feb-sim                    the launcher (Python 3, needs only docker and gh)
+    starter_kit/               feb_driver package + submission Dockerfile
+    stack/                     YOUR code (gitignored)
+    tracks/                    public tracks (also shipped inside the app)
+    runs/                      your attempt folders (gitignored)
+    results/, events/, submissions.yaml, site/    leaderboard data and page
+    docs/                      handbook, this manual, detail pages
+\end{lstlisting}
+
+\end{document}

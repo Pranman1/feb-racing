@@ -18,7 +18,7 @@ setup(
     zip_safe=True,
     maintainer="Formula Electric at Berkeley",
     maintainer_email="pranavbhatttheonlyone@gmail.com",
-    description="FEB Racing starter kit",
+    description="FEBAUTO Racing starter kit",
     license="BSD-2-Clause",
     entry_points={
         "console_scripts": [

@@ -1,4 +1,4 @@
-# FEB Racing
+# FEBAUTO Racing
 
 Autonomous sim-racing for Formula Electric at Berkeley: a 1:10-scale racing simulator
 (fork of [AutoDRIVE](https://github.com/AutoDRIVE-Ecosystem/AutoDRIVE)), a ROS 2 devkit,
@@ -16,7 +16,7 @@ to the RoboRacer Sim Racing League and to the real 1:10 cars.
 | Organiser harness (time-attack, nightly reruns, head-to-head brackets) | `./feb-race`, `febrace/` |
 | Leaderboard site (GitHub Pages) | `site/`, `results/`, `events/`, `submissions.yaml` |
 | Starter kit (reactive driver, sysid probe, submission Dockerfile) | `starter_kit/` |
-| Docs | `docs/`: build, tracks, competition, starter-kit, head-to-head, semester, unity-licence |
+| Docs | `docs/`: handbook, the competitor and organiser manuals (`docs/manual/*.pdf`), detail pages |
 
 **Start with [docs/handbook.md](docs/handbook.md)**: the whole flow for competitors and the organiser.
 

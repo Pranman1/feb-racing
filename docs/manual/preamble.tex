@@ -1,0 +1,53 @@
+% Shared preamble of the FEBAUTO Racing manuals.
+\usepackage[margin=2.2cm,headheight=16pt]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{listings}
+\usepackage{fancyhdr}
+\usepackage[hidelinks,colorlinks=true,linkcolor=febblue,urlcolor=febblue]{hyperref}
+
+\definecolor{febblue}{HTML}{1C4687}
+\definecolor{febgold}{HTML}{FDB515}
+\definecolor{codebg}{HTML}{F3F4F6}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  frame=single, framerule=0pt, framesep=4pt,
+  xleftmargin=4pt, xrightmargin=4pt,
+  breaklines=true, columns=fullflexible, keepspaces=true,
+  showstringspaces=false,
+}
+\newcommand{\file}[1]{\texttt{#1}}
+\newcommand{\cmd}[1]{\texttt{#1}}
+\newcommand{\rulebox}[1]{\par\noindent\colorbox{codebg}{\parbox{\dimexpr\linewidth-2\fboxsep}{#1}}\par\medskip}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\color{febblue}\textbf{FEBAUTO Racing}}
+\fancyhead[R]{\color{febblue}\nouppercase{\leftmark}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.8pt}
+\renewcommand{\headrule}{\color{febgold}\hrule width\headwidth height\headrulewidth}
+\setcounter{tocdepth}{1}
+
+% \febtitle{subtitle}{part lines}
+\newcommand{\febtitle}[2]{%
+\begin{titlepage}
+  \centering
+  \vspace*{2cm}
+  \includegraphics[width=5cm]{../../assets/feb_logo_512.png}\\[1.5cm]
+  {\color{febblue}\Huge\bfseries FEBAUTO Racing}\\[6pt]
+  {\Large #1}\\[2cm]
+  \begin{tabular}{rl}#2\end{tabular}\\[3cm]
+  Formula Electric at Berkeley\\
+  September 2026, platform release v0.1.0\\[6pt]
+  \url{https://github.com/Pranman1/feb-racing}\\
+  \url{https://pranman1.github.io/feb-racing/}
+\end{titlepage}
+\tableofcontents
+\newpage}

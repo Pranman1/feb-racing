@@ -1,1 +1,1 @@
-"""FEB Racing harness: run attempts, score them, publish results."""
+"""FEBAUTO Racing harness: run attempts, score them, publish results."""

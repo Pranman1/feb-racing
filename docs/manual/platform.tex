@@ -1,0 +1,81 @@
+% Part I, shared by both manuals: what the platform is and the rules.
+\part{The platform}
+
+\section{What it is}
+
+FEBAUTO Racing is a sim-racing programme for autonomous driving. Members write a ROS~2
+driving stack for a 1:10 scale RoboRacer car, run it in the FEB Simulator on their own
+laptop, and post lap times to a public leaderboard. Twice a semester the organiser runs a
+competition on a secret track, with the same rules as the RoboRacer Sim Racing League.
+
+The simulator is a fork of the AutoDRIVE Simulator (Unity). The car, its sensors and its
+physics are the league's RoboRacer model, unchanged, so a stack that works here works in the
+league too.
+
+\subsection{The pieces}
+
+\begin{tabularx}{\linewidth}{p{3.3cm}Xp{3.4cm}}
+\toprule
+Piece & What it does & Who touches it\\
+\midrule
+FEB Simulator & Native app (Mac, Windows, Linux). Simulates the car on a track folder and talks to a bridge over a WebSocket on port 4567. & Everyone runs it, nobody edits it\\
+Devkit container & Docker image \file{ghcr.io/pranman1/feb-devkit}: ROS~2 Humble plus the AutoDRIVE bridge that turns the WebSocket into ROS~2 topics. The member's code runs inside it. & Members' code runs inside it\\
+\file{stack/} & The member's ROS~2 packages. Mounted into the container and built on every start. & Members\\
+\file{tracks/} & Public tracks. PNG and YAML in, \file{track.json} out. Shipped inside the app. & Organiser adds, members use\\
+\file{feb-sim} & The member launcher: setup, run, practice, submit, shell, stop. & Members\\
+\file{feb-race} & The organiser harness: events, nightly reruns, verification, head-to-head brackets. & Organiser\\
+\file{results/}, \file{events/}, \file{submissions.yaml} & The data behind the leaderboard site. & Harness writes, members' pull requests add\\
+Site & GitHub Pages, rebuilt on every push to \file{main}. & Read-only\\
+\bottomrule
+\end{tabularx}
+
+\subsection{Data flow while driving}
+
+\begin{lstlisting}
+lidar, imu, encoders, camera, lap/collision counts --> bridge --> /autodrive/roboracer_1/* --> your node
+your node --> /autodrive/roboracer_1/steering_command, throttle_command --> bridge --> simulator
+\end{lstlisting}
+
+The car takes exactly two inputs and everything else is a sensor:
+
+\begin{itemize}
+  \item \texttt{steering\_command}, \texttt{std\_msgs/Float32} in $[-1, 1]$: full left to full right, $\pm 0.5236$~rad. The actuator lags about 0.25~s and slews at 3.2~rad/s.
+  \item \texttt{throttle\_command}, \texttt{std\_msgs/Float32} in $[-1, 1]$. \textbf{Zero is a hard brake}, not coasting. A car that wants to keep moving must never send zero.
+\end{itemize}
+
+\subsection{Sensors (namespace \texttt{/autodrive/roboracer\_1/})}
+
+\begin{tabularx}{\linewidth}{p{5.2cm}p{4.3cm}X}
+\toprule
+Topic & Type & Notes\\
+\midrule
+\texttt{lidar} & \texttt{sensor\_msgs/LaserScan} & 1080 beams over 270\textdegree, 0.06 to 10~m, 40~Hz\\
+\texttt{imu} & \texttt{sensor\_msgs/Imu} & orientation, angular velocity, linear acceleration\\
+\texttt{left\_encoder}, \texttt{right\_encoder} & \texttt{sensor\_msgs/JointState} & wheel angle in rad; wheel radius 0.059~m\\
+\texttt{steering}, \texttt{throttle} & \texttt{std\_msgs/Float32} & actuator feedback\\
+\texttt{front\_camera} & \texttt{sensor\_msgs/Image} & forward camera (cone tracks)\\
+\texttt{ips}, \texttt{odom}, \texttt{tf} & pose & ground truth: \textbf{training and debugging only}\\
+\texttt{lap\_count}, \texttt{lap\_time}, \texttt{last\_lap\_time}, \texttt{best\_lap\_time}, \texttt{collision\_count} & counters & scoring: \textbf{training and debugging only}\\
+\texttt{reset\_command} & command & respawn: \textbf{training and debugging only}\\
+\bottomrule
+\end{tabularx}
+
+\medskip
+Wheelbase 0.324~m, half width 0.135~m, steady-state speed about 23~m/s per unit throttle.
+With a window open the bridge exchanges data at about 10~Hz (each exchange reads the
+cameras back from the GPU); headless it reaches 20 to 40~Hz. Scored runs go through a proxy
+fixed at 10~Hz for everyone, so a driver must cope with 10~Hz. The starter kit does.
+
+\section{Rules}
+
+These follow the RoboRacer Sim Racing League.
+
+\rulebox{
+\begin{itemize}
+  \item One attempt is 1 warm-up lap plus 10 timed laps. Total time is the sum of the timed laps plus \textbf{10~s per collision}.
+  \item Not finishing within \textbf{300~s} is DNF, ranked after every finisher by laps completed. More than \textbf{10 collisions} is DSQ.
+  \item Each team gets the number of attempts stated in the event; the best counts.
+  \item \textbf{Restricted topics at race time}: \texttt{ips}, \texttt{odom}, \texttt{tf}, the lap and collision counters, and \texttt{reset\_command}. The harness records which nodes subscribe to them during the run and flags the result on the site. Use them freely while developing.
+  \item Everything a submission needs starts from the container's entrypoint (\file{/home/autodrive\_devkit.sh}), never from \file{.bashrc}.
+  \item Head-to-head: car-to-car contact counts as a collision for both cars and respawns them side by side. Finishing order is most laps first, then the finish time including penalties.
+\end{itemize}}

@@ -1,0 +1,328 @@
+\documentclass[11pt,a4paper]{article}
+\input{preamble}
+
+\begin{document}
+\febtitle{Organiser manual}{%
+  \textbf{Part I} & The platform and the rules\\[3pt]
+  \textbf{Part II} & Running the programme: tracks, events, race day\\[3pt]
+  \textbf{Part III} & Maintaining the platform: builds, releases, reference\\}
+
+\input{platform}
+
+% =====================================================================
+\part{Running the programme}
+% =====================================================================
+
+\section{The organiser PC}
+
+Everything official runs on the team PC with the headless Linux simulator. Members never need
+access to it. The organiser works on it through Claude Code sessions in \cmd{tmux} (remote
+desktop through Sunshine and Moonlight when a screen is needed); the commands below are what
+those sessions run.
+
+\begin{tabularx}{\linewidth}{lX}
+\toprule
+Item & Path\\
+\midrule
+Repos & \file{\textasciitilde/FEB/feb-racing} (main, this manual), \file{\textasciitilde/FEB/feb-sim} (Unity fork, branch \texttt{feb})\\
+Simulator players & \file{\textasciitilde/FEB/feb-sim/Builds/\{linux,mac,windows\}}; Linux also linked at \file{\textasciitilde/.feb-sim/app/linux}\\
+Unity editor & \file{\textasciitilde/Unity/Hub/Editor/2022.3.52f1}, licensed through Hub sign-in\\
+Run folders & \file{\textasciitilde/FEB/feb-racing/runs/<id>/} (\file{result.json}, \file{sim.log}, \file{container.log}, bag)\\
+Secret tracks & \file{\textasciitilde/feb-secret-tracks/<name>/}, same layout as \file{tracks/}, never committed until released\\
+Ports & 4567 member devkit; 4568+ harness containers, one per car; 4580 harness proxy; 4565/4566 launcher proxy and opponent\\
+\bottomrule
+\end{tabularx}
+
+\section{Tracks}
+
+A track is a folder. The simulator reads \file{track.json} at launch, so adding a track never
+needs a Unity rebuild; it needs an app release only to ship inside the app.
+
+\begin{lstlisting}
+tracks/<name>/
+    design.yaml    optional: waypoints + width, rendered to map.png
+    map.png        white = drivable corridor, everything else = not drivable
+    track.yaml     name, resolution, direction, checkpoints, walls, cones, max_cars
+    track.json     GENERATED: walls, centreline, checkpoints, spawn, cones
+    preview.png    GENERATED: picture for the site
+\end{lstlisting}
+
+\subsection{Create a new track (two commands)}
+
+\begin{lstlisting}
+mkdir tracks/hairpins
+cat > tracks/hairpins/design.yaml <<EOF
+width: 2.0
+points: [[0, 0], [12, 0], [12, 4], [4, 4], [4, 8], [14, 8], [14, 12], [0, 12]]
+EOF
+cat > tracks/hairpins/track.yaml <<EOF
+name: Hairpins
+direction: ccw
+checkpoints: 20
+walls: {diameter: 0.33}
+EOF
+tools/track_design.py tracks/hairpins/design.yaml   # map.png, resolution and origin into track.yaml
+tools/track_build.py tracks/hairpins                # track.json + preview.png
+./feb-sim run --track hairpins                      # look at it
+\end{lstlisting}
+
+The corridor is a smooth closed spline through the waypoints: any number, any shape, no
+self-intersections. Any other PNG works too: hand-painted, or a SLAM occupancy grid of a real
+track (Porto is one; its resolution and origin come from the ROS \file{map.yaml}). Grey
+``unknown'' pixels count as not drivable.
+
+\begin{tabularx}{\linewidth}{lX}
+\toprule
+\file{track.yaml} key & Meaning\\
+\midrule
+\texttt{name} & shown in the simulator and on the site\\
+\texttt{resolution}, \texttt{origin} & metres per pixel and map position of the bottom-left pixel (written by \cmd{track\_design.py})\\
+\texttt{direction} & \texttt{ccw} or \texttt{cw}\\
+\texttt{checkpoints} & lap checkpoints; checkpoint 0 is the finish line\\
+\texttt{max\_cars} & 1 for corridors too narrow to race side by side (Porto); default 4\\
+\texttt{start} & optional \texttt{[x, y]} finish-line position; default: the straightest section\\
+\texttt{walls.diameter} & air-duct diameter, 0.33~m like the league; omit for a cone-only track\\
+\texttt{cones.spacing} & metres between cones on each edge, blue left, yellow right; omit for none\\
+\bottomrule
+\end{tabularx}
+
+\subsection{Secret tracks}
+
+Design competition tracks in \file{\textasciitilde/feb-secret-tracks/<name>/} with the same two
+commands. The event file points at that folder and the harness passes it to the headless
+simulator directly. After the event, move the folder into \file{tracks/}, commit, and cut an
+app release so it ships inside the simulator as a practice track.
+
+\section{Events}
+
+One YAML per event in \file{events/}. Pushing it lists the event on the site.
+
+\begin{lstlisting}
+id: 2026-10-qualification
+title: Fall 2026 Qualification
+date: 2026-10-15
+mode: time-attack            # or head-to-head
+status: upcoming             # upcoming | live | done
+track: ~/feb-secret-tracks/qual-2026-10
+attempts: 2                  # best attempt counts
+rules: {laps: 10, warmup_laps: 1, collision_penalty_s: 10, max_collisions: 10, timeout_s: 300}
+entries: all                 # or a list of team names
+\end{lstlisting}
+
+Teams register their image in \file{submissions.yaml} by pull request (name, GitHub logins,
+public image built from the devkit). Review that the image is public and the launch command
+is set before merging.
+
+\section{Race day: time-attack}
+
+\begin{lstlisting}
+cd ~/FEB/feb-racing
+git pull                                    # latest submissions.yaml
+./feb-race event 2026-10-qualification      # every registered image, N attempts each
+git add results && git commit -m "qualification results" && git push
+\end{lstlisting}
+
+Each attempt: pull the image, start the container, start the headless simulator on the
+secret track behind the 10~Hz proxy, probe laps and collisions inside the container, record a
+bag, tear down, write \file{result.json}. Standings print at the end and the site rebuilds
+itself on push. Afterwards set \texttt{status: done} in the event file and release the track.
+
+One attempt takes about 3 minutes. Ten teams with two attempts is about an hour.
+\cmd{--gui} on any harness command shows the simulator window instead of running headless.
+
+\section{Finals: head-to-head}
+
+\begin{lstlisting}
+./feb-race bracket 2026-12-final --seed-from 2026-10-qualification
+./feb-race h2h --teams "Team A" "Team B" --track tracks/loop --laps 10 --gui   # one race
+\end{lstlisting}
+
+Seeds come from the time-attack standings: single elimination, 1~v~N, 2~v~N$-$1, top seed
+has a bye on an odd count. Race ids are \texttt{r<round>-m<match>}; the site shows every race
+under the event and ranks teams by the round they reached.
+
+\begin{lstlisting}
+simulator --cars 2 --connect :4580  <->  proxy (4580)  <->  container A (4568, sees V1)
+                                                       <->  container B (4569, sees V1)
+\end{lstlisting}
+
+Each car runs in its own container behind the proxy (\file{febrace/proxy.py}), which rewrites
+the vehicle ids so every container sees its own car as \texttt{roboracer\_1}, unchanged from
+time-attack. Cars start on a two-column grid centred on the spawn pose. Results carry
+\texttt{race}, \texttt{opponents}, \texttt{finish\_s} and \texttt{position} (most laps first,
+then finish time).
+
+The official AutoDRIVE Race Control Tower does the same rewriting and adds stewarding: after
+any car-to-car contact it freezes both cars until a race director rules in its web UI. That
+suits a live final with a human steward and not automated brackets, which is why the harness
+has its own proxy. Two cars is the supported race mode; three or more works end to end but
+drivers do not see each other, so contact and pair respawns pile up. Treat it as experimental.
+
+\section{Between events}
+
+\begin{lstlisting}
+./feb-race nightly                                  # rerun every registered image on every practice track
+./feb-race verify results/practice/loop/<file>.json # rerun one self-reported entry
+./feb-race standings 2026-10-qualification
+./feb-race site                                     # rebuild site/data.json locally
+\end{lstlisting}
+
+Put \cmd{nightly} in cron on the PC and push \file{results/} afterwards. Self-reported practice
+results arrive as pull requests that validate and merge themselves
+(\file{.github/workflows/results-pr.yml}); the nightly turns them verified.
+
+\section{A semester}
+
+\begin{tabularx}{\linewidth}{lXl}
+\toprule
+When & What & Where it shows\\
+\midrule
+Week 0 & Install, drive manually, run the starter driver, post one practice result & \texttt{loop} practice board\\
+Weeks 1 to 5 & Self-paced learning path, one practice track per stage & practice boards, nightly reruns\\
+Mid-semester & Qualification: time-attack on a secret track, 2 attempts & the event page\\
+Weeks 7 to 12 & Weekly open rounds on rotating tracks; released tracks join the pool & practice boards\\
+Finals & Time-attack on a new secret track for seeding, then a head-to-head knockout & the event page with races\\
+\bottomrule
+\end{tabularx}
+
+\medskip
+Roles: the organiser owns the secret tracks, the events folder and the PC; members own their
+\file{stack/}, their images and their practice results. Members learn by tuning against a
+leaderboard; the organiser reviews rather than lectures.
+
+\section{Checklist for the first run-through}
+
+\begin{enumerate}
+  \item Make the devkit package public on GitHub (Packages, \texttt{feb-devkit}, Package settings, Change visibility). Until then \cmd{feb-sim setup} fails at the pull for anyone but you.
+  \item On a member laptop (your Mac): follow the competitor manual exactly as written, from \cmd{git clone} to \cmd{./feb-sim submit}. Note every step that needs a hint the manual does not give.
+  \item Design the first secret track, write its event file, push it.
+  \item Run \cmd{./feb-race event} once with the example team to see a full result land on the site.
+\end{enumerate}
+
+% =====================================================================
+\part{Maintaining the platform}
+% =====================================================================
+
+\section{Building and releasing the simulator}
+
+The simulator is the \texttt{feb-sim} repo: a fork of the AutoDRIVE Simulator (Unity
+2022.3.52f1, HDRP, Mono backend) with everything FEB-specific under \file{Assets/FEB}. The
+RoboRacer vehicle prefab (\file{Assets/Prefabs/F1TENTH/F1TENTH.prefab}) and the upstream
+scripts are untouched. A rebuild is needed only when the app changes or a released track
+should ship inside it.
+
+\begin{lstlisting}
+cd ~/FEB/feb-sim
+./compile_check.sh                       # compiles Assets/FEB against the editor, no licence needed
+./build.sh scene                         # regenerates the FEB scene from the upstream scene
+./build.sh linux && ./build.sh mac && ./build.sh windows
+tar -C Builds/linux -czf FEB-Simulator-linux.tar.gz .
+(cd Builds/mac && zip -qr ../../FEB-Simulator-mac.zip "FEB Simulator.app")
+(cd Builds/windows && zip -qr ../../FEB-Simulator-windows.zip .)
+gh release upload v0.1.0 -R Pranman1/feb-racing --clobber FEB-Simulator-*.tar.gz FEB-Simulator-*.zip
+\end{lstlisting}
+
+The shipped tracks are copied from \file{../feb-racing/tracks} at build time. The first build
+imports the whole project (30 to 90 minutes); later builds take minutes. Logs are in
+\file{Logs/}. \cmd{feb-sim setup} downloads from the latest release, so uploading with
+\cmd{--clobber} to the existing release is enough; make a new release tag when the launcher's
+expectations change.
+
+\subsection{What the fork adds (\file{Assets/FEB})}
+
+\begin{tabularx}{\linewidth}{p{5.6cm}X}
+\toprule
+File & Role\\
+\midrule
+\file{Scripts/TrackLoader.cs} & builds walls, checkpoints, cones, spawn and cameras from a track folder at runtime; clones the car for \texttt{--cars N} (clones keep only their sensor cameras); applies the FEB decals\\
+\file{Scripts/TrackData.cs}, \file{TrackLibrary.cs} & the \file{track.json} model and where tracks are found (StreamingAssets/Tracks, \file{\textasciitilde/.feb-sim/tracks})\\
+\file{Scripts/FebLaunch.cs}, \file{FebAutoStart.cs} & command-line options, bridge address, starting mode and camera\\
+\file{Scripts/FebTrackMenu.cs} & the Track and Cars buttons in the menu\\
+\file{Scripts/GhostLap.cs} & records and replays the best lap as a translucent car\\
+\file{Editor/FebScene.cs} & generates the FEB scene from the upstream RoboRacer Sim Racing scene\\
+\file{Editor/FebBuild.cs} & player builds, icon, shipped tracks\\
+\bottomrule
+\end{tabularx}
+
+\medskip
+Command-line options of the built app (Unity's own \cmd{-batchmode -nographics -logFile}
+also work):
+\begin{lstlisting}
+--track <name|folder>   --connect <host:port>   --mode manual|autonomous
+--lidar-hz <rate>       --cars <n>              --camera <name>
+\end{lstlisting}
+
+\subsection{Unity licence on the build PC}
+
+Unity Personal is free for the team but must be activated once per machine. Easiest: start
+Unity Hub on the PC's screen (via Moonlight), sign in, Installs, Locate,
+\file{\textasciitilde/Unity/Hub/Editor/2022.3.52f1/Editor/Unity}, then Preferences, Licenses, add
+a free personal licence. Without a GUI: generate an activation file with
+\cmd{Unity -batchmode -nographics -quit -createManualActivationFile}, upload it at
+\url{https://license.unity3d.com/manual}, and activate the downloaded \file{.ulf} with
+\cmd{-manualLicenseFile}. Details in \file{docs/unity-licence.md}.
+
+\section{Devkit image}
+
+\file{devkit/} holds the Dockerfile (ROS~2 Humble, the AutoDRIVE bridge, pinned Python
+packages) and the entrypoint, which builds every package under \file{src/} and then starts
+the bridge and the command in \texttt{FEB\_LAUNCH}. \file{devkit/feb\_tools} adds the map-following
+house driver and the sensor-noise node. Pushing a change under \file{devkit/} rebuilds and
+publishes \file{ghcr.io/pranman1/feb-devkit} for amd64 and arm64
+(\file{.github/workflows/devkit.yml}). Members' images are built \emph{from} this one, so a
+devkit change reaches them on their next image build.
+
+\section{Frequently hit}
+
+\begin{tabularx}{\linewidth}{lX}
+\toprule
+Symptom & Cause and fix\\
+\midrule
+No window after a driver update & GPU driver mismatch on the PC: reboot.\\
+Port 4567 in use & A member-style container is running: \cmd{./feb-sim stop}; harness ports start at 4568.\\
+Attempt shows no laps & The image's stack never started: read \file{runs/<id>/container.log}. Check \texttt{FEB\_LAUNCH} and that the packages built.\\
+Result flagged \emph{restricted topics} & A node in the image subscribed to \texttt{ips}, \texttt{odom}, \texttt{tf}, counters or \texttt{reset\_command}. The audit lists the node names.\\
+Two cars touch at the start & The track's spawn straight is too narrow for the grid; set \texttt{max\_cars: 1} in its \file{track.yaml}.\\
+Cones or walls missing & The track folder has no \file{track.json}; run \cmd{tools/track\_build.py}.\\
+\bottomrule
+\end{tabularx}
+
+\section{Command reference}
+
+\begin{tabularx}{\linewidth}{p{7.2cm}X}
+\toprule
+Command & What it does\\
+\midrule
+\cmd{feb-race event ID} & run a time-attack event\\
+\cmd{feb-race bracket ID --seed-from ID} & run a head-to-head knockout\\
+\cmd{feb-race h2h --teams A B --track T [--laps] [--gui]} & one race\\
+\cmd{feb-race run --image I --team T --track T [--event] [--laps] [--timeout]} & one attempt of one image\\
+\cmd{feb-race nightly} & rerun every registered image on every practice track\\
+\cmd{feb-race verify FILE} & rerun one self-reported result\\
+\cmd{feb-race standings ID} & print an event's standings\\
+\cmd{feb-race site} & rebuild \file{site/data.json} locally\\
+\midrule
+\cmd{feb-sim run --track T --stack S --opponent L --cars N} & the member launcher, also handy for looking at a new track\\
+\cmd{tools/track\_design.py FOLDER/design.yaml} & waypoints to \file{map.png}\\
+\cmd{tools/track\_build.py FOLDER} & \file{map.png} to \file{track.json} and \file{preview.png}\\
+\bottomrule
+\end{tabularx}
+
+\section{Repository layout}
+
+\begin{lstlisting}
+feb-racing/
+    feb-sim, feb-race          launchers (Python 3, no dependencies beyond docker and gh)
+    febrace/                   harness library: runner, probe, proxy, rules, results, site, h2h
+    devkit/                    Dockerfile + entrypoint of the devkit image, feb_tools
+    starter_kit/               feb_driver package + submission Dockerfile
+    tools/                     track_design.py, track_build.py, unity_install.py
+    tracks/                    public tracks
+    events/, results/, submissions.yaml, site/    leaderboard data and page
+    .github/workflows/         site (Pages), devkit (image), results-pr (self-merging results)
+    docs/                      handbook, the two manuals, detail pages
+    STATUS.md                  engineering log, newest first
+feb-sim/  (branch feb)         Unity fork; Assets/FEB holds everything FEB-specific
+\end{lstlisting}
+
+\end{document}
