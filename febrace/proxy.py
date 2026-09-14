@@ -23,8 +23,10 @@ COMMANDS = ("Throttle", "Steering", "Reset")
 
 
 class Proxy:
-    def __init__(self, devkit_ports):
+    def __init__(self, devkit_ports, verbose=False):
         self.ports = devkit_ports
+        self.verbose = verbose
+        self.count = 0
         self.lock = threading.Lock()
         self.commands = {f"V{i + 1} {c}": ("False" if c == "Reset" else "0.0000") for i in range(len(devkit_ports)) for c in COMMANDS}
         self.server = socketio.Server(async_mode="gevent")
@@ -62,6 +64,9 @@ class Proxy:
         with self.lock:
             reply = dict(self.commands)
         self.server.emit("Bridge", reply, to=sid)
+        self.count += 1
+        if self.verbose and self.count % 200 == 1:
+            print("reply", {k: v for k, v in reply.items() if "Reset" not in k}, flush=True)
 
     def from_devkit(self, index, data):
         with self.lock:
@@ -80,8 +85,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=4570, help="port the simulator connects to")
     ap.add_argument("--devkits", type=int, nargs="+", required=True, help="devkit bridge ports, car 1 first")
+    ap.add_argument("--verbose", action="store_true", help="log the merged commands now and then")
     args = ap.parse_args()
-    Proxy(args.devkits).serve(args.port)
+    Proxy(args.devkits, args.verbose).serve(args.port)
 
 
 if __name__ == "__main__":

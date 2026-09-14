@@ -161,6 +161,8 @@ def cmd_run(args):
     track = resolve_track(args.track)
     cars, port = args.cars, PORT
     if args.opponent:
+        if not args.stack:
+            fail("--opponent races your stack, so it needs --stack \"ros2 launch ...\" as well")
         if not pathlib.Path(track).is_dir():
             fail("--opponent needs a track folder with track.json (a name from ./tracks or a path)")
         start_opponent(args.opponent, track)
