@@ -41,9 +41,10 @@ shows every race under the event and ranks teams by the round they reached.
 
 ## More than two cars
 
-`--cars N` is supported end to end (the simulator clones the car, the proxy maps N containers).
-Expect the simulator frame rate to drop past 4 cars, and write the rules for multi-car
-contact before you use it for anything that counts.
+`--cars N` is supported end to end (the simulator clones the car, the proxy maps N containers)
+and a three-car race completes its laps, but drivers do not see each other, so contact and
+pair respawns pile up. Treat 3+ cars as experimental until the rules for multi-car contact
+are written; two cars is the supported race mode.
 
 ## Practice
 

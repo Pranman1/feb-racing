@@ -2,6 +2,27 @@
 
 Newest first.
 
+## 2026-09-13 (late) - bug pass from the on-screen review
+
+- Bridge: a devkit that drives fewer cars than the scene has no longer breaks the simulator
+  (missing per-car command fields default to "no command"); extra cars sit still until a
+  bridge drives them, and only car one takes the keyboard.
+- Grid: two columns 0.7 m apart, rows 1 m apart; cars no longer touch at the start.
+- Menu: upstream button style kept; "Track: <name>" and "Cars: <n>" rows cycle (Scene Light row
+  removed). Driver's Eye is the default view.
+- Decals: FEB mark on the rear panel's left, "FEB AUTO" on its right.
+- House driver rewritten (`devkit/feb_tools/feb_tools/house_driver.py`): centreline pursuit with
+  curvature feed-forward capped at the slip peak, speed profile with braking pass, feed-forward
+  throttle with bounded trim (no accelerate/brake limit cycle). Loop 14.4 s laps at 2.5 m/s,
+  10.8 s at 3.5; Porto 12.3 s / 10.0 s; zero wall contact, lap-to-lap spread 0.05 s.
+- `feb-sim run --opponent` needs `--stack` (no opponent without your own car driving).
+- Harness proxy moved to port 4580 (three cars collided with it on 4570). Verified headless:
+  two-car race clean (0 collisions); three-car race completes laps but the house drivers do not
+  avoid each other, so 3+ cars stays experimental.
+- Porto: walls are now built by offsetting each boundary along its normals, so the thin island
+  is one loop (dilation used to split it into two).
+- All three players rebuilt and the release assets replaced.
+
 ## 2026-09-13 (night) - seen on screen, opponent mode, handbook
 
 - After the reboot the simulator runs on the PC's GPU. Fixed from what we saw: cones (upstream
