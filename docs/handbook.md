@@ -58,6 +58,10 @@ and throttle in [-1, 1] (0 is a hard brake). Everything else is a sensor.
    Add your team, GitHub logins and image to `submissions.yaml` in a pull request. Competitions
    and nightly reruns pull that image; the entrypoint starts your stack automatically.
 
+To qualify for the first competition: a verified practice run of 10 laps with at most 1 collision
+on every practice track (the Teams page shows your ticks). The final is head-to-head, two cars per
+race, for the top qualification seeds.
+
 Rules you must respect: no `ips`, `odom`, `tf`, lap or collision counters or `reset_command`
 at race time (training and debugging only). The harness audits which nodes subscribe to them
 and flags the result. Everything must start from the container's entrypoint, not `.bashrc`.

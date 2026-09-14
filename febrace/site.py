@@ -60,7 +60,13 @@ def build():
         e["attempts"] = len(rows)
         e["track"] = pathlib.Path(str(e["track"])).name
 
+    practice = [r for r in all_results if r["event"] == "practice"]
+    track_ids = [t["id"] for t in tracks]
+    for team in teams:
+        team["qualification"], team["qualified"] = rules_mod.qualification(team["name"], track_ids, practice)
+
     data = {"teams": teams, "tracks": tracks, "events": events,
+            "qualify": {"laps": rules_mod.Rules().laps, "max_collisions": rules_mod.QUALIFY_MAX_COLLISIONS},
             "generated": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")}
     (OUT / "data.json").write_text(json.dumps(data, indent=1, default=str))
     shutil.copy(ROOT / "site" / "index.html", OUT / "index.html")

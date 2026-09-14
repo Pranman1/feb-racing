@@ -106,8 +106,15 @@ status: upcoming             # upcoming | live | done
 track: ~/feb-secret-tracks/qual-2026-10
 attempts: 2                  # best attempt counts
 rules: {laps: 10, warmup_laps: 1, collision_penalty_s: 10, max_collisions: 10, timeout_s: 300}
-entries: all                 # or a list of team names
+entries: qualified           # all | qualified | a list of team names
 \end{lstlisting}
+
+\texttt{entries: qualified} admits the teams that have a verified practice run of all laps
+with at most one collision on every practice track (\cmd{./feb-race qualified} lists who is
+there and what each team is missing; the site's Teams page shows the same). A head-to-head
+event takes \texttt{top: 8} to limit the knockout to the top seeds of the event it is seeded
+from. Adding a practice track raises the bar for everyone, since the rule covers every
+track in \file{tracks/}; announce new tracks early.
 
 Teams register their image in \file{submissions.yaml} by pull request (name, GitHub logins,
 public image built from the devkit). Review that the image is public and the launch command
@@ -302,6 +309,7 @@ Command & What it does\\
 \cmd{feb-race nightly} & rerun every registered image on every practice track\\
 \cmd{feb-race verify FILE} & rerun one self-reported result\\
 \cmd{feb-race standings ID} & print an event's standings\\
+\cmd{feb-race qualified} & who has qualified, and what each team still lacks\\
 \cmd{feb-race site} & rebuild \file{site/data.json} locally\\
 \midrule
 \cmd{feb-sim run --track T --stack S --opponent L --cars N} & the member launcher, also handy for looking at a new track\\

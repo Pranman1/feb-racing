@@ -7,6 +7,10 @@ after every finisher, by laps completed. More than `max_collisions` collisions i
 """
 from dataclasses import asdict, dataclass
 
+# To enter the first competition a team must, on EVERY practice track, complete a full
+# attempt (all timed laps) with at most this many collisions. Verified (rerun) results count.
+QUALIFY_MAX_COLLISIONS = 1
+
 
 @dataclass
 class Rules:
@@ -41,3 +45,18 @@ def rank_key(result):
     order = {"finished": 0, "dnf": 1, "dsq": 2}.get(result.get("status"), 3)
     return (order, result.get("total_s") or float("inf"), -len(result.get("lap_times") or []),
             result.get("best_lap_s") or float("inf"))
+
+
+def qualifies(result):
+    """A practice attempt that meets the qualification bar: finished, at most QUALIFY_MAX_COLLISIONS."""
+    return result.get("status") == "finished" and result.get("collisions", 99) <= QUALIFY_MAX_COLLISIONS
+
+
+def qualification(team, track_ids, practice_results):
+    """Per-track status for a team: 'verified', 'unverified' (self-reported only) or None; and
+    whether the team is qualified (verified on every track)."""
+    status = {}
+    for track in track_ids:
+        rows = [r for r in practice_results if r["team"] == team and r["track"] == track and qualifies(r)]
+        status[track] = "verified" if any(r.get("verified") for r in rows) else ("unverified" if rows else None)
+    return status, all(v == "verified" for v in status.values()) and bool(track_ids)

@@ -4,6 +4,7 @@ date: 2026-12-05
 mode: head-to-head
 status: upcoming
 track: ~/feb-secret-tracks/final-2026-12
+top: 8                    # the top seeds of the qualification race the knockout
 rules:
   laps: 10
   warmup_laps: 1

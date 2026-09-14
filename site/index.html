@@ -46,6 +46,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&l
 const secs = (v) => v == null ? '—' : Number(v).toFixed(2);
 const statusBadge = (r) => r.status === 'finished' ? '' : `<span class="badge ${r.status === 'dnf' ? 'warn' : 'bad'}">${r.status.toUpperCase()}</span>`;
 const verifiedBadge = (r) => r.verified ? '<span class="badge ok">verified</span>' : '<span class="badge warn">unverified</span>';
+const qualMark = (v) => v === 'verified' ? '<span class="badge ok">✓</span>' : v === 'unverified' ? '<span class="badge warn">~</span>' : '<span class="muted">–</span>';
 const auditBadge = (r) => Object.keys(r.restricted_subscribers || {}).length ? '<span class="badge bad" title="a node subscribed to a restricted topic">restricted topics</span>' : '';
 
 function table(rows, showVerified) {
@@ -69,6 +70,7 @@ const pages = {
     <div class="cards">${d.events.map(e => `<a class="card" href="#/events/${esc(e.id)}"><b>${esc(e.title)}</b><div class="meta">${esc(e.date)} · ${esc(e.mode)} · ${esc(e.track)}</div>
       <span class="badge ${e.status === 'done' ? 'ok' : e.status === 'live' ? 'bad' : 'info'}">${esc(e.status)}</span></a>`).join('') || '<p class="muted">No events scheduled.</p>'}</div>
     <h2>Practice tracks</h2>
+    <p class="muted">Qualify for the first competition with ${d.qualify.laps} laps and at most ${d.qualify.max_collisions} collision on every track below. Progress per team: <a href="#/teams">Teams</a>.</p>
     <div class="cards">${d.tracks.map(t => `<a class="card" href="#/practice/${esc(t.id)}">${t.preview ? `<img src="tracks/${esc(t.id)}.png" alt="">` : ''}<b>${esc(t.name)}</b>
       <div class="meta">${t.length} m · ${t.direction} · ${t.attempts} attempts${t.standings[0] ? ` · best ${secs(t.standings[0].best_lap_s)} s by ${esc(t.standings[0].team)}` : ''}</div></a>`).join('')}</div>`,
   '/practice': (d) => pages['/'](d),
@@ -80,13 +82,16 @@ const pages = {
     const r = e.rules || {};
     return `<h2>${esc(e.title)} <span class="badge info">${esc(e.status)}</span></h2><p class="muted">${esc(e.date)} · ${esc(e.mode)} · track ${esc(e.track)} · ${e.attempts ?? 1} attempt(s) per team, best counts.<br>
       Rules: ${r.warmup_laps ?? 1} warm-up + ${r.laps ?? 10} timed laps, +${r.collision_penalty_s ?? 10} s per collision, DSQ above ${r.max_collisions ?? 10} collisions, ${r.timeout_s ?? 300} s limit.</p>${table(e.standings, false)}${races(e)}`; },
-  '/teams': (d) => `<h2>Teams</h2><div class="wrap"><table><thead><tr><th>Team</th><th>Members</th><th>Image</th></tr></thead><tbody>${d.teams.map(t => `<tr><td>${esc(t.name)}</td><td>${(t.members || []).map(esc).join(', ')}</td><td><code>${esc(t.image)}</code></td></tr>`).join('')}</tbody></table></div>`,
+  '/teams': (d) => `<h2>Teams</h2>
+    <p class="muted">Qualification for the first competition: on every practice track, a verified run of ${d.qualify.laps} laps with at most ${d.qualify.max_collisions} collision. ✓ verified &nbsp; ~ self-reported, awaiting the nightly rerun &nbsp; – not yet.</p>
+    <div class="wrap"><table><thead><tr><th>Team</th><th>Members</th>${d.tracks.map(t => `<th>${esc(t.name)}</th>`).join('')}<th>Image</th></tr></thead><tbody>${d.teams.map(t => `<tr><td>${esc(t.name)}${t.qualified ? '<span class="badge ok">qualified</span>' : ''}</td><td>${(t.members || []).map(esc).join(', ')}</td>${d.tracks.map(tr => `<td>${qualMark((t.qualification || {})[tr.id])}</td>`).join('')}<td><code>${esc(t.image)}</code></td></tr>`).join('')}</tbody></table></div>`,
   '/docs': () => `<h2>How to enter</h2>
     <ol>
       <li>Clone the repo, run <code>./feb-sim setup</code>, then <code>./feb-sim run</code> to drive manually.</li>
       <li>Copy <code>starter_kit/feb_driver</code> into <code>stack/</code> and make it drive: <code>./feb-sim run --stack "ros2 launch feb_driver drive.launch.py"</code>.</li>
       <li>Score yourself: <code>./feb-sim practice --track loop</code>. Post it: <code>./feb-sim submit</code> (opens a pull request).</li>
       <li>Build and push your image (<code>docker build</code> from the FEB devkit), add your team to <code>submissions.yaml</code>. Nightly reruns and competitions use that image.</li>
+      <li>Qualify: complete 10 laps with at most one collision on <em>every</em> practice track (verified by the nightly rerun; the Teams page shows your progress). More practice tracks arrive over the semester. Qualified teams race the qualification time-attack; its top seeds go to the head-to-head final, two cars at a time.</li>
     </ol>
     <p>Full guide: <a href="https://github.com/Pranman1/feb-racing/blob/main/docs/handbook.md">docs/handbook.md</a> in the repo.</p>
     <p>Rules follow the RoboRacer Sim Racing League: ground-truth topics (<code>ips</code>, <code>odom</code>, <code>tf</code>, lap/collision counters, <code>reset_command</code>) are for training and debugging only, never at race time; 10 s per collision.</p>`,

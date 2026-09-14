@@ -46,6 +46,23 @@ def teams():
     return yaml.safe_load((ROOT / "submissions.yaml").read_text())["teams"]
 
 
+def qualified_teams():
+    """Teams with a verified practice result of all laps and at most one collision on every practice track."""
+    track_ids = [p.parent.name for p in sorted((ROOT / "tracks").glob("*/track.json"))]
+    practice = [r for r in results.load_all() if r["event"] == "practice"]
+    return [t for t in teams() if rules_mod.qualification(t["name"], track_ids, practice)[1]]
+
+
+def event_entries(spec):
+    """`entries: all` (default), `entries: qualified`, or an explicit list of team names."""
+    entries = spec.get("entries", "all")
+    if entries == "all":
+        return teams()
+    if entries == "qualified":
+        return qualified_teams()
+    return [t for t in teams() if t["name"] in entries]
+
+
 def attempt(image, team, track, event, rules, gui=False, port=4568):
     a = Attempt(image=image, track=track, sim_exe=sim_exe(), team=team, event=event, rules=rules,
                 port=port, headless=not gui, runs_dir=ROOT / "runs")
@@ -66,7 +83,9 @@ def cmd_event(args):
     spec = yaml.safe_load((ROOT / "events" / f"{args.event}.yaml").read_text())
     rules = rules_mod.Rules(**spec.get("rules", {}))
     track = track_path(spec["track"])
-    entries = teams() if spec.get("entries", "all") == "all" else [t for t in teams() if t["name"] in spec["entries"]]
+    entries = event_entries(spec)
+    if not entries:
+        sys.exit("feb-race: no entries (nobody qualified yet? see `feb-race qualified`)")
     for team in entries:
         for _ in range(int(spec.get("attempts", 1))):
             attempt(team["image"], team["name"], track, spec["id"], rules, args.gui)
@@ -124,7 +143,7 @@ def cmd_bracket(args):
     track = track_path(spec["track"])
     by_name = {t["name"]: t for t in teams()}
     seeded = [r["team"] for r in sorted((r for r in results.load_all() if r["event"] == args.seed_from), key=rules_mod.rank_key)]
-    seeded = list(dict.fromkeys(t for t in seeded if t in by_name))
+    seeded = list(dict.fromkeys(t for t in seeded if t in by_name))[: int(spec.get("top", len(seeded)) or len(seeded))]
     if len(seeded) < 2:
         sys.exit(f"feb-race: need at least two seeded teams from {args.seed_from}")
     round_no = 1
@@ -136,6 +155,15 @@ def cmd_bracket(args):
             winners.append(rows[0]["team"])
         seeded, round_no = winners, round_no + 1
     print(f"\nwinner: {seeded[0]}")
+
+
+def cmd_qualified(args):
+    track_ids = [p.parent.name for p in sorted((ROOT / "tracks").glob("*/track.json"))]
+    practice = [r for r in results.load_all() if r["event"] == "practice"]
+    for t in teams():
+        status, ok = rules_mod.qualification(t["name"], track_ids, practice)
+        marks = "  ".join(f"{k}:{ {'verified': 'ok', 'unverified': 'unverified', None: '-'}[v] }" for k, v in status.items())
+        print(f"{'QUALIFIED' if ok else '         '}  {t['name']:24s} {marks}")
 
 
 def cmd_site(args):
@@ -170,7 +198,8 @@ def main():
     br.set_defaults(func=cmd_bracket)
 
     for name, func, extra in (("event", cmd_event, "event"), ("standings", cmd_standings, "event"),
-                              ("verify", cmd_verify, "result"), ("nightly", cmd_nightly, None), ("site", cmd_site, None)):
+                              ("verify", cmd_verify, "result"), ("nightly", cmd_nightly, None), ("site", cmd_site, None),
+                              ("qualified", cmd_qualified, None)):
         p = sub.add_parser(name)
         if extra:
             p.add_argument(extra)

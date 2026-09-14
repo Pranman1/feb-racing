@@ -75,6 +75,8 @@ These follow the RoboRacer Sim Racing League.
   \item One attempt is 1 warm-up lap plus 10 timed laps. Total time is the sum of the timed laps plus \textbf{10~s per collision}.
   \item Not finishing within \textbf{300~s} is DNF, ranked after every finisher by laps completed. More than \textbf{10 collisions} is DSQ.
   \item Each team gets the number of attempts stated in the event; the best counts.
+  \item \textbf{Qualifying for the first competition}: on \emph{every} practice track, a verified practice run of 10 laps with at most 1 collision. Practice tracks are added through the semester; the bar applies to all of them. The Teams page of the site shows each team's progress per track.
+  \item \textbf{The final} is head-to-head, two cars at a time, in a knockout seeded by the qualification standings; only the top seeds (set per event, 8 by default) enter.
   \item \textbf{Restricted topics at race time}: \texttt{ips}, \texttt{odom}, \texttt{tf}, the lap and collision counters, and \texttt{reset\_command}. The harness records which nodes subscribe to them during the run and flags the result on the site. Use them freely while developing.
   \item Everything a submission needs starts from the container's entrypoint (\file{/home/autodrive\_devkit.sh}), never from \file{.bashrc}.
   \item Head-to-head: car-to-car contact counts as a collision for both cars and respawns them side by side. Finishing order is most laps first, then the finish time including penalties.

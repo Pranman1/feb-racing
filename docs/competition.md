@@ -11,6 +11,9 @@ need access to it.
 - Ground-truth topics (`ips`, `odom`, `tf`, lap and collision counters, `reset_command`) are for
   training and debugging only. The harness audits which nodes subscribe to them during the run and
   flags the result (`restricted_subscribers`); the site shows a red badge.
+- Qualifying for the first competition: a verified practice run of 10 laps with at most 1 collision
+  on every practice track (`./feb-race qualified`; `entries: qualified` in the event file). The final
+  is a head-to-head knockout, two cars per race, for the top seeds (`top: 8` in the event file).
 - Everything a submission needs must start from the container's entrypoint
   (`/home/autodrive_devkit.sh`), exactly as in the league.
 
