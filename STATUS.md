@@ -19,6 +19,10 @@ Newest first.
 - Branding: the Unity splash logo is now a "FEBAUTO Sim" card (was the AutoDRIVE logo; the
   "Made with Unity" part cannot be removed on a Personal licence) and the toolbar title reads
   "FEBAUTO Sim | <track>". App and archive file names stay "FEB Simulator".
+- Wing wrap: the deck and the "Rear Shock Tower" (which is the wing, endplates and rear panel
+  in this CAD) get planar texture coordinates on the renderer's own mesh copy and a generated
+  texture: blue with gold edge streaks (endplates) and a gold trailing edge. Colliders and the
+  prefab asset untouched; verified on screen.
 - HUD clock: the start-line crossing is detected geometrically (behind the line to ahead of
   it); the grid is so close to the line that the trigger fired at spawn. Verified: "--" on the
   grid.
