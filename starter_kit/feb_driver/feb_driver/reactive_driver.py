@@ -35,12 +35,13 @@ HALF_WIDTH = 0.135     # m
 WHEEL_RADIUS = 0.059   # m
 MAX_STEER = 0.5236     # rad, the simulator's steering limit
 MAX_STEER_RATE = 3.2   # rad/s, the simulator's steering actuator
+STEER_DELAY = 0.25     # s, command-to-wheel lag measured on this car
 
 
 class ReactiveDriver(Node):
     def __init__(self, name="reactive_driver"):
         super().__init__(name)
-        defaults = dict(bubble=0.40, gap_fov=1.60, range_cap=6.0, steer_gain=0.85, deep_weight=0.6,
+        defaults = dict(bubble=0.40, gap_fov=1.60, range_cap=6.0, steer_gain=0.7, deep_weight=0.6,
                         max_speed=2.5, min_speed=0.9, accel_limit=4.0, decel_limit=6.0, lat_accel=6.0,
                         brake_margin=0.40, clear_pct=3.0, clear_tau=0.30, curv_tau=0.35, goal_tau=0.30, steer_tau=0.20,
                         speed_per_throttle=23.0, throttle_kp=0.02, throttle_ki=0.03, throttle_slew=0.8,
@@ -104,6 +105,9 @@ class ReactiveDriver(Node):
         angles = msg.angle_min + np.arange(len(ranges)) * msg.angle_increment
 
         target = self.gap_target(np.minimum(ranges, self.p["range_cap"]), angles)
+        # the car keeps turning at the current steering for one actuator delay (plus the time
+        # until the next scan) before this command acts: take that heading change off the target
+        target -= self.speed * math.tan(self.steer) / WHEELBASE * (STEER_DELAY + dt)
         wanted = float(np.clip(self.p["steer_gain"] * target, -MAX_STEER, MAX_STEER))
         step = (wanted - self.steer) * lowpass(dt, self.p["steer_tau"])
         self.steer += float(np.clip(step, -MAX_STEER_RATE * dt, MAX_STEER_RATE * dt))

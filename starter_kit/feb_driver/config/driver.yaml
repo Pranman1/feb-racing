@@ -4,7 +4,7 @@ reactive_driver:
     bubble: 0.40          # m, safety radius zeroed around the nearest return
     gap_fov: 1.60         # rad, half field of view considered for gaps
     range_cap: 6.0        # m, ranges are clipped here before choosing a gap
-    steer_gain: 0.85      # steering = gain * bearing of the gap target
+    steer_gain: 0.7       # steering = gain * bearing of the gap target (after delay compensation)
     deep_weight: 0.6      # target = deep_weight * deepest beam + (1 - deep_weight) * gap middle
     max_speed: 2.5        # m/s on an open straight
     min_speed: 0.9        # m/s floor in tight corners

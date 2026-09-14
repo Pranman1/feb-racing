@@ -2,6 +2,26 @@
 
 Newest first.
 
+## 2026-09-14 (early) - bridge rate is the root cause; fixed 10 Hz scoring; drivers rate-robust
+
+- Finding: with a window open the simulator exchanges data at ~10 Hz on Linux (camera readback
+  per car per message); headless it is 20-40 Hz. Every driver had only ever been tested at 40 Hz.
+  At 10 Hz the old house driver limit-cycled (overspeed brake -> stop -> restart) and the old
+  starter driver weaved full lock and grazed walls (~0.6 collisions/s).
+- Design: scoring is now at a fixed 10 Hz for everyone. The proxy has a time-based `--rate`;
+  every scored run (single car too) goes through it at 10 Hz, matching what a laptop with a
+  window gets. Drivers must be rate-agnostic; docs say so.
+- House driver: no brake regime, event-driven (one step per pose), windowed speed estimate,
+  lookahead grows with data latency, bounded pursuit curvature, follows a car ahead. 10 Hz: clean
+  at 2.5 and 3.5 m/s (14.1 s / 10.9 s loop laps). 5 Hz: degrades (out of spec).
+- Starter driver: ported the tuned reference (deep-weighted gap target, percentile clearance,
+  slow-steering speed law, accel/decel-limited target, feed-forward + bounded trim, slew) plus
+  actuator-delay compensation of the target bearing. 10 Hz: 14.1 s laps, one wall touch in four.
+- Launcher: car one is autonomous by default whenever a stack is given (it defaulted to Manual,
+  which is why "car one does not move" kept coming back); `--opponent` needs `--stack`.
+- Two-car race at 10 Hz (starter vs house): both finish; 4-6 contacts between the cars over
+  four laps as they run nose-to-tail. Counted for both per the rules.
+
 ## 2026-09-13 (late) - bug pass from the on-screen review
 
 - Bridge: a devkit that drives fewer cars than the scene has no longer breaks the simulator

@@ -19,7 +19,7 @@ import threading
 import time
 
 from . import results
-from .runner import Attempt
+from .runner import BRIDGE_RATE, Attempt
 
 PROXY = pathlib.Path(__file__).with_name("proxy.py")
 PROXY_IMAGE = os.environ.get("FEB_DEVKIT_IMAGE", "ghcr.io/pranman1/feb-devkit:latest")
@@ -47,6 +47,7 @@ class Race:
                 car.dir.mkdir(parents=True, exist_ok=True)
                 car._start_container()
                 car._wait_port()
+                car.proxy = None   # the race proxy replaces the per-car rate proxy
             self._start_proxy()
             for car in self.cars:
                 car._exec_detached("ros2 bag record -o /tmp/feb_bag /autodrive/roboracer_1/lidar /autodrive/roboracer_1/ips "

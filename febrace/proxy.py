@@ -6,8 +6,9 @@
 The simulator connects here and sends one Bridge message with V1..VN fields. Each
 devkit gets only its own car, renamed to V1, so every racing stack keeps believing it
 drives roboracer_1. Commands coming back (V1 Throttle/Steering/Reset) are renamed to the
-car's real id and merged into one reply for the simulator. Nothing else: no stewarding,
-no redaction. Runs inside the devkit image (python-socketio 4 + gevent + websocket-client).
+car's real id and merged into one reply for the simulator. With --rate the devkits are fed
+at a fixed rate whatever the simulator manages, so every scored run sees the same 10 Hz a
+laptop with a window gets. Runs inside the devkit image (python-socketio 4 + gevent).
 """
 import argparse
 import re
@@ -23,10 +24,11 @@ COMMANDS = ("Throttle", "Steering", "Reset")
 
 
 class Proxy:
-    def __init__(self, devkit_ports, verbose=False, decimate=1):
+    def __init__(self, devkit_ports, verbose=False, rate=0.0):
         self.ports = devkit_ports
         self.verbose = verbose
-        self.decimate = decimate    # forward every n-th simulator message (test rig for slow bridges)
+        self.rate = rate            # Hz forwarded to the devkits (0 = every simulator message)
+        self.next_forward = 0.0
         self.count = 0
         self.lock = threading.Lock()
         self.commands = {f"V{i + 1} {c}": ("False" if c == "Reset" else "0.0000") for i in range(len(devkit_ports)) for c in COMMANDS}
@@ -53,9 +55,11 @@ class Proxy:
 
     def from_simulator(self, sid, data):
         self.count += 1
-        if self.count % self.decimate:
-            self.server.emit("Bridge", self.snapshot(), to=sid)
+        now = time.time()
+        if self.rate > 0.0 and now < self.next_forward:
+            self.server.emit("Bridge", self.snapshot(), to=sid)   # keep the simulator's loop fast
             return
+        self.next_forward = max(self.next_forward + 1.0 / self.rate, now) if self.rate > 0.0 else now
         for index, client in enumerate(self.clients):
             own = {}
             for key, value in data.items():
@@ -93,9 +97,9 @@ def main():
     ap.add_argument("--port", type=int, default=4570, help="port the simulator connects to")
     ap.add_argument("--devkits", type=int, nargs="+", required=True, help="devkit bridge ports, car 1 first")
     ap.add_argument("--verbose", action="store_true", help="log the merged commands now and then")
-    ap.add_argument("--decimate", type=int, default=1, help="forward every n-th message (e.g. 4 turns 40 Hz into 10 Hz)")
+    ap.add_argument("--rate", type=float, default=0.0, help="Hz delivered to the devkits, e.g. 10 (0 = unlimited)")
     args = ap.parse_args()
-    Proxy(args.devkits, args.verbose, args.decimate).serve(args.port)
+    Proxy(args.devkits, args.verbose, args.rate).serve(args.port)
 
 
 if __name__ == "__main__":

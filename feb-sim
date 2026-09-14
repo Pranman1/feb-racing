@@ -126,7 +126,7 @@ def start_opponent(level, track):
     proxy = ROOT / "febrace" / "proxy.py"
     subprocess.run(["docker", "run", "-d", "--rm", "--name", PROXY, "--network=host", "-v", f"{proxy}:/tmp/proxy.py:ro",
                     "--entrypoint", "python3", IMAGE, "-u", "/tmp/proxy.py", "--verbose", "--port", str(PROXY_PORT),
-                    "--devkits", str(PORT), str(OPPONENT_PORT)], check=True, stdout=subprocess.DEVNULL)
+                    "--devkits", str(PORT), str(OPPONENT_PORT), "--rate", "10"], check=True, stdout=subprocess.DEVNULL)
     print(f"opponent: stock driver at {speed} m/s")
 
 

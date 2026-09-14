@@ -6,8 +6,8 @@ members' `feb-sim practice` (their window, their devkit container with ./stack m
 """
 import datetime as dt
 import json
+import os
 import pathlib
-import shutil
 import socket
 import subprocess
 import time
@@ -16,6 +16,9 @@ from . import results, rules as rules_mod
 
 ROS_ENV = "source /opt/ros/humble/setup.bash && source /home/autodrive_devkit/install/setup.bash"
 PROBE = pathlib.Path(__file__).with_name("probe.py")
+PROXY = pathlib.Path(__file__).with_name("proxy.py")
+PROXY_IMAGE = os.environ.get("FEB_DEVKIT_IMAGE", "ghcr.io/pranman1/feb-devkit:latest")
+BRIDGE_RATE = 10.0   # Hz delivered to every scored container: what a laptop with a window gets
 BAG_TOPICS = ["lidar", "imu", "left_encoder", "right_encoder", "steering", "throttle", "steering_command",
               "throttle_command", "ips", "lap_count", "collision_count", "last_lap_time"]
 
@@ -29,6 +32,8 @@ class Attempt:
         self.id = dt.datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + team.replace(" ", "_")
         self.dir = pathlib.Path(runs_dir) / self.id
         self.container = "feb-run-" + self.id
+        self.proxy = "feb-rate-" + self.id
+        self.proxy_port = port + 20
 
     # ------------------------------------------------------------ lifecycle
 
@@ -41,6 +46,7 @@ class Attempt:
             self._start_container()
             self._wait_port()
             self._exec_detached(f"ros2 bag record -o /tmp/feb_bag " + " ".join("/autodrive/roboracer_1/" + t for t in BAG_TOPICS))
+            self._start_rate_proxy()
             sim = self._start_sim()
             for ev in self._probe():
                 events.append(ev)
@@ -75,8 +81,17 @@ class Attempt:
             time.sleep(1)
         raise RuntimeError(f"bridge did not open port {self.port} within {timeout} s")
 
+    def _start_rate_proxy(self):
+        """The simulator talks to a proxy that feeds the container at BRIDGE_RATE, so a headless
+        run on a fast PC scores the same way as a laptop with a window."""
+        subprocess.run(["docker", "run", "-d", "--rm", "--name", self.proxy, "--network=host",
+                        "-v", f"{PROXY}:/tmp/proxy.py:ro", "--entrypoint", "python3", PROXY_IMAGE, "-u", "/tmp/proxy.py",
+                        "--port", str(self.proxy_port), "--devkits", str(self.port), "--rate", str(BRIDGE_RATE)],
+                       check=True, stdout=subprocess.DEVNULL)
+        time.sleep(3)
+
     def _start_sim(self):
-        cmd = [str(self.sim_exe), "--track", str(self.track), "--connect", f"127.0.0.1:{self.port}",
+        cmd = [str(self.sim_exe), "--track", str(self.track), "--connect", f"127.0.0.1:{self.proxy_port}",
                "--mode", "autonomous", "-logFile", str(self.dir / "sim.log")]
         if self.headless:
             cmd += ["-batchmode", "-nographics"]
@@ -96,6 +111,8 @@ class Attempt:
         subprocess.run(["docker", "exec", "-d", self.container, "bash", "-c", f"{ROS_ENV} && {cmd}"], check=True)
 
     def _collect_and_stop(self):
+        if self.proxy:
+            subprocess.run(["docker", "rm", "-f", self.proxy], capture_output=True)
         subprocess.run(["docker", "exec", self.container, "pkill", "-INT", "-f", "ros2 bag record"], capture_output=True)
         time.sleep(2)
         subprocess.run(["docker", "cp", f"{self.container}:/tmp/feb_bag", str(self.dir / "bag")], capture_output=True)

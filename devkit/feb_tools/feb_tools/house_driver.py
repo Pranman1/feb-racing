@@ -21,7 +21,7 @@ import rclpy
 from geometry_msgs.msg import Point
 from rclpy.node import Node
 from rclpy.qos import QoSDurabilityPolicy, QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy
-from sensor_msgs.msg import Imu, JointState
+from sensor_msgs.msg import Imu, JointState, LaserScan
 from std_msgs.msg import Float32
 
 NS = "/autodrive/roboracer_1/"
@@ -53,6 +53,7 @@ class HouseDriver(Node):
         self.yaw = None
         self.yaw_rate = 0.0
         self.speed = 0.0
+        self.ahead = 10.0           # m, nearest lidar return in the cone ahead (another car, mostly)
         self.encoders = {}          # frame_id -> [(t, angle), ...] over the last speed_window
         self.v_target = 0.0
         self.integral = 0.0
@@ -64,6 +65,7 @@ class HouseDriver(Node):
         self.pub_steering = self.create_publisher(Float32, NS + "steering_command", QOS)
         self.create_subscription(Point, NS + "ips", self.on_position, QOS)
         self.create_subscription(Imu, NS + "imu", self.on_imu, QOS)
+        self.create_subscription(LaserScan, NS + "lidar", self.on_scan, QOS)
         for side in ("left", "right"):
             self.create_subscription(JointState, NS + side + "_encoder", self.on_encoder, QOS)
         self.get_logger().info(f"house driver on '{track['name']}' at {self.p['max_speed']} m/s "
@@ -109,6 +111,16 @@ class HouseDriver(Node):
         self.yaw = math.atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y * q.y + q.z * q.z))
         self.yaw_rate = msg.angular_velocity.z
 
+    def on_scan(self, msg):
+        """Nearest return within +-15 degrees ahead: the walls are far on the centreline, so
+        anything close here is another car."""
+        n = len(msg.ranges)
+        centre = int((0.0 - msg.angle_min) / msg.angle_increment)
+        half = int(math.radians(15.0) / msg.angle_increment)
+        cone = np.asarray(msg.ranges[max(0, centre - half):min(n, centre + half)], dtype=float)
+        cone = cone[np.isfinite(cone)]
+        self.ahead = float(cone.min()) if cone.size else 10.0
+
     def on_encoder(self, msg):
         """Wheel speed over a short window of samples; robust to a 10 Hz bridge and to the
         encoder reset that comes with a collision respawn."""
@@ -139,12 +151,12 @@ class HouseDriver(Node):
         n = len(self.path)
 
         # --- steering: L1 pursuit + curvature feed-forward, inverted through the bicycle model
-        ld = 0.5 + 0.3 * max(v, 1.0)
+        ld = 0.5 + 0.3 * max(v, 1.0) + v * self.dt          # one data interval further at slow bridges
         j = (i0 + max(1, int(ld / self.ds))) % n
         dx, dy = self.path[j] - pos
         eta = math.atan2(dy, dx) - yaw
         eta = math.atan2(math.sin(eta), math.cos(eta))
-        kappa_fb = 2.0 * math.sin(eta) / max(math.hypot(dx, dy), 0.3)
+        kappa_fb = float(np.clip(2.0 * math.sin(eta) / max(math.hypot(dx, dy), 0.3), -0.8, 0.8))
         kappa_ff = 0.6 * float(self.kappa[(i0 + max(1, int(0.15 * v / self.ds))) % n])
         delta = float(np.clip(math.atan((kappa_fb + kappa_ff) * WHEELBASE), -SLIP_PEAK, SLIP_PEAK))
         self.steer += float(np.clip(delta - self.steer, -3.2 * self.dt, 3.2 * self.dt))   # the actuator's own rate
@@ -152,6 +164,8 @@ class HouseDriver(Node):
         # --- speed: lowest profile speed over the next 0.3 s, low-passed
         window = [(i0 + k) % n for k in range(max(2, int(0.3 * v / self.ds)))]
         target = float(self.v_ref[window].min())
+        if self.ahead < 1.5:   # a car ahead: follow it instead of ramming it
+            target = min(target, max(0.6, 2.0 * (self.ahead - 0.5)))
         self.v_target += (target - self.v_target) * min(1.0, self.dt / 0.3)
         self.throttle = self.throttle_law(self.speed, self.v_target)
 
