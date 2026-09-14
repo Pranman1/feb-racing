@@ -42,7 +42,7 @@ class ReactiveDriver(Node):
         super().__init__(name)
         defaults = dict(bubble=0.40, gap_fov=1.60, range_cap=6.0, steer_gain=0.85, deep_weight=0.6,
                         max_speed=2.5, min_speed=0.9, accel_limit=4.0, decel_limit=6.0, lat_accel=6.0,
-                        brake_margin=0.40, clear_pct=3.0, clear_tau=0.30, curv_tau=0.35, goal_tau=0.30,
+                        brake_margin=0.40, clear_pct=3.0, clear_tau=0.30, curv_tau=0.35, goal_tau=0.30, steer_tau=0.20,
                         speed_per_throttle=23.0, throttle_kp=0.02, throttle_ki=0.03, throttle_slew=0.8,
                         speed_window=0.25)
         for key, value in defaults.items():
@@ -105,7 +105,8 @@ class ReactiveDriver(Node):
 
         target = self.gap_target(np.minimum(ranges, self.p["range_cap"]), angles)
         wanted = float(np.clip(self.p["steer_gain"] * target, -MAX_STEER, MAX_STEER))
-        self.steer += float(np.clip(wanted - self.steer, -MAX_STEER_RATE * dt, MAX_STEER_RATE * dt))
+        step = (wanted - self.steer) * lowpass(dt, self.p["steer_tau"])
+        self.steer += float(np.clip(step, -MAX_STEER_RATE * dt, MAX_STEER_RATE * dt))
 
         ahead = self.room_ahead(ranges, angles, dt)
         self.steer_slow += (self.steer - self.steer_slow) * lowpass(dt, self.p["curv_tau"])

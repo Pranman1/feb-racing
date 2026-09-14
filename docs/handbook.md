@@ -96,8 +96,11 @@ and flags the result. Everything must start from the container's entrypoint, not
 ## Frequently hit
 
 - *Port 4567 in use*: another bridge container is running (`docker ps`; `./feb-sim stop`).
-- *Car does not move*: driving mode is Manual (menu) or the stack did not start
-  (`./feb-sim shell`, `ros2 node list`).
+- *Car does not move*: the stack did not start (`./feb-sim shell`, `ros2 node list`), or the
+  mode is Manual (the launcher picks Autonomous whenever `--stack` is given; the menu button toggles it).
+- *Bridge rate*: with a window open the simulator exchanges data at about 10 Hz on Linux
+  (each exchange reads the cameras back from the GPU); headless it is 20 to 40 Hz. Drivers must
+  cope with 10 Hz: the starter kit and the house driver do, a plain PI speed loop does not.
 - *Two cars follow the keyboard*: only car one takes the keyboard; extra cars need a bridge.
 - *No window on the organiser PC after a driver update*: reboot (GPU driver mismatch).
 - *Cones or walls missing*: the track folder has no `track.json`; run `tools/track_build.py`.

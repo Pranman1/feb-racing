@@ -26,8 +26,10 @@ in [-1, 1] where 0 is a hard brake. Steering lags about 0.25 s and slews at 3.2 
 
 ## Stage 1: reactive driving (follow the gap)
 
-Read `feb_driver/reactive_driver.py` (140 lines). Tune `config/driver.yaml`: bubble, gap FOV,
-speed limits, braking margin. Score yourself: `./feb-sim practice --stack "ros2 launch feb_driver drive.launch.py"`,
+Read `feb_driver/reactive_driver.py` (about 170 lines). Tune `config/driver.yaml`: bubble, gap
+FOV, the deep-beam weight, speed limits, braking margin, the filter time constants. Note the
+throttle law: feed-forward plus a trim bounded to half of it. Throttle 0 is a hard brake here,
+so a textbook PI speed loop surges and stops; keep the command away from zero. Score yourself: `./feb-sim practice --stack "ros2 launch feb_driver drive.launch.py"`,
 post with `./feb-sim submit`. Target: 10 clean laps on `loop` under 100 s.
 
 ## Stage 2: system identification

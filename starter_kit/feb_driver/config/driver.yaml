@@ -16,6 +16,7 @@ reactive_driver:
     clear_tau: 0.30       # s, clearance low-pass
     curv_tau: 0.35        # s, steering low-pass used for the cornering speed
     goal_tau: 0.30        # s, speed goal low-pass
+    steer_tau: 0.20       # s, steering low-pass (on top of the actuator rate limit)
     speed_per_throttle: 23.0  # m/s per unit throttle at steady state (see sysid_probe)
     throttle_kp: 0.02     # proportional speed trim, throttle per m/s (bounded to half the feed-forward)
     throttle_ki: 0.03     # integral speed trim

@@ -38,7 +38,7 @@ class HouseDriver(Node):
     def __init__(self):
         super().__init__("house_driver")
         defaults = dict(track="", max_speed=2.5, min_speed=0.8, lat_accel=4.5, decel=5.0, accel=4.0,
-                        speed_per_throttle=23.0, throttle_kp=0.02, throttle_ki=0.03, speed_window=0.25, rate=40.0)
+                        speed_per_throttle=23.0, throttle_kp=0.02, throttle_ki=0.03, speed_window=0.25)
         for key, value in defaults.items():
             self.declare_parameter(key, value)
         self.p = {k: self.get_parameter(k).value for k in defaults}
@@ -58,6 +58,7 @@ class HouseDriver(Node):
         self.integral = 0.0
         self.throttle = 0.0
         self.steer = 0.0
+        self.last_t = None
 
         self.pub_throttle = self.create_publisher(Float32, NS + "throttle_command", QOS)
         self.pub_steering = self.create_publisher(Float32, NS + "steering_command", QOS)
@@ -65,8 +66,6 @@ class HouseDriver(Node):
         self.create_subscription(Imu, NS + "imu", self.on_imu, QOS)
         for side in ("left", "right"):
             self.create_subscription(JointState, NS + side + "_encoder", self.on_encoder, QOS)
-        self.dt = 1.0 / self.p["rate"]
-        self.create_timer(self.dt, self.step)
         self.get_logger().info(f"house driver on '{track['name']}' at {self.p['max_speed']} m/s "
                                f"(profile mean {self.v_ref.mean():.2f} m/s)")
 
@@ -97,7 +96,13 @@ class HouseDriver(Node):
     # ---------------------------------------------------------------- sensing
 
     def on_position(self, msg):
+        """One control step per new pose: the bridge may run at 10 Hz, and stepping faster than
+        the data arrives only integrates stale errors into the steering."""
         self.position = np.array([msg.x, msg.y])
+        now = self.get_clock().now().nanoseconds * 1e-9
+        self.dt = min(max(now - self.last_t, 0.01), 0.3) if self.last_t else 0.05
+        self.last_t = now
+        self.step()
 
     def on_imu(self, msg):
         q = msg.orientation
@@ -134,7 +139,7 @@ class HouseDriver(Node):
         n = len(self.path)
 
         # --- steering: L1 pursuit + curvature feed-forward, inverted through the bicycle model
-        ld = 0.35 + 0.22 * max(v, 1.0)
+        ld = 0.5 + 0.3 * max(v, 1.0)
         j = (i0 + max(1, int(ld / self.ds))) % n
         dx, dy = self.path[j] - pos
         eta = math.atan2(dy, dx) - yaw
