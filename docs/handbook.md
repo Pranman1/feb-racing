@@ -28,7 +28,8 @@ and throttle in [-1, 1] (0 is a hard brake). Everything else is a sensor.
 
 ## Competitor: from zero to a leaderboard entry
 
-1. **Install** (once). Docker Desktop (Mac/Windows) or `docker.io` (Linux), Python 3, the GitHub CLI.
+1. **Install** (once). Docker Desktop (Mac/Windows) or `docker.io` (Linux), Python 3, the GitHub CLI,
+   and [Foxglove](https://foxglove.dev/download) (sign in once; it is the data viewer).
    ```bash
    git clone https://github.com/Pranman1/feb-racing && cd feb-racing
    ./feb-sim setup --team "Your Team"     # pulls the devkit image, downloads the app for your OS

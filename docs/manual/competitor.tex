@@ -21,14 +21,16 @@
 \toprule
 OS & Install\\
 \midrule
-macOS & Docker Desktop (\url{https://docker.com}), Python~3 (comes with the Xcode command line tools: \cmd{xcode-select --install}), GitHub CLI (\cmd{brew install gh})\\
-Windows & Docker Desktop with the WSL~2 backend, Python~3 from python.org, GitHub CLI (\cmd{winget install GitHub.cli}). Run the commands below in Git Bash or WSL.\\
-Linux & \cmd{sudo apt install docker.io python3 gh}, then add yourself to the \texttt{docker} group and log in again\\
+macOS & Docker Desktop (\url{https://docker.com}), Python~3 (comes with the Xcode command line tools: \cmd{xcode-select --install}), GitHub CLI (\cmd{brew install gh}), Foxglove (the \file{.dmg} from \url{https://foxglove.dev/download})\\
+Windows & Docker Desktop with the WSL~2 backend, Python~3 from python.org, GitHub CLI (\cmd{winget install GitHub.cli}), Foxglove (the installer from \url{https://foxglove.dev/download}). Run the commands below in Git Bash or WSL.\\
+Linux & \cmd{sudo apt install docker.io python3 gh}, then add yourself to the \texttt{docker} group and log in again; Foxglove: \cmd{sudo apt install ./foxglove-studio-*.deb} from \url{https://foxglove.dev/download}\\
 \bottomrule
 \end{tabularx}
 
 \medskip
-Start Docker Desktop before anything else. Then log the GitHub CLI in once: \cmd{gh auth login}.
+Start Docker Desktop before anything else. Log the GitHub CLI in once: \cmd{gh auth login}. Open
+Foxglove once and sign in (free account); it is how you look at your car's data, see
+section~\ref{sec:foxglove}.
 
 \subsection{Get the repo and the simulator}
 
@@ -38,8 +40,9 @@ cd feb-racing
 ./feb-sim setup --team "Your Team"
 \end{lstlisting}
 
-\cmd{setup} checks Docker, pulls the devkit image, and downloads the simulator app for your
-OS into \file{\textasciitilde/.feb-sim/app/}. The team name is what your results are posted under;
+\cmd{setup} checks Docker, pulls the devkit image, downloads the simulator app for your
+OS into \file{\textasciitilde/.feb-sim/app/}, and checks that Foxglove is installed (it opens the
+download page if not). The team name is what your results are posted under;
 use the name your team registers in \file{submissions.yaml}.
 
 \subsection{First drive: manual}
@@ -124,11 +127,11 @@ Car one is always \emph{your} car: the Manual/Autonomous button, the keyboard, t
 Eye camera and topic namespace \texttt{roboracer\_1} all belong to it. Your container never sees
 any other car.
 
-\subsection{See the data: Foxglove}
+\subsection{See the data: Foxglove}\label{sec:foxglove}
 
 The devkit runs a Foxglove bridge on port 8765, so the Foxglove app on your laptop shows
-every topic live on any OS, with no ROS installed outside the container. Install the desktop
-app from \url{https://foxglove.dev/download} and sign in once (free account). From then on
+every topic live on any OS, with no ROS installed outside the container. With the app installed
+and signed in (prerequisites above),
 \cmd{./feb-sim run} opens Foxglove connected to your car, a few seconds after the simulator
 window. Without the app installed the launcher prints the address instead:
 \texttt{ws://localhost:8765} under \emph{Open connection}, \emph{Foxglove WebSocket}.

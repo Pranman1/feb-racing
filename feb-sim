@@ -67,6 +67,7 @@ def cmd_setup(args):
     subprocess.run(["docker", "pull", IMAGE], check=True)
     if app_executable():
         print(f"simulator app present: {app_executable()}")
+        check_foxglove()
         return
     import tarfile
     import urllib.request
@@ -86,6 +87,19 @@ def cmd_setup(args):
         fail(f"unpacked the app but did not find the executable under {sim.APP_DIR}")
     exe.chmod(0o755)
     print(f"simulator app installed: {exe}")
+    check_foxglove()
+
+
+def check_foxglove():
+    """Foxglove is how members look at their car's data (lidar, camera, plots). It is a separate
+    desktop app with its own installer per OS and a one-time sign-in, so setup only points at it."""
+    if foxglove_app():
+        print(f"Foxglove app present: {foxglove_app()}")
+        return
+    print("Foxglove app not found. Install it from https://foxglove.dev/download and sign in once")
+    print("(free account); `feb-sim run` then opens it on your car's topics. Optional but recommended.")
+    import webbrowser
+    webbrowser.open("https://foxglove.dev/download")
 
 
 # ------------------------------------------------------------------ devkit container

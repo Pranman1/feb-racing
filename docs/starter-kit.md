@@ -14,7 +14,7 @@ cp -r starter_kit/feb_driver stack/     # your copy; stack/ is mounted into the 
 ```
 
 Requirements: Docker Desktop (Mac/Windows) or docker.io (Linux), Python 3, the GitHub CLI for
-`feb-sim submit`. Your code stays on your laptop and is built inside the container on start.
+`feb-sim submit`, and [Foxglove](https://foxglove.dev/download) (sign in once) to see your car's data. Your code stays on your laptop and is built inside the container on start.
 
 ## Stage 0: read the car
 
