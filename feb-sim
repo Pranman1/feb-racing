@@ -240,6 +240,8 @@ def cmd_run(args):
         sim += ["--lidar-hz", str(args.lidar_hz)]
     if args.camera:
         sim += ["--camera", args.camera]
+    if args.look or args.headless:
+        sim += ["--look", "simple" if args.headless else args.look]   # nothing to see headless
     if args.headless:
         sim += ["-batchmode", "-nographics"]
     print("starting simulator:", " ".join(sim[1:]))
@@ -317,6 +319,7 @@ def main():
     run.add_argument("--opponent", choices=list(OPPONENT_SPEED) + ["map"], help="house racer in car 2: slow | normal | fast (lidar driver) or map")
     run.add_argument("--camera", help="starting camera: \"God's Eye\", Trackcam, \"Driver's Eye\", ...")
     run.add_argument("--no-foxglove", action="store_true", help="do not open Foxglove on the devkit's topics")
+    run.add_argument("--look", choices=["visual", "simple"], help="dressed scene or the bare one (default: last choice in the app, else visual)")
     run.set_defaults(func=cmd_run)
     practice = sub.add_parser("practice", help="scored attempt under competition rules")
     practice.add_argument("--track", default="loop")

@@ -54,7 +54,11 @@ use the name your team registers in \file{submissions.yaml}.
 A window opens on the \emph{FEB Loop} track in Driver's Eye view. Nothing drives by itself:
 with no stack given, the launcher starts no driver and no opponent. Arrow keys steer and
 throttle. The menu in the top-left has the Manual/Autonomous button, the Track button (cycles
-the built-in tracks), the Cars button (more cars on the grid) and the camera choices.
+the built-in tracks), the Cars button (more cars on the grid), the Look button (Visual or
+Simple scene; Simple for a weak laptop) and the camera choices. The HUD at the bottom shows
+the running lap time, last and best lap, lap count, collisions and speed. After your first
+completed lap a translucent gold ghost replays your best lap so you can see where you gain
+and lose time.
 
 \medskip
 \textbf{macOS, if the app does not open} (``damaged'' or ``cannot be opened''): the app is not
@@ -120,6 +124,7 @@ Option & Effect\\
 \texttt{--lidar-hz 10} & slower lidar, as a real bridge often delivers\\
 \texttt{--camera Trackcam} & start in another view (\texttt{"God's Eye"}, \texttt{Trackcam}, \texttt{"Driver's Eye"})\\
 \texttt{--no-foxglove} & do not open Foxglove on the car's topics\\
+\texttt{--look simple} & the bare scene instead of the dressed one (\emph{Visual}: asphalt, banded walls, start line, sky, livery). Purely cosmetic; the menu's Look button toggles it and the choice is remembered.\\
 \bottomrule
 \end{tabularx}
 

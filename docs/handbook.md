@@ -44,7 +44,8 @@ and throttle in [-1, 1] (0 is a hard brake). Everything else is a sensor.
    Options: `--track porto`, `--noise 1`, `--lidar-hz 10`, `--opponent normal`, `--camera Trackcam`.
    With the [Foxglove](https://foxglove.dev/download) app installed (sign in once), `run` also opens
    it on your car's topics (`ws://localhost:8765`, the devkit's `foxglove_bridge`); `--no-foxglove` skips that.
-   In the app: the menu's "Track" and "Cars" buttons cycle tracks and put more cars on the grid.
+   In the app: the menu's "Track" and "Cars" buttons cycle tracks and put more cars on the grid;
+   "Look" switches between the dressed scene and the bare one (`--look simple` for weak laptops).
 4. **Score yourself.** `./feb-sim practice --stack "..."`: warm-up plus 10 timed laps, 10 s per
    collision, DNF after 300 s. The result and a bag land in `runs/<id>/`.
 5. **Post it.** `./feb-sim submit`: opens a pull request with the result file; a check validates

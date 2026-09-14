@@ -245,7 +245,8 @@ File & Role\\
 \file{Scripts/TrackData.cs}, \file{TrackLibrary.cs} & the \file{track.json} model and where tracks are found (StreamingAssets/Tracks, \file{\textasciitilde/.feb-sim/tracks})\\
 \file{Scripts/FebLaunch.cs}, \file{FebAutoStart.cs} & command-line options, bridge address, starting mode and camera\\
 \file{Scripts/FebTrackMenu.cs} & the Track and Cars buttons in the menu\\
-\file{Scripts/GhostLap.cs} & records and replays the best lap as a translucent car\\
+\file{Scripts/GhostLap.cs} & records and replays the best lap as a translucent gold car\\
+\file{Scripts/FebLook.cs}, \file{FebHud.cs} & the Visual look (asphalt, banded walls, start line, sky, livery; no colliders, no physics change) and the race HUD\\
 \file{Editor/FebScene.cs} & generates the FEB scene from the upstream RoboRacer Sim Racing scene\\
 \file{Editor/FebBuild.cs} & player builds, icon, shipped tracks\\
 \bottomrule
@@ -256,7 +257,7 @@ Command-line options of the built app (Unity's own \cmd{-batchmode -nographics -
 also work):
 \begin{lstlisting}
 --track <name|folder>   --connect <host:port>   --mode manual|autonomous
---lidar-hz <rate>       --cars <n>              --camera <name>
+--lidar-hz <rate>       --cars <n>              --camera <name>         --look visual|simple
 \end{lstlisting}
 
 \subsection{Unity licence on the build PC}

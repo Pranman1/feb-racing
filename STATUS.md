@@ -2,6 +2,23 @@
 
 Newest first.
 
+## 2026-09-14 - Visual look, race HUD, menu icons, qualification rule
+
+- Look: `FebLook.cs` dresses the scene at load (Visual, default): floor tint, an asphalt ribbon
+  along the corridor (width from the nearest wall or cone) with white edge lines, white ducts
+  with FEB blue bands (UVs added to the tube mesh), a chequered start line and gold checkpoint
+  marks, a gradient sky and a warmer sun (runtime HDRP Volume, priority 10), and the livery:
+  deck (wing + rear panel) FEB blue, chassis plate and crash members gold, rear decals on a
+  white plate. All material instances and collider-free meshes: the prefab and physics are
+  untouched. `--look simple` / the menu's Look button give the bare scene; remembered in
+  PlayerPrefs. Headless runs force Simple.
+- HUD: `FebHud.cs` replaces the small upstream lap panel with a bottom-centre panel: lap time
+  large, last/best/lap/hits, speed. Same in both looks.
+- Menu: Track, Cars and Look rows have their own icons (loop, two cars, sun).
+- Verified on screen on Linux: loop (Driver's Eye), loop_cones (Trackcam), Porto, Simple.
+- Qualification: `entries: qualified` events, `feb-race qualified`, Teams page ticks, `top: N`
+  seeds for the bracket. Rule text in both manuals.
+
 ## 2026-09-14 - Foxglove instead of rviz; FEBAUTO Racing name; two manuals
 
 - Visualisation: rviz on the laptop cannot see the container's topics (ROS_LOCALHOST_ONLY plus

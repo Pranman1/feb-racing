@@ -44,7 +44,8 @@ Upload the three archives to a GitHub release of `feb-racing`; `feb-sim setup` d
 | `Scripts/TrackData.cs`, `TrackLibrary.cs` | track.json model and where tracks are found (StreamingAssets/Tracks, `~/.feb-sim/tracks`) |
 | `Scripts/FebLaunch.cs`, `FebAutoStart.cs` | `--track --connect --mode --lidar-hz --cars` command-line options |
 | `Scripts/FebTrackMenu.cs` | the Track button in the menu |
-| `Scripts/GhostLap.cs` | records and replays the best lap as a translucent car |
+| `Scripts/GhostLap.cs` | records and replays the best lap as a translucent gold car |
+| `Scripts/FebLook.cs`, `FebHud.cs` | the Visual look (asphalt ribbon, banded walls, start line, gradient sky, livery; cosmetic only) and the race HUD |
 | `Editor/FebScene.cs` | generates the FEB Racing scene from the upstream RoboRacer Sim Racing scene |
 | `Editor/FebBuild.cs` | player builds, icon, shipped tracks |
 
@@ -52,5 +53,5 @@ Command-line options of the built app (Unity's own `-batchmode -nographics -logF
 
 ```
 --track <name|folder>   --connect <host:port>   --mode manual|autonomous
---lidar-hz <rate>       --cars <n>
+--lidar-hz <rate>       --cars <n>              --camera <name>         --look visual|simple
 ```
