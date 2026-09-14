@@ -48,5 +48,9 @@ are written; two cars is the supported race mode.
 
 ## Practice
 
-Members race the stock starter driver locally: `./feb-sim run --stack "..." --opponent normal`
-(`slow` 1.5 m/s, `normal` 2.5, `fast` 4.0). `--cars 2` alone puts an undriven second car on the grid.
+Members race the house racer locally: `./feb-sim run --stack "..." --opponent normal`. The house
+racer is the smooth lidar driver from the starter kit at a conservative pace (`slow` 1.5 m/s,
+`normal` 2.0, `fast` 2.5; zero wall contact over eight laps on the loop at 10 Hz), the thing a new
+stack has to overtake. `--opponent map` runs the map-following driver instead (it knows the track
+and the car's true pose; faster, less smooth). `--cars 2` alone puts an undriven second car on the
+grid. Tracks with `max_cars: 1` (Porto: 1.3 m corridor) refuse a second car.

@@ -55,8 +55,8 @@ and track it (pure pursuit, then MAP or MPC). This is where lap times halve.
 
 `./feb-sim run --noise 1` adds lidar range noise and dropouts; `--noise "range_sigma:=0.05 latency:=0.05"`
 sets them; `--lidar-hz 10` runs the lidar at the rate the real bridge often delivers.
-`./feb-sim run --stack "..." --opponent normal` races you against the stock driver in car two
-(`slow`, `normal` or `fast`), through the same proxy the competitions use.
+`./feb-sim run --stack "..." --opponent normal` races you against the house racer in car two
+(`slow`, `normal`, `fast`, or `map`), through the same 10 Hz proxy the competitions use.
 
 ## Submitting for competitions
 

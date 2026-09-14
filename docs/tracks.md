@@ -44,6 +44,7 @@ ROS `map.yaml`). Grey "unknown" pixels count as not drivable.
 | `resolution`, `origin` | metres per pixel and map position of the bottom-left pixel (written by track_design) |
 | `direction` | `ccw` or `cw` driving direction |
 | `checkpoints` | lap checkpoints; checkpoint 0 is the finish line |
+| `max_cars` | 1 for corridors too narrow to race side by side (Porto); default 4 |
 | `start` | optional `[x, y]` finish-line position; default: the straightest section |
 | `walls.diameter` | air-duct diameter (0.33 m like the league; omit the key for a cone-only track) |
 | `cones.spacing` | metres between cones on each edge, blue left, yellow right (omit for none) |

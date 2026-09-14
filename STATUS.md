@@ -21,6 +21,9 @@ Newest first.
   which is why "car one does not move" kept coming back); `--opponent` needs `--stack`.
 - Two-car race at 10 Hz (starter vs house): both finish; 4-6 contacts between the cars over
   four laps as they run nose-to-tail. Counted for both per the rules.
+- House racer is now the smooth lidar driver at 1.5/2.0/2.5 m/s (8 laps, 0 wall contact on the
+  loop at 10 Hz, lap spread 0.02 s); the map follower stays as `--opponent map`. Tracks carry
+  `max_cars` (Porto = 1, ducts now 33 cm).
 
 ## 2026-09-13 (late) - bug pass from the on-screen review
 
