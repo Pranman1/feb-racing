@@ -16,6 +16,12 @@ Newest first.
 - HUD clock: starts at the car's first crossing of the start line (`FebStartLine` on the
   finish trigger); the upstream LapTimer, which scoring reads, is unchanged.
 - Packaging: exclude the stray `runs/` folder from the Linux archive.
+- Branding: the Unity splash logo is now a "FEBAUTO Sim" card (was the AutoDRIVE logo; the
+  "Made with Unity" part cannot be removed on a Personal licence) and the toolbar title reads
+  "FEBAUTO Sim | <track>". App and archive file names stay "FEB Simulator".
+- HUD clock: the start-line crossing is detected geometrically (behind the line to ahead of
+  it); the grid is so close to the line that the trigger fired at spawn. Verified: "--" on the
+  grid.
 
 ## 2026-09-14 - Visual look, race HUD, menu icons, qualification rule
 
