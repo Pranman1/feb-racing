@@ -41,6 +41,8 @@ and throttle in [-1, 1] (0 is a hard brake). Everything else is a sensor.
    starts the container (which builds your packages), then the simulator, connected. Edit,
    rerun. `./feb-sim shell` gives a ROS 2 shell in the container (`ros2 topic echo`, `rqt`).
    Options: `--track porto`, `--noise 1`, `--lidar-hz 10`, `--opponent normal`, `--camera Trackcam`.
+   With the [Foxglove](https://foxglove.dev/download) app installed (sign in once), `run` also opens
+   it on your car's topics (`ws://localhost:8765`, the devkit's `foxglove_bridge`); `--no-foxglove` skips that.
    In the app: the menu's "Track" and "Cars" buttons cycle tracks and put more cars on the grid.
 4. **Score yourself.** `./feb-sim practice --stack "..."`: warm-up plus 10 timed laps, 10 s per
    collision, DNF after 300 s. The result and a bag land in `runs/<id>/`.
@@ -91,7 +93,7 @@ and flags the result. Everything must start from the container's entrypoint, not
 | Simulator players | `~/FEB/feb-sim/Builds/{linux,mac,windows}`; Linux also linked at `~/.feb-sim/app/linux` |
 | Unity editor | `~/Unity/Hub/Editor/2022.3.52f1` (licensed via Hub sign-in) |
 | Run folders | `~/FEB/feb-racing/runs/<id>/` (result.json, sim.log, container.log, bag) |
-| Ports | 4567 member devkit, 4568+ harness containers (one per car), 4580 harness proxy, 4565/4566 launcher proxy and opponent |
+| Ports | 4567 member devkit, 8765 its Foxglove bridge, 4568+ harness containers (one per car), 4580 harness proxy, 4565/4566 launcher proxy and opponent |
 
 ## Frequently hit
 

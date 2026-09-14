@@ -116,12 +116,27 @@ Option & Effect\\
 \texttt{--noise 1} & lidar range noise and dropouts; \texttt{--noise "range\_sigma:=0.05 latency:=0.05"} sets them\\
 \texttt{--lidar-hz 10} & slower lidar, as a real bridge often delivers\\
 \texttt{--camera Trackcam} & start in another view (\texttt{"God's Eye"}, \texttt{Trackcam}, \texttt{"Driver's Eye"})\\
+\texttt{--no-foxglove} & do not open Foxglove on the car's topics\\
 \bottomrule
 \end{tabularx}
 
 Car one is always \emph{your} car: the Manual/Autonomous button, the keyboard, the Driver's
 Eye camera and topic namespace \texttt{roboracer\_1} all belong to it. Your container never sees
 any other car.
+
+\subsection{See the data: Foxglove}
+
+The devkit runs a Foxglove bridge on port 8765, so the Foxglove app on your laptop shows
+every topic live on any OS, with no ROS installed outside the container. Install the desktop
+app from \url{https://foxglove.dev/download} and sign in once (free account). From then on
+\cmd{./feb-sim run} opens Foxglove connected to your car, a few seconds after the simulator
+window. Without the app installed the launcher prints the address instead:
+\texttt{ws://localhost:8765} under \emph{Open connection}, \emph{Foxglove WebSocket}.
+
+Useful panels: 3D (lidar as \texttt{/autodrive/roboracer\_1/lidar}), Image (the front camera),
+Plot (\texttt{throttle\_command}, \texttt{steering\_command} and the encoders against time), Raw
+Messages and the Topics list with rates. Foxglove also opens the bags that \cmd{practice}
+records under \file{runs/<id>/}. \texttt{--no-foxglove} skips the auto-open.
 
 \subsection{Debug}
 
@@ -231,7 +246,7 @@ Cones or walls missing & The track folder has no \file{track.json}; run \cmd{too
 Command & What it does\\
 \midrule
 \cmd{feb-sim setup --team T} & pull the devkit image, download the app, set the team name\\
-\cmd{feb-sim run [--track] [--stack] [--mode] [--opponent] [--cars] [--noise] [--lidar-hz] [--camera]} & start the container and the simulator, connected\\
+\cmd{feb-sim run [--track] [--stack] [--mode] [--opponent] [--cars] [--noise] [--lidar-hz] [--camera] [--no-foxglove]} & start the container, the simulator and Foxglove, connected\\
 \cmd{feb-sim practice --stack S [--track] [--laps]} & one scored attempt into \file{runs/<id>/}\\
 \cmd{feb-sim submit [--run DIR]} & pull request with the newest (or given) result\\
 \cmd{feb-sim shell} & ROS~2 shell inside the running container\\

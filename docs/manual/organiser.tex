@@ -267,7 +267,9 @@ a free personal licence. Without a GUI: generate an activation file with
 \file{devkit/} holds the Dockerfile (ROS~2 Humble, the AutoDRIVE bridge, pinned Python
 packages) and the entrypoint, which builds every package under \file{src/} and then starts
 the bridge and the command in \texttt{FEB\_LAUNCH}. \file{devkit/feb\_tools} adds the map-following
-house driver and the sensor-noise node. Pushing a change under \file{devkit/} rebuilds and
+house driver and the sensor-noise node. The entrypoint also starts \texttt{foxglove\_bridge}
+on port 8765 (off with \texttt{FEB\_FOXGLOVE=0}, which the harness and the opponent container
+set), so members visualise with the Foxglove app on any OS instead of rviz. Pushing a change under \file{devkit/} rebuilds and
 publishes \file{ghcr.io/pranman1/feb-devkit} for amd64 and arm64
 (\file{.github/workflows/devkit.yml}). Members' images are built \emph{from} this one, so a
 devkit change reaches them on their next image build.

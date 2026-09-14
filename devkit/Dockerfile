@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ros-humble-cv-bridge \
         ros-humble-rosbag2 \
         ros-humble-rosbag2-storage-mcap \
+        ros-humble-foxglove-bridge \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt /tmp/requirements.txt
@@ -22,5 +23,5 @@ COPY entrypoint.sh /home/autodrive_devkit.sh
 # the members' stack is bind-mounted; do not litter it with root-owned bytecode
 ENV PYTHONDONTWRITEBYTECODE=1
 WORKDIR /home/autodrive_devkit
-EXPOSE 4567
+EXPOSE 4567 8765
 ENTRYPOINT ["/home/autodrive_devkit.sh"]

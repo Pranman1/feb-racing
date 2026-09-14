@@ -22,7 +22,9 @@ Topics (namespace `/autodrive/roboracer_1/`): `lidar` (1080 beams, 270°, 0.06 t
 `imu`, `left_encoder` / `right_encoder` (wheel angle in rad, 0.059 m radius), `steering` and
 `throttle` feedback. Commands: `steering_command` in [-1, 1] = ±0.5236 rad, `throttle_command`
 in [-1, 1] where 0 is a hard brake. Steering lags about 0.25 s and slews at 3.2 rad/s.
-`./feb-sim shell` gives you a ROS 2 shell: `ros2 topic hz`, `ros2 topic echo`, `rqt`.
+`./feb-sim shell` gives you a ROS 2 shell: `ros2 topic hz`, `ros2 topic echo`. To *see* the data
+(lidar in 3D, the camera, plots of throttle and steering) install [Foxglove](https://foxglove.dev/download):
+`feb-sim run` opens it on your car (`ws://localhost:8765`). It also opens the bags under `runs/`.
 
 ## Stage 1: reactive driving (follow the gap)
 

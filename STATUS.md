@@ -2,6 +2,22 @@
 
 Newest first.
 
+## 2026-09-14 - Foxglove instead of rviz; FEBAUTO Racing name; two manuals
+
+- Visualisation: rviz on the laptop cannot see the container's topics (ROS_LOCALHOST_ONLY plus
+  the Docker bridge network) and Mac/Windows members have no ROS at all. The devkit image now
+  runs `foxglove_bridge` (port 8765, `FEB_FOXGLOVE=0` disables; the harness and the opponent
+  container disable it). `feb-sim run` publishes the port and opens the Foxglove desktop app
+  on it via its `foxglove://open?ds=foxglove-websocket&ds.url=ws://localhost:8765` deep link
+  (`--no-foxglove` skips). Verified on the PC: 24 topics advertised, camera at 10 Hz in the app.
+  Note: foxglove_bridge 3.4 speaks the `foxglove.sdk.v1` subprotocol; the current desktop app
+  does too. Foxglove needs a one-time free sign-in.
+- Renamed the programme to FEBAUTO Racing everywhere users see it (site, README, docs,
+  manuals). The Unity scene file keeps its `FEB Racing.unity` name (internal; a rename means a
+  full rebuild and re-release).
+- Manuals: `docs/manual/competitor.pdf` and `organiser.pdf` from LaTeX (shared platform
+  section), built with the texlive Docker image. They fold in every docs/*.md page.
+
 ## 2026-09-14 - ego car and camera are the same car; nothing drives without a stack
 
 - Bug: cloning car one for the grid also cloned its viewing cameras (Driver's Eye etc.), so the
