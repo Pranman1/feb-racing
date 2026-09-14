@@ -125,7 +125,7 @@ def start_opponent(level, track):
                     "-v", f"{track}:/track:ro", "-e", f"FEB_LAUNCH={launch}", IMAGE], check=True, stdout=subprocess.DEVNULL)
     proxy = ROOT / "febrace" / "proxy.py"
     subprocess.run(["docker", "run", "-d", "--rm", "--name", PROXY, "--network=host", "-v", f"{proxy}:/tmp/proxy.py:ro",
-                    "--entrypoint", "python3", IMAGE, "-u", "/tmp/proxy.py", "--port", str(PROXY_PORT),
+                    "--entrypoint", "python3", IMAGE, "-u", "/tmp/proxy.py", "--verbose", "--port", str(PROXY_PORT),
                     "--devkits", str(PORT), str(OPPONENT_PORT)], check=True, stdout=subprocess.DEVNULL)
     print(f"opponent: stock driver at {speed} m/s")
 
@@ -159,6 +159,7 @@ def cmd_run(args):
     print(f"starting devkit ({IMAGE}) ...")
     start_container(args.stack, args.noise)
     track = resolve_track(args.track)
+    mode = args.mode or ("autonomous" if args.stack else "manual")
     cars, port = args.cars, PORT
     if args.opponent:
         if not args.stack:
@@ -168,7 +169,7 @@ def cmd_run(args):
         start_opponent(args.opponent, track)
         cars, port = max(cars, 2), PROXY_PORT
     sim = [str(exe), "--track", track, "--connect", f"127.0.0.1:{port}",
-           "--mode", args.mode, "--cars", str(cars)]
+           "--mode", mode, "--cars", str(cars)]
     if args.lidar_hz:
         sim += ["--lidar-hz", str(args.lidar_hz)]
     if args.camera:
@@ -237,7 +238,7 @@ def main():
     sub = ap.add_subparsers(dest="command", required=True)
     run = sub.add_parser("run", help="start devkit + simulator")
     run.add_argument("--track", default="loop", help="track folder name in ./tracks, or a path")
-    run.add_argument("--mode", choices=["manual", "autonomous"], default="manual")
+    run.add_argument("--mode", choices=["manual", "autonomous"], help="default: autonomous with --stack, manual without")
     run.add_argument("--stack", default="", help='command started after the bridge, e.g. "ros2 launch feb_driver drive.launch.py"')
     run.add_argument("--headless", action="store_true", help="no window (organiser harness)")
     run.add_argument("--lidar-hz", type=float, default=0, help="lidar scan rate override (default: the car's 40 Hz)")

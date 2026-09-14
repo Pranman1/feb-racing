@@ -6,8 +6,9 @@ competitors may not do at race time. That is the point: it is the rabbit, not an
 Steering: MAP-style pursuit (L1 guidance plus a curvature feed-forward, capped at the tyre's
 slip peak, lightly low-passed), from the IROS 2026 league stack in ~/roboracer.
 Speed: a profile along the path from curvature with a braking backward pass, tracked by
-feed-forward plus a bounded trim (throttle 0 is a hard brake in this simulator, so a plain
-PI loop limit-cycles), slew-limited, with a hysteretic brake regime for real overspeed.
+feed-forward plus a trim bounded to half of it and slew-limited. Throttle 0 is a hard brake
+in this simulator and the bridge can run as slow as 10 Hz, so the command must never fall
+to zero while speed is wanted: no PI loop that can cut out, no overspeed brake regime.
 
     ros2 run feb_tools house_driver --ros-args -p track:=/path/to/track/folder -p max_speed:=2.5
 """
@@ -37,7 +38,7 @@ class HouseDriver(Node):
     def __init__(self):
         super().__init__("house_driver")
         defaults = dict(track="", max_speed=2.5, min_speed=0.8, lat_accel=4.5, decel=5.0, accel=4.0,
-                        speed_per_throttle=23.0, throttle_kp=0.05, throttle_ki=0.03, rate=40.0)
+                        speed_per_throttle=23.0, throttle_kp=0.02, throttle_ki=0.03, speed_window=0.25, rate=40.0)
         for key, value in defaults.items():
             self.declare_parameter(key, value)
         self.p = {k: self.get_parameter(k).value for k in defaults}
@@ -52,12 +53,11 @@ class HouseDriver(Node):
         self.yaw = None
         self.yaw_rate = 0.0
         self.speed = 0.0
-        self.encoders = {}
+        self.encoders = {}          # frame_id -> [(t, angle), ...] over the last speed_window
         self.v_target = 0.0
         self.integral = 0.0
         self.throttle = 0.0
         self.steer = 0.0
-        self.braking = False
 
         self.pub_throttle = self.create_publisher(Float32, NS + "throttle_command", QOS)
         self.pub_steering = self.create_publisher(Float32, NS + "steering_command", QOS)
@@ -105,14 +105,21 @@ class HouseDriver(Node):
         self.yaw_rate = msg.angular_velocity.z
 
     def on_encoder(self, msg):
+        """Wheel speed over a short window of samples; robust to a 10 Hz bridge and to the
+        encoder reset that comes with a collision respawn."""
         t = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
         angle = float(msg.position[0])
-        last = self.encoders.get(msg.header.frame_id)
-        self.encoders[msg.header.frame_id] = (t, angle)
-        if last and angle >= last[1] and t - last[0] > 1e-3:
-            v = (angle - last[1]) / (t - last[0]) * WHEEL_RADIUS
-            if v < 25.0:
-                self.speed = 0.7 * self.speed + 0.3 * v
+        hist = self.encoders.setdefault(msg.header.frame_id, [])
+        if hist and angle < hist[-1][1]:
+            hist.clear()
+        hist.append((t, angle))
+        while len(hist) > 2 and t - hist[0][0] > self.p["speed_window"]:
+            hist.pop(0)
+        if len(hist) < 2 or t - hist[0][0] < 1e-3:
+            return
+        v = (angle - hist[0][1]) / (t - hist[0][0]) * WHEEL_RADIUS
+        if 0.0 <= v < 25.0:
+            self.speed = 0.5 * self.speed + 0.5 * v
 
     # ---------------------------------------------------------------- control
 
@@ -127,7 +134,7 @@ class HouseDriver(Node):
         n = len(self.path)
 
         # --- steering: L1 pursuit + curvature feed-forward, inverted through the bicycle model
-        ld = 0.35 + 0.22 * v
+        ld = 0.35 + 0.22 * max(v, 1.0)
         j = (i0 + max(1, int(ld / self.ds))) % n
         dx, dy = self.path[j] - pos
         eta = math.atan2(dy, dx) - yaw
@@ -135,7 +142,7 @@ class HouseDriver(Node):
         kappa_fb = 2.0 * math.sin(eta) / max(math.hypot(dx, dy), 0.3)
         kappa_ff = 0.6 * float(self.kappa[(i0 + max(1, int(0.15 * v / self.ds))) % n])
         delta = float(np.clip(math.atan((kappa_fb + kappa_ff) * WHEELBASE), -SLIP_PEAK, SLIP_PEAK))
-        self.steer += (delta - self.steer) * min(1.0, self.dt / 0.06)
+        self.steer += float(np.clip(delta - self.steer, -3.2 * self.dt, 3.2 * self.dt))   # the actuator's own rate
 
         # --- speed: lowest profile speed over the next 0.3 s, low-passed
         window = [(i0 + k) % n for k in range(max(2, int(0.3 * v / self.ds)))]
@@ -148,14 +155,7 @@ class HouseDriver(Node):
 
     def throttle_law(self, v, v_t):
         """Feed-forward plus a trim bounded to half of it: the command never falls to zero
-        (a hard brake) while speed is wanted. Real overspeed uses the brake with hysteresis."""
-        if self.braking:
-            self.braking = v > v_t + 0.2
-        elif v > v_t + 0.6:
-            self.braking = True
-        if self.braking:
-            self.integral = 0.0
-            return 0.0
+        (a hard brake) while speed is wanted, so the car cannot surge and stop."""
         ff = v_t / self.p["speed_per_throttle"]
         err = v_t - v
         self.integral = float(np.clip(self.integral + err * self.dt, -0.8, 0.8))

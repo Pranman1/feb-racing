@@ -23,9 +23,10 @@ COMMANDS = ("Throttle", "Steering", "Reset")
 
 
 class Proxy:
-    def __init__(self, devkit_ports, verbose=False):
+    def __init__(self, devkit_ports, verbose=False, decimate=1):
         self.ports = devkit_ports
         self.verbose = verbose
+        self.decimate = decimate    # forward every n-th simulator message (test rig for slow bridges)
         self.count = 0
         self.lock = threading.Lock()
         self.commands = {f"V{i + 1} {c}": ("False" if c == "Reset" else "0.0000") for i in range(len(devkit_ports)) for c in COMMANDS}
@@ -51,6 +52,10 @@ class Proxy:
         return client
 
     def from_simulator(self, sid, data):
+        self.count += 1
+        if self.count % self.decimate:
+            self.server.emit("Bridge", self.snapshot(), to=sid)
+            return
         for index, client in enumerate(self.clients):
             own = {}
             for key, value in data.items():
@@ -61,12 +66,14 @@ class Proxy:
                     own["V1 " + m.group(2)] = value
             if client.eio.state == "connected":
                 client.emit("Bridge", own)
-        with self.lock:
-            reply = dict(self.commands)
+        reply = self.snapshot()
         self.server.emit("Bridge", reply, to=sid)
-        self.count += 1
         if self.verbose and self.count % 200 == 1:
             print("reply", {k: v for k, v in reply.items() if "Reset" not in k}, flush=True)
+
+    def snapshot(self):
+        with self.lock:
+            return dict(self.commands)
 
     def from_devkit(self, index, data):
         with self.lock:
@@ -86,8 +93,9 @@ def main():
     ap.add_argument("--port", type=int, default=4570, help="port the simulator connects to")
     ap.add_argument("--devkits", type=int, nargs="+", required=True, help="devkit bridge ports, car 1 first")
     ap.add_argument("--verbose", action="store_true", help="log the merged commands now and then")
+    ap.add_argument("--decimate", type=int, default=1, help="forward every n-th message (e.g. 4 turns 40 Hz into 10 Hz)")
     args = ap.parse_args()
-    Proxy(args.devkits, args.verbose).serve(args.port)
+    Proxy(args.devkits, args.verbose, args.decimate).serve(args.port)
 
 
 if __name__ == "__main__":

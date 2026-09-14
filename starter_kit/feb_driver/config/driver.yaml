@@ -4,15 +4,20 @@ reactive_driver:
     bubble: 0.40          # m, safety radius zeroed around the nearest return
     gap_fov: 1.60         # rad, half field of view considered for gaps
     range_cap: 6.0        # m, ranges are clipped here before choosing a gap
-    steer_gain: 0.85      # steering = gain * angle to the gap target
+    steer_gain: 0.85      # steering = gain * bearing of the gap target
+    deep_weight: 0.6      # target = deep_weight * deepest beam + (1 - deep_weight) * gap middle
     max_speed: 2.5        # m/s on an open straight
     min_speed: 0.9        # m/s floor in tight corners
+    accel_limit: 4.0      # m/s^2, how fast the speed target may rise
+    decel_limit: 6.0      # m/s^2, how fast it may fall, and the braking assumed for clearance
     lat_accel: 6.0        # m/s^2 cornering limit used for the speed target
     brake_margin: 0.40    # m, stopping distance margin before the clearance ahead
-    decel_limit: 6.0      # m/s^2 assumed braking for the clearance-based speed cap
+    clear_pct: 3.0        # percentile of the corridor ranges taken as the clearance
+    clear_tau: 0.30       # s, clearance low-pass
+    curv_tau: 0.35        # s, steering low-pass used for the cornering speed
+    goal_tau: 0.30        # s, speed goal low-pass
     speed_per_throttle: 23.0  # m/s per unit throttle at steady state (see sysid_probe)
     throttle_kp: 0.02     # proportional speed trim, throttle per m/s (bounded to half the feed-forward)
     throttle_ki: 0.03     # integral speed trim
-    steer_tau: 0.25       # s, steering low-pass (raw gap targets jump beam to beam)
-    target_tau: 0.30      # s, clearance and speed-target low-pass
     throttle_slew: 0.8    # throttle units per second
+    speed_window: 0.25    # s, window of encoder samples for the speed estimate
