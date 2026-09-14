@@ -2,6 +2,19 @@
 
 Newest first.
 
+## Future plans (not started)
+
+- RoboSense M1 on the nose: a solid-state scan pattern (120 x 25 deg, ~0.2 deg, 10 Hz) on the
+  existing GPU lidar component, attached at runtime with no mass so the prefab and physics stay
+  as they are. Needs a downsampled cloud or a binary side channel (a full 75k-point cloud is
+  ~12 MB/s, beyond the JSON bridge), a tilt/crop for the 1:10 scale, and a 3D noise node.
+  Training and the cone-track perception project only; never in a scored event (league sensor
+  set is fixed). Estimate: 2-3 days for a downsampled version.
+- Showcase camera: a slow orbit around the car for site and recruiting shots (no side profile
+  exists today).
+- Human-versus-human exhibition mode (two keyboards): car two is bridge-only by design.
+- Wing wrap tuning: wider top-surface streaks, a pinstripe around the rear panel.
+
 ## 2026-09-14 (later) - ducts inside-out, app install folder, feb-sim update, HUD clock
 
 - Ducts: the tube mesh was wound inside-out (near side culled, far inside visible: the
