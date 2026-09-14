@@ -19,6 +19,7 @@ track.yaml::
     start: [3.0, 1.0]         # optional finish-line position (m); default: longest straight
     walls:
       diameter: 0.33          # air-duct diameter (m); omit the key for no walls
+      color: "#9a9a9a"        # optional duct colour (hex), default mid grey
     cones:                    # optional; omit the key for no cones
       spacing: 1.0            # metres between cones along each boundary
 
@@ -252,6 +253,7 @@ def build_track(folder):
     if "walls" in cfg:
         diameter = float(cfg["walls"].get("diameter", 0.33))
         track["wall_diameter"] = diameter
+        track["wall_color"] = str(cfg["walls"].get("color", "#9a9a9a"))
         track["walls"] = [{"points": w.round(3).flatten().tolist()}
                           for w in build_walls(mask, diameter / 2 / frame.res, frame)]
     if "cones" in cfg:
