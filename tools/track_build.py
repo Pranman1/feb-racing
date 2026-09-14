@@ -102,6 +102,12 @@ def distance_to(contour, shape):
     return cv2.distanceTransform(canvas, cv2.DIST_L2, 5)
 
 
+def inside(mask, p):
+    h, w = mask.shape
+    c, r = int(round(p[0])), int(round(p[1]))
+    return 0 <= c < w and 0 <= r < h and mask[r, c] > 0
+
+
 def simplify(contour, tolerance_px=SIMPLIFY_PX):
     approx = cv2.approxPolyDP(contour.astype(np.float32).reshape(-1, 1, 2), tolerance_px, True)
     return approx.reshape(-1, 2).astype(float)
@@ -129,31 +135,31 @@ def smooth_closed(points, window):
 def centreline_px(mask, outer, hole, d_outer, d_hole):
     """Walk outward from the hole boundary until equidistant from both walls."""
     h, w = mask.shape
-    pts = resample_closed(hole, spacing=4.0)
-    tangents = np.roll(pts, -1, axis=0) - np.roll(pts, 1, axis=0)
-    tangents /= np.linalg.norm(tangents, axis=1, keepdims=True)
-    normals = np.stack([-tangents[:, 1], tangents[:, 0]], axis=1)
-
-    def inside(p):
-        c, r = int(round(p[0])), int(round(p[1]))
-        return 0 <= c < w and 0 <= r < h and mask[r, c] > 0
-
-    # pick the normal sign that points into the corridor
-    probe = pts + 3.0 * normals
-    if np.mean([inside(p) for p in probe]) < 0.5:
-        normals = -normals
+    pts, normals = contour_normals(hole, mask, spacing=4.0, into_corridor=True)
 
     centre = []
     for p, n in zip(pts, normals):
         q = p.copy()
         for _ in range(int(max(h, w))):
             q += 0.5 * n
-            if not inside(q):
+            if not inside(mask, q):
                 break
             if d_outer[int(round(q[1])), int(round(q[0]))] <= d_hole[int(round(q[1])), int(round(q[0]))]:
                 centre.append(q.copy())
                 break
     return np.array(centre)
+
+
+def contour_normals(contour, mask, spacing, into_corridor):
+    """Resampled contour points and unit normals pointing into (or away from) the corridor."""
+    pts = smooth_closed(resample_closed(contour, spacing), window=5)
+    tangents = np.roll(pts, -1, axis=0) - np.roll(pts, 1, axis=0)
+    tangents /= np.maximum(np.linalg.norm(tangents, axis=1, keepdims=True), 1e-9)
+    normals = np.stack([-tangents[:, 1], tangents[:, 0]], axis=1)
+    inward = np.mean([inside(mask, p) for p in pts + 3.0 * normals]) >= 0.5
+    if inward != into_corridor:
+        normals = -normals
+    return pts, normals
 
 
 def signed_area(xy):
@@ -179,11 +185,13 @@ def yaw_at(xy, i):
 # ---------------------------------------------------------------- features
 
 def build_walls(mask, radius_px, frame):
-    """Wall centre polylines (metres): the corridor boundary pushed out by the duct radius."""
-    k = 2 * int(math.ceil(radius_px)) + 1
-    grown = cv2.dilate(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
-    outer, holes = boundaries(grown)
-    loops = [frame.to_map(simplify(c)) for c in [outer] + holes]
+    """Wall centre polylines (metres): each corridor boundary pushed away from the corridor by the
+    duct radius along its normals, so thin islands stay one loop."""
+    outer, holes = boundaries(mask)
+    loops = []
+    for contour in [outer] + holes:
+        pts, normals = contour_normals(contour, mask, spacing=2.0, into_corridor=False)
+        loops.append(frame.to_map(simplify(pts + radius_px * normals)))
     return [w for w in loops if cv2.arcLength(w.astype(np.float32), True) >= MIN_WALL_LENGTH]
 
 

@@ -19,5 +19,6 @@ setup(
     maintainer_email="pranavbhatttheonlyone@gmail.com",
     description="FEB devkit extras",
     license="BSD-2-Clause",
-    entry_points={"console_scripts": ["sensor_noise = feb_tools.sensor_noise:main"]},
+    entry_points={"console_scripts": ["sensor_noise = feb_tools.sensor_noise:main",
+                                      "house_driver = feb_tools.house_driver:main"]},
 )

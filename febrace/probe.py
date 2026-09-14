@@ -50,7 +50,7 @@ def settle_lap_time(node, state, before, wait=2.0):
     to change from the raw value seen at the previous lap. The simulator reports +inf until the
     first lap, which JSON cannot carry: use None."""
     deadline = time.time() + wait
-    while time.time() < deadline and state.get("last_lap_time") in (before, None):
+    while time.time() < deadline and (state.get("last_lap_time") in (before, None) or not math.isfinite(state["last_lap_time"])):
         rclpy.spin_once(node, timeout_sec=0.05)
     t = state.get("last_lap_time")
     return t if t is not None and math.isfinite(t) else None

@@ -26,7 +26,7 @@ PROXY_IMAGE = os.environ.get("FEB_DEVKIT_IMAGE", "ghcr.io/pranman1/feb-devkit:la
 
 
 class Race:
-    def __init__(self, entries, track, sim_exe, event, race_id, rules, base_port=4568, rct_port=4570,
+    def __init__(self, entries, track, sim_exe, event, race_id, rules, base_port=4568, proxy_port=4580,
                  headless=True, runs_dir=pathlib.Path("runs")):
         stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
         self.cars = [Attempt(image=image, track=track, sim_exe=sim_exe, team=team, event=event, rules=rules,
@@ -36,7 +36,7 @@ class Race:
             car.id = f"{stamp}-{race_id}-{car.team.replace(' ', '_')}"
             car.dir = pathlib.Path(runs_dir) / f"{stamp}-{race_id}" / f"car{i + 1}"
             car.container = f"feb-h2h-{stamp}-{i + 1}"
-        self.race_id, self.proxy_port, self.proxy = race_id, rct_port, f"feb-proxy-{stamp}"
+        self.race_id, self.proxy_port, self.proxy = race_id, proxy_port, f"feb-proxy-{stamp}"
 
     def run(self, on_event=print):
         started = dt.datetime.now(dt.timezone.utc)
