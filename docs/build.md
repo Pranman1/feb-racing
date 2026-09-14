@@ -28,7 +28,7 @@ The first build imports the whole project (30 to 90 minutes); later builds take 
 Logs are in `Logs/`. Package the players for the release page:
 
 ```bash
-tar -C Builds/linux -czf FEB-Simulator-linux.tar.gz .
+tar -C Builds/linux --exclude=./runs -czf FEB-Simulator-linux.tar.gz .
 (cd Builds/mac && zip -qr ../../FEB-Simulator-mac.zip "FEB Simulator.app")
 (cd Builds/windows && zip -qr ../../FEB-Simulator-windows.zip .)
 ```

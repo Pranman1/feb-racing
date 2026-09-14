@@ -2,6 +2,21 @@
 
 Newest first.
 
+## 2026-09-14 (later) - ducts inside-out, app install folder, feb-sim update, HUD clock
+
+- Ducts: the tube mesh was wound inside-out (near side culled, far inside visible: the
+  "see-through" walls). Winding flipped; verified on screen.
+- Install bug: the app archive unpacked into `~/.feb-sim/app/` while the launcher looks in
+  `~/.feb-sim/app/<os>/`. A member's first `feb-sim setup` would have failed. Now unpacks into
+  the per-OS folder (`unzip` on Mac to keep permissions); tested into a temporary folder.
+- `feb-sim update`: git pull, docker pull, and the app is replaced when the release asset is
+  newer than the installed one (stamp in `app/release.json`); `feb-sim run` prints one line
+  when an update exists. The app also reads the repo's `tracks/` (`--tracks`), so a pulled
+  track shows in the Track button without an app update.
+- HUD clock: starts at the car's first crossing of the start line (`FebStartLine` on the
+  finish trigger); the upstream LapTimer, which scoring reads, is unchanged.
+- Packaging: exclude the stray `runs/` folder from the Linux archive.
+
 ## 2026-09-14 - Visual look, race HUD, menu icons, qualification rule
 
 - Look: `FebLook.cs` dresses the scene at load (Visual, default): floor tint, an asphalt ribbon

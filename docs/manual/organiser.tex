@@ -210,6 +210,23 @@ leaderboard; the organiser reviews rather than lectures.
 \part{Maintaining the platform}
 % =====================================================================
 
+\section{What reaches members, and how}
+
+Members run \cmd{./feb-sim update} (or just \cmd{git pull}); nothing is pushed to them.
+The launcher tells them when a newer app exists.
+
+\begin{tabularx}{\linewidth}{lXl}
+\toprule
+You change & Members get it by & App rebuild?\\
+\midrule
+A practice track in \file{tracks/} & \cmd{git pull}: the launcher passes the repo's tracks folder to the app, so the Track button shows it & no (only to ship it inside the app)\\
+Launcher, harness, docs, rules & \cmd{git pull} & no\\
+The devkit image (\file{devkit/}) & CI publishes it; \cmd{feb-sim update} pulls it; their next image build inherits it & no\\
+The simulator itself (\file{Assets/FEB}) & you build and upload the release; \cmd{feb-sim update} replaces the app & yes\\
+Results, events, site & nothing: the site rebuilds on push & no\\
+\bottomrule
+\end{tabularx}
+
 \section{Building and releasing the simulator}
 
 The simulator is the \texttt{feb-sim} repo: a fork of the AutoDRIVE Simulator (Unity
@@ -223,7 +240,7 @@ cd ~/FEB/feb-sim
 ./compile_check.sh                       # compiles Assets/FEB against the editor, no licence needed
 ./build.sh scene                         # regenerates the FEB scene from the upstream scene
 ./build.sh linux && ./build.sh mac && ./build.sh windows
-tar -C Builds/linux -czf FEB-Simulator-linux.tar.gz .
+tar -C Builds/linux --exclude=./runs -czf FEB-Simulator-linux.tar.gz .
 (cd Builds/mac && zip -qr ../../FEB-Simulator-mac.zip "FEB Simulator.app")
 (cd Builds/windows && zip -qr ../../FEB-Simulator-windows.zip .)
 gh release upload v0.1.0 -R Pranman1/feb-racing --clobber FEB-Simulator-*.tar.gz FEB-Simulator-*.zip
@@ -231,9 +248,10 @@ gh release upload v0.1.0 -R Pranman1/feb-racing --clobber FEB-Simulator-*.tar.gz
 
 The shipped tracks are copied from \file{../feb-racing/tracks} at build time. The first build
 imports the whole project (30 to 90 minutes); later builds take minutes. Logs are in
-\file{Logs/}. \cmd{feb-sim setup} downloads from the latest release, so uploading with
-\cmd{--clobber} to the existing release is enough; make a new release tag when the launcher's
-expectations change.
+\file{Logs/}. \cmd{feb-sim setup} and \cmd{feb-sim update} download from the latest release and remember
+the asset's upload time, so uploading with \cmd{--clobber} to the existing release is enough:
+members are told a newer app exists the next time they run. Make a new release tag when the
+launcher's expectations change.
 
 \subsection{What the fork adds (\file{Assets/FEB})}
 

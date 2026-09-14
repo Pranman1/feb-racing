@@ -45,6 +45,7 @@ PROXY_PORT = 4565
 OPPONENT_SPEED = {"slow": 1.5, "normal": 2.0, "fast": 2.5}   # the lidar house racer's max_speed
 MAP_OPPONENT_SPEED = 2.5                                      # --opponent map: the map-following driver
 RELEASES = "https://github.com/Pranman1/feb-racing/releases/latest/download"
+RELEASES_API = "https://api.github.com/repos/Pranman1/feb-racing/releases/latest"
 
 
 def fail(msg):
@@ -67,27 +68,82 @@ def cmd_setup(args):
     subprocess.run(["docker", "pull", IMAGE], check=True)
     if app_executable():
         print(f"simulator app present: {app_executable()}")
-        check_foxglove()
-        return
+    else:
+        install_app()
+    check_foxglove()
+
+
+def cmd_update(_):
+    """Bring everything up to date: the repo (tracks, launcher, docs), the devkit image, the app."""
+    if (ROOT / ".git").exists():
+        subprocess.run(["git", "-C", str(ROOT), "pull", "--ff-only"], check=False)
+    subprocess.run(["docker", "pull", IMAGE], check=False)
+    latest = latest_release_stamp()
+    if latest is None:
+        print("could not reach GitHub to check the app; kept the installed one")
+    elif latest == installed_release_stamp():
+        print(f"simulator app is current ({latest})")
+    else:
+        install_app(latest)
+
+
+STAMP = sim.APP_DIR / "release.json"      # which release asset the installed app came from
+
+
+def installed_release_stamp():
+    try:
+        return json.loads(STAMP.read_text())["updated_at"]
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+def latest_release_stamp(timeout=4):
+    """The updated_at of this platform's archive in the latest release, or None offline."""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(RELEASES_API, timeout=timeout) as r:
+            release = json.load(r)
+        return next(a["updated_at"] for a in release["assets"] if a["name"] == sim.archive_name())
+    except Exception:
+        return None
+
+
+def install_app(stamp=None):
     import tarfile
     import urllib.request
     import zipfile
     name = sim.archive_name()
-    sim.APP_DIR.mkdir(parents=True, exist_ok=True)
+    dest = sim.platform_dir()
+    if dest.is_symlink():
+        dest.unlink()        # the organiser PC links the app to the build folder; do not write through it
+    elif dest.exists():
+        shutil.rmtree(dest)  # replace the old install wholesale: builds add and remove files
+    dest.mkdir(parents=True)
     archive = sim.APP_DIR / name
     print(f"downloading {RELEASES}/{name} ...")
     urllib.request.urlretrieve(f"{RELEASES}/{name}", archive)
     if name.endswith(".zip"):
-        zipfile.ZipFile(archive).extractall(sim.APP_DIR)
+        if shutil.which("unzip"):    # keeps permissions and symlinks inside the Mac app bundle
+            subprocess.run(["unzip", "-q", str(archive), "-d", str(dest)], check=True)
+        else:
+            zipfile.ZipFile(archive).extractall(dest)
     else:
-        tarfile.open(archive).extractall(sim.APP_DIR)
+        tarfile.open(archive).extractall(dest)
     archive.unlink()
     exe = app_executable()
     if exe is None:
         fail(f"unpacked the app but did not find the executable under {sim.APP_DIR}")
     exe.chmod(0o755)
+    STAMP.write_text(json.dumps({"updated_at": stamp or latest_release_stamp() or ""}))
     print(f"simulator app installed: {exe}")
-    check_foxglove()
+
+
+def app_update_hint():
+    """One line if a newer app is on the release page; silent offline (a 2 s budget)."""
+    latest = latest_release_stamp(timeout=2)
+    installed = installed_release_stamp()
+    if latest and installed and latest != installed:
+        print("a newer simulator app is available: ./feb-sim update")
 
 
 def check_foxglove():
@@ -220,6 +276,7 @@ def cmd_run(args):
     exe = app_executable()
     if exe is None:
         fail("simulator app not found; run `feb-sim setup` or set FEB_SIM_APP")
+    app_update_hint()
     print(f"starting devkit ({IMAGE}) ...")
     start_container(args.stack, args.noise)
     track = resolve_track(args.track)
@@ -234,7 +291,7 @@ def cmd_run(args):
             fail(f"{pathlib.Path(track).name} is a single-car track (too narrow to race side by side)")
         start_opponent(args.opponent, track)
         cars, port = max(cars, 2), PROXY_PORT
-    sim = [str(exe), "--track", track, "--connect", f"127.0.0.1:{port}",
+    sim = [str(exe), "--track", track, "--tracks", str(TRACKS), "--connect", f"127.0.0.1:{port}",
            "--mode", mode, "--cars", str(cars)]
     if args.lidar_hz:
         sim += ["--lidar-hz", str(args.lidar_hz)]
@@ -332,6 +389,7 @@ def main():
     submit.set_defaults(func=cmd_submit)
     setup = sub.add_parser("setup", help="install prerequisites, optionally set your team name")
     setup.add_argument("--team")
+    sub.add_parser("update", help="git pull, newer devkit image, newer simulator app").set_defaults(func=cmd_update)
     setup.set_defaults(func=cmd_setup)
     for name, func in (("shell", cmd_shell), ("stop", cmd_stop)):
         sub.add_parser(name).set_defaults(func=func)

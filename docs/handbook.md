@@ -46,6 +46,8 @@ and throttle in [-1, 1] (0 is a hard brake). Everything else is a sensor.
    it on your car's topics (`ws://localhost:8765`, the devkit's `foxglove_bridge`); `--no-foxglove` skips that.
    In the app: the menu's "Track" and "Cars" buttons cycle tracks and put more cars on the grid;
    "Look" switches between the dressed scene and the bare one (`--look simple` for weak laptops).
+   Later: `./feb-sim update` pulls the repo (new tracks show up in the Track button at once),
+   the newer devkit image and, when the organiser released one, the newer app.
 4. **Score yourself.** `./feb-sim practice --stack "..."`: warm-up plus 10 timed laps, 10 s per
    collision, DNF after 300 s. The result and a bag land in `runs/<id>/`.
 5. **Post it.** `./feb-sim submit`: opens a pull request with the result file; a check validates

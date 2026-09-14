@@ -56,7 +56,8 @@ with no stack given, the launcher starts no driver and no opponent. Arrow keys s
 throttle. The menu in the top-left has the Manual/Autonomous button, the Track button (cycles
 the built-in tracks), the Cars button (more cars on the grid), the Look button (Visual or
 Simple scene; Simple for a weak laptop) and the camera choices. The HUD at the bottom shows
-the running lap time, last and best lap, lap count, collisions and speed. After your first
+the running lap time (its clock starts when you first cross the start line), last and best
+lap, lap count, collisions and speed. After your first
 completed lap a translucent gold ghost replays your best lap so you can see where you gain
 and lose time.
 
@@ -158,6 +159,18 @@ rqt
 \end{lstlisting}
 
 The container log (build errors, your node's output) is \cmd{docker logs feb-devkit}.
+
+\subsection{Keeping up to date}
+
+\begin{lstlisting}
+./feb-sim update
+\end{lstlisting}
+
+One command pulls the repo (new practice tracks, launcher and docs), pulls the newer devkit
+image if there is one, and replaces the simulator app if the organiser has released a new
+build. New tracks need no app update: the launcher hands the repo's \file{tracks/} folder to
+the app, so a pulled track appears in the Track button right away. \cmd{./feb-sim run} prints
+one line when a newer app exists.
 
 \section{Score yourself and post it}
 
@@ -265,6 +278,7 @@ Command & What it does\\
 \cmd{feb-sim run [--track] [--stack] [--mode] [--opponent] [--cars] [--noise] [--lidar-hz] [--camera] [--no-foxglove]} & start the container, the simulator and Foxglove, connected\\
 \cmd{feb-sim practice --stack S [--track] [--laps]} & one scored attempt into \file{runs/<id>/}\\
 \cmd{feb-sim submit [--run DIR]} & pull request with the newest (or given) result\\
+\cmd{feb-sim update} & git pull, newer devkit image, newer simulator app\\
 \cmd{feb-sim shell} & ROS~2 shell inside the running container\\
 \cmd{feb-sim stop} & stop containers and the simulator\\
 \bottomrule
