@@ -1,6 +1,6 @@
 # FEB Racing handbook
 
-One document for both roles. Detail pages: `starter-kit.md`, `tracks.md`, `competition.md`,
+One document for both roles. Printable version: `docs/manual/manual.pdf` (LaTeX source alongside). Detail pages: `starter-kit.md`, `tracks.md`, `competition.md`,
 `head-to-head.md`, `semester.md`, `build.md`, `unity-licence.md`.
 
 ## What the pieces are
