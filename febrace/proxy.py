@@ -55,7 +55,9 @@ class Proxy:
 
     def from_simulator(self, sid, data):
         self.count += 1
-        now = time.time()
+        # rate-limit in simulated time when the simulator reports it (a stalled simulator then
+        # still delivers 10 Hz of simulated motion), else in wall time
+        now = float(data["Sim Time"]) if isinstance(data, dict) and "Sim Time" in data else time.time()
         if self.rate > 0.0 and now < self.next_forward:
             self.server.emit("Bridge", self.snapshot(), to=sid)   # keep the simulator's loop fast
             return

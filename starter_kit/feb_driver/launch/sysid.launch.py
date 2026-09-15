@@ -9,5 +9,5 @@ TOPICS = ["/autodrive/roboracer_1/" + t for t in
 def generate_launch_description():
     return LaunchDescription([
         ExecuteProcess(cmd=["ros2", "bag", "record", "-o", "/home/autodrive_devkit/src/stack/sysid_bag"] + TOPICS, output="screen"),
-        Node(package="feb_driver", executable="sysid_probe", name="sysid_probe", output="screen", emulate_tty=True),
+        Node(package="feb_driver", executable="sysid_probe", name="sysid_probe", parameters=[{"use_sim_time": True}], output="screen", emulate_tty=True),
     ])

@@ -62,9 +62,21 @@ Topic & Type & Notes\\
 
 \medskip
 Wheelbase 0.324~m, half width 0.135~m, steady-state speed about 23~m/s per unit throttle.
-With a window open the bridge exchanges data at about 10~Hz (each exchange reads the
-cameras back from the GPU); headless it reaches 20 to 40~Hz. Scored runs go through a proxy
-fixed at 10~Hz for everyone, so a driver must cope with 10~Hz. The starter kit does.
+With a window open the bridge exchanges data at about 10~Hz; headless it reaches 20 to
+40~Hz. Scored runs go through a proxy fixed at 10~Hz for everyone, so a driver must cope
+with 10~Hz. The starter kit does.
+
+\subsection{Time}
+
+Physics runs in \emph{simulated} time. When the machine cannot keep up (a screen recorder,
+a browser, two cars) the simulator advances physics by at most 0.1~s per frame, so simulated
+time falls behind the wall clock rather than the car jumping. Everything is built so that
+this cannot hurt a driver: every message stamp and the \texttt{/clock} topic carry simulated
+time, the starter kit runs with \texttt{use\_sim\_time}, lap timers count simulated time,
+the scoring proxy delivers 10~Hz of \emph{simulated} time, and the render rate is capped so
+it rarely happens at all. The HUD shows the real-time factor (RTF, simulated seconds per wall
+second; red below 0.9) and every result records it. If you write your own nodes, use the
+message stamps or \texttt{use\_sim\_time}, never the wall clock, for speeds and integrals.
 
 \section{Rules}
 

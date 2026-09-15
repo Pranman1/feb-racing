@@ -2,6 +2,38 @@
 
 Newest first.
 
+## 2026-09-14 (night) - simulated time end to end: stamps, /clock, RTF, frame cap, camera cache
+
+Context: a note from the RoboRacer session (verified against this fork) showed that under GPU
+contention Unity advances physics by at most 0.1 s per frame, telemetry is frame-bound, the
+payload had no time field, and the frame rate was uncapped. Drivers dividing encoder distance
+by wall time then read speed 2-3x low during stalls and braked into corners.
+
+All fixes are in the simulator and the devkit; competitors change nothing.
+- Simulator: `FebRealTime` (Assets/FEB) tracks simulated time and a smoothed real-time factor
+  (RTF). `Socket.cs` adds `Sim Time` and `Real Time Factor` to every telemetry message and
+  reads each bridge camera back at most `--camera-hz` (10) times per simulated second, reusing
+  the frame in between (the readback was the costly part of a message). `RenderingQuality.cs`
+  caps rendering at `--fps` (60; 0 = uncapped) instead of -1. HUD shows `RTF x.xx`, red < 0.9.
+  Maximum Allowed Timestep stays 0.1 s (documented).
+- Devkit bridge (our copy): stamps every message with `Sim Time`, publishes `/clock`
+  (rosgraph_msgs) and `/autodrive/roboracer_1/real_time_factor`. Starter launch files and the
+  house racer run with `use_sim_time`. Starter driver never drops a scan silently (long gap is
+  clamped, still commands).
+- Proxy: `--rate` paces in simulated time when the payload carries `Sim Time`.
+- Harness: the probe measures RTF from `/clock`; `result.json` records `real_time_factor`.
+- Launcher: `--fps`, `--camera-hz`; `FEB_DEVKIT_PORT` env override (another bridge held 4567 on
+  this PC during the test).
+- Measured on this PC (with the roboracer session's headless league sim also running):
+  idle: lidar 12 Hz, sim gap = wall gap 0.082 s, RTF 1.000. Under a full-screen xwd grab loop:
+  wall gaps up to 0.285 s but simulated gaps at most 0.168 s, RTF 0.907 measured vs 0.92
+  reported by the simulator. Headless starter practice unchanged: 11 laps, 0 hits, 14.04 s
+  best, RTF 1.0 in the result.
+- Not done, and why: emitting telemetry from a physics-side timer independent of rendering is
+  not possible on Unity's main thread (FixedUpdate catch-up steps run inside a frame too); the
+  cap plus the camera cache remove most of the frame cost instead, and the sim-time stamps make
+  the remainder harmless to drivers.
+
 ## Future plans (not started)
 
 - RoboSense M1 on the nose: a solid-state scan pattern (120 x 25 deg, ~0.2 deg, 10 Hz) on the

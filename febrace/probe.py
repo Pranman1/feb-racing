@@ -17,6 +17,7 @@ import time
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSDurabilityPolicy, QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy
+from rosgraph_msgs.msg import Clock
 from std_msgs.msg import Float32, Int32
 
 NS = "/autodrive/roboracer_1/"
@@ -68,6 +69,13 @@ def main():
     state = {}
     for name, T in (("lap_count", Int32), ("collision_count", Int32), ("last_lap_time", Float32)):
         node.create_subscription(T, NS + name, (lambda k: lambda m: state.__setitem__(k, m.data))(name), QOS)
+    # simulated time from the bridge's /clock: the run's real-time factor is sim elapsed / wall elapsed
+    clock = {}
+    def on_clock(m):
+        sim = m.clock.sec + m.clock.nanosec * 1e-9
+        clock.setdefault("first", (sim, time.time()))
+        clock["last"] = (sim, time.time())
+    node.create_subscription(Clock, "/clock", on_clock, 10)
 
     t0 = time.time()
     base = None
@@ -101,8 +109,11 @@ def main():
     if base is None:
         emit(event="end", t=round(time.time() - t0, 2), error="no telemetry")
     else:
+        rtf = None
+        if "last" in clock and clock["last"][1] - clock["first"][1] > 1.0:
+            rtf = round((clock["last"][0] - clock["first"][0]) / (clock["last"][1] - clock["first"][1]), 3)
         emit(event="end", t=round(time.time() - t0, 2), laps=seen_lap - base[0],
-             collisions=seen_col - base[1], lap_times=lap_times)
+             collisions=seen_col - base[1], lap_times=lap_times, real_time_factor=rtf)
     node.destroy_node()
     rclpy.shutdown()
 

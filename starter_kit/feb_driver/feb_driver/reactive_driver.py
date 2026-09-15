@@ -96,8 +96,9 @@ class ReactiveDriver(Node):
             t = self.get_clock().now().nanoseconds * 1e-9
         dt = t - self.last_scan_t if self.last_scan_t else 0.0
         self.last_scan_t = t
-        if not 0.0 < dt < 1.0:
+        if dt <= 0.0:
             return
+        dt = min(dt, 0.5)   # a long gap (stalled simulator) still gets a command; never go blind
 
         ranges = np.asarray(msg.ranges, dtype=float)
         ranges[~np.isfinite(ranges)] = msg.range_max

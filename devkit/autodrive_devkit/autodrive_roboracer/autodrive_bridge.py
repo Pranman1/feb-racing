@@ -33,6 +33,8 @@ import rclpy # ROS 2 client library (rcl) for Python (built on rcl C API)
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy # Quality of Service (tune communication between nodes)
 import tf2_ros # ROS bindings for tf2 library to handle transforms
 from std_msgs.msg import Int32, Float32, Header # Int32, Float32 and Header message classes
+from rosgraph_msgs.msg import Clock # FEB: /clock in simulated time
+from rclpy.time import Time as RclTime # FEB: build stamps from simulated seconds
 from geometry_msgs.msg import Point, TransformStamped # Point and TransformStamped message classes
 from sensor_msgs.msg import JointState, Imu, LaserScan, Image # JointState, Imu, LaserScan and Image message classes
 from nav_msgs.msg import Odometry # Odometry message class
@@ -102,7 +104,7 @@ def create_float_msg(f, val):
 
 def create_joint_state_msg(js, joint_angle, joint_name, frame_id):
     js.header = Header()
-    js.header.stamp = autodrive_bridge.get_clock().now().to_msg()
+    js.header.stamp = sim_stamp()
     js.header.frame_id = frame_id
     js.name = [joint_name]
     js.position = [joint_angle]
@@ -118,7 +120,7 @@ def create_point_msg(p, position):
 
 def create_imu_msg(imu, orientation_quaternion, angular_velocity, linear_acceleration):
     imu.header = Header()
-    imu.header.stamp = autodrive_bridge.get_clock().now().to_msg()
+    imu.header.stamp = sim_stamp()
     imu.header.frame_id = 'imu'
     imu.orientation.x = orientation_quaternion[0]
     imu.orientation.y = orientation_quaternion[1]
@@ -137,7 +139,7 @@ def create_imu_msg(imu, orientation_quaternion, angular_velocity, linear_acceler
 
 def create_odom_msg(odom, position, orientation_quaternion, linear_velocity, angular_velocity):
     odom.header = Header()
-    odom.header.stamp = autodrive_bridge.get_clock().now().to_msg()
+    odom.header.stamp = sim_stamp()
     odom.header.frame_id = 'world'
     odom.child_frame_id = 'roboracer_1'
     odom.pose.pose.position.x = position[0]
@@ -169,7 +171,7 @@ def create_odom_msg(odom, position, orientation_quaternion, linear_velocity, ang
 
 def create_laserscan_msg(ls, lidar_scan_rate, lidar_range_array, lidar_intensity_array):
     ls.header = Header()
-    ls.header.stamp = autodrive_bridge.get_clock().now().to_msg()
+    ls.header.stamp = sim_stamp()
     ls.header.frame_id = 'lidar'
     ls.angle_min = -2.35619 # Minimum angle of laser scan (0 degrees)
     ls.angle_max = 2.35619 # Maximum angle of laser scan (270 degrees)
@@ -185,13 +187,13 @@ def create_laserscan_msg(ls, lidar_scan_rate, lidar_range_array, lidar_intensity
 def create_image_msg(img, frame_id):
     img = cv_bridge.cv2_to_imgmsg(img, encoding="rgb8")
     img.header = Header()
-    img.header.stamp = autodrive_bridge.get_clock().now().to_msg()
+    img.header.stamp = sim_stamp()
     img.header.frame_id = frame_id
     return img
 
 def create_tf_msg(child_frame_id, parent_frame_id, position_tf, orientation_tf):
     tf = TransformStamped()
-    tf.header.stamp = autodrive_bridge.get_clock().now().to_msg()
+    tf.header.stamp = sim_stamp()
     tf.header.frame_id = parent_frame_id
     tf.child_frame_id = child_frame_id
     tf.transform.translation.x = position_tf[0] # Pos X
@@ -297,6 +299,28 @@ def callback_reset_command(reset_command_msg):
 # WEBSOCKET SERVER INFRASTRUCTURE
 #########################################################
 
+#########################################################
+# FEB: SIMULATED TIME
+#########################################################
+# The simulator advances physics by at most 0.1 s per rendered frame, so under GPU load
+# simulated time runs slower than the wall clock. Every message carries "Sim Time"; stamps
+# and /clock use it, so drivers integrate correctly through such stalls (set use_sim_time).
+sim_time_s = None          # latest simulated time from the simulator, seconds
+real_time_factor = 1.0     # simulated seconds per wall second, as measured by the simulator
+clock_publisher = None
+rtf_publisher = None
+
+def sim_stamp():
+    if sim_time_s is None:
+        return autodrive_bridge.get_clock().now().to_msg()
+    return RclTime(nanoseconds=int(sim_time_s * 1e9)).to_msg()
+
+def publish_clock():
+    if clock_publisher is not None and sim_time_s is not None:
+        clock_publisher.publish(Clock(clock=sim_stamp()))
+    if rtf_publisher is not None:
+        rtf_publisher.publish(create_float_msg(Float32(), real_time_factor))
+
 # Initialize the server
 sio = socketio.Server(async_mode='gevent')
 
@@ -309,10 +333,15 @@ def connect(sid, environ):
 @sio.on('Bridge')
 def bridge(sid, data):
     # Global declarations
-    global autodrive, autodrive_bridge, cv_bridge, publishers, transform_broadcaster
+    global autodrive, autodrive_bridge, cv_bridge, publishers, transform_broadcaster, sim_time_s, real_time_factor
 
     # Wait for data to become available
     if data:
+        # FEB: simulated time first, so every stamp below uses it
+        if "Sim Time" in data:
+            sim_time_s = float(data["Sim Time"])
+            real_time_factor = float(data.get("Real Time Factor", 1.0))
+            publish_clock()
         ########################################################################
         # INCOMMING DATA
         ########################################################################
@@ -410,6 +439,9 @@ def main():
     # ROS 2 infrastructure
     rclpy.init() # Initialize ROS 2 communication for this context
     autodrive_bridge = rclpy.create_node('autodrive_bridge') # Create ROS 2 node
+    global clock_publisher, rtf_publisher
+    clock_publisher = autodrive_bridge.create_publisher(Clock, '/clock', 10) # FEB: simulated time
+    rtf_publisher = autodrive_bridge.create_publisher(Float32, '/autodrive/roboracer_1/real_time_factor', 10)
     qos_profile = QoSProfile( # Ouality of Service profile
         durability=QoSDurabilityPolicy.VOLATILE, # Volatile durability with no attempt made to persist samples
         reliability=QoSReliabilityPolicy.RELIABLE, # Reliable (not best effort) communication to guarantee that samples are delivered

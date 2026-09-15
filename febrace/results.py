@@ -37,6 +37,7 @@ def build(attempt, events, started):
         "duration_s": end.get("t"),
         "status": status,
         "laps_completed": end.get("laps") or 0,
+        "real_time_factor": end.get("real_time_factor"),   # simulated / wall time over the run; ~1.0 is healthy
         "warmup_s": lap_times[0] if lap_times else None,
         "lap_times": [round(t, 3) for t in timed],
         "collisions": collisions,

@@ -108,6 +108,9 @@ and flags the result. Everything must start from the container's entrypoint, not
 - *Port 4567 in use*: another bridge container is running (`docker ps`; `./feb-sim stop`).
 - *Car does not move*: the stack did not start (`./feb-sim shell`, `ros2 node list`), or the
   mode is Manual (the launcher picks Autonomous whenever `--stack` is given; the menu button toggles it).
+- *Simulated time*: physics can only fall behind the wall clock, never jump. Stamps and `/clock` are
+  simulated time, the starter kit uses `use_sim_time`, results record `real_time_factor` (HUD: RTF).
+  Use message stamps, not the wall clock, in your own nodes. `--fps` caps rendering (default 60).
 - *Bridge rate*: with a window open the simulator exchanges data at about 10 Hz on Linux
   (each exchange reads the cameras back from the GPU); headless it is 20 to 40 Hz. Drivers must
   cope with 10 Hz: the starter kit and the house driver do, a plain PI speed loop does not.

@@ -38,7 +38,7 @@ IMAGE = os.environ.get("FEB_DEVKIT_IMAGE", "ghcr.io/pranman1/feb-devkit:latest")
 CONTAINER = "feb-devkit"
 OPPONENT = "feb-opponent"
 PROXY = "feb-proxy"
-PORT = 4567
+PORT = int(os.environ.get("FEB_DEVKIT_PORT", 4567))   # override when another bridge holds 4567 on this machine
 OPPONENT_PORT = 4566
 FOXGLOVE_PORT = 8765      # foxglove_bridge inside the devkit: live topics for the Foxglove app on the laptop
 PROXY_PORT = 4565
@@ -169,7 +169,7 @@ def start_container(stack_cmd, noise=""):
     if container_running():
         subprocess.run(["docker", "rm", "-f", CONTAINER], capture_output=True)
     STACK.mkdir(exist_ok=True)
-    cmd = ["docker", "run", "-d", "--rm", "--name", CONTAINER, "-p", f"{PORT}:{PORT}",
+    cmd = ["docker", "run", "-d", "--rm", "--name", CONTAINER, "-p", f"{PORT}:4567",
            "-p", f"{FOXGLOVE_PORT}:{FOXGLOVE_PORT}", "-e", "ROS_LOCALHOST_ONLY=1",
            "-v", f"{STACK}:/home/autodrive_devkit/src/stack",
            "-v", f"{TRACKS}:/home/autodrive_devkit/tracks:ro",
@@ -196,11 +196,11 @@ def start_opponent(level, track):
     if not json.loads((pathlib.Path(track) / "track.json").read_text()).get("walls"):
         level = "map"   # no walls to follow: the lidar racer would wander; the map follower knows the lane
     if level == "map":
-        launch = f"ros2 run feb_tools house_driver --ros-args -p track:=/track -p max_speed:={MAP_OPPONENT_SPEED}"
+        launch = f"ros2 run feb_tools house_driver --ros-args -p track:=/track -p max_speed:={MAP_OPPONENT_SPEED} -p use_sim_time:=true"
         speed = MAP_OPPONENT_SPEED
     else:
         speed = OPPONENT_SPEED[level]
-        launch = f"ros2 run feb_driver reactive_driver --ros-args -p max_speed:={speed} -p bubble:=0.45"
+        launch = f"ros2 run feb_driver reactive_driver --ros-args -p max_speed:={speed} -p bubble:=0.45 -p use_sim_time:=true"
     subprocess.run(["docker", "run", "-d", "--rm", "--name", OPPONENT, "-p", f"{OPPONENT_PORT}:4567", "-e", "ROS_LOCALHOST_ONLY=1",
                     "-e", "FEB_FOXGLOVE=0",
                     "-v", f"{track}:/track:ro", "-v", f"{ROOT / 'starter_kit'}:/home/autodrive_devkit/src/stack:ro",
@@ -299,6 +299,10 @@ def cmd_run(args):
         sim += ["--camera", args.camera]
     if args.look or args.headless:
         sim += ["--look", "simple" if args.headless else args.look]   # nothing to see headless
+    if args.fps is not None:
+        sim += ["--fps", str(args.fps)]
+    if args.camera_hz is not None:
+        sim += ["--camera-hz", str(args.camera_hz)]
     if args.headless:
         sim += ["-batchmode", "-nographics"]
     print("starting simulator:", " ".join(sim[1:]))
@@ -377,6 +381,8 @@ def main():
     run.add_argument("--camera", help="starting camera: \"God's Eye\", Trackcam, \"Driver's Eye\", ...")
     run.add_argument("--no-foxglove", action="store_true", help="do not open Foxglove on the devkit's topics")
     run.add_argument("--look", choices=["visual", "simple"], help="dressed scene or the bare one (default: last choice in the app, else visual)")
+    run.add_argument("--fps", type=int, help="render-rate cap (default 60, 0 = uncapped); keeps simulated time at real time")
+    run.add_argument("--camera-hz", type=float, help="bridge camera readback rate (default 10, 0 = every message)")
     run.set_defaults(func=cmd_run)
     practice = sub.add_parser("practice", help="scored attempt under competition rules")
     practice.add_argument("--track", default="loop")

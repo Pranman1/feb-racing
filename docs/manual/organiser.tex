@@ -300,6 +300,18 @@ publishes \file{ghcr.io/pranman1/feb-devkit} for amd64 and arm64
 (\file{.github/workflows/devkit.yml}). Members' images are built \emph{from} this one, so a
 devkit change reaches them on their next image build.
 
+\section{Timing and comparability}
+
+Runs on different machines are comparable because the harness scores in simulated time: the
+simulator stamps every message (\texttt{Sim Time}), the bridge publishes \texttt{/clock},
+the proxy paces the devkit at 10~Hz of simulated time, and lap timers are simulated time.
+Each \file{result.json} records \texttt{real\_time\_factor}, the run's simulated seconds per
+wall second; a value well below 1 means the PC was overloaded during that run (rerun it, and
+keep recorders, browsers and Foxglove off the organiser PC during events). The simulator caps
+rendering at 60~fps (\texttt{--fps}) and reads cameras back at 10~Hz (\texttt{--camera-hz}) so
+that physics keeps real time; headless runs need neither. Details: \file{STATUS.md},
+2026-09-14 timing entry.
+
 \section{Frequently hit}
 
 \begin{tabularx}{\linewidth}{lX}
