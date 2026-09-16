@@ -1,0 +1,180 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage[hidelinks,colorlinks=true,linkcolor=febblue,urlcolor=febblue]{hyperref}
+\definecolor{febblue}{HTML}{1C4687}
+\definecolor{febgold}{HTML}{FDB515}
+\newcommand{\file}[1]{\texttt{#1}}
+\setlength{\parskip}{4pt}
+
+\title{\color{febblue}\LARGE Autonomous Racing Hardware Proposal\\[4pt]\large Formula Electric at Berkeley, Autonomous Team}
+\author{Prepared for the FEB leadership and budget committee}
+\date{September 2026}
+
+\begin{document}
+\maketitle
+
+\section*{Summary}
+
+Over the last month the autonomous team built and shipped a complete sim-racing platform:
+a native simulator of the RoboRacer 1:10 race car, a containerised ROS~2 devkit, a starter
+driving stack, a competition harness and a public leaderboard, with a two-stage season
+(qualification, then a head-to-head final) and written manuals for competitors and organisers.
+Members can be driving a car in software within an hour of joining. What they cannot do yet is
+put that software on a real car. This proposal asks for \textbf{one RoboRacer-standard 1:10
+vehicle and a track kit now (\$3{,}500 including contingency) and a second car plus a camera
+next semester (\$2{,}900)}, so that
+the same code members write for the simulator runs on hardware, and so FEB can enter the
+RoboRacer physical competitions.
+
+\section{What we have built}
+
+\begin{tabularx}{\linewidth}{lX}
+\toprule
+Piece & What it does \\
+\midrule
+FEB Simulator & Native Mac, Windows and Linux app; a fork of the AutoDRIVE simulator carrying the RoboRacer digital twin unchanged. Tracks load from folders; head-to-head with up to four cars; a house racer to practise overtakes against. \\
+Devkit & A Docker image (ROS~2 Humble) that turns the simulator's sensor stream into ROS topics and hosts the member's code. Foxglove for visualisation on any laptop. \\
+Starter kit & A commented reactive driver that laps any track, with a tuning file and a system-identification tool; the learning path goes from tuning it to mapping, racelines and model-predictive control. \\
+Competition harness & Runs every team's submitted image on a secret track under league rules, records bags, audits banned topics, publishes results. \\
+Leaderboard site & Practice boards per track, qualification status per team, competition standings and brackets. \\
+Manuals & A competitor manual (install to leaderboard entry) and an organiser manual (tracks, events, race day, releases). \\
+\bottomrule
+\end{tabularx}
+
+\textbf{Onboarding.} A new member clones one repository, runs one setup command, and drives
+manually. Copying the starter kit and running one more command puts an autonomous car on
+track. Their first leaderboard entry follows the same afternoon. No ROS installation, no
+hardware, no organiser time.
+
+\textbf{The season.} Members qualify by completing ten laps with at most one collision on
+every practice track. Qualified teams race a time-attack on a secret track; the top seeds meet
+in a two-car knockout final. All of this exists and has been exercised end to end.
+
+\section{Why hardware, and why now}
+
+\begin{itemize}
+  \item \textbf{Sim-to-real is the point of the exercise.} The simulator's car is the digital twin of the RoboRacer reference vehicle. A stack tuned in it is meant to transfer to the real car; without one, that claim is never tested and members never meet latency, tyre variation, or a lidar that sees the room.
+  \item \textbf{Competitions.} RoboRacer (formerly F1TENTH) runs physical races at ICRA, IROS and IFAC each year, on the same rules our league uses. Our simulator entries already match the league's format; a car makes the physical events reachable.
+  \item \textbf{Retention.} Software-only teams lose members after the first semester. A car on a table is what keeps a room full.
+\end{itemize}
+
+\section{Platform choice}
+
+\subsection{Traxxas Slash 4x4 (1:10), the RoboRacer standard}
+
+The RoboRacer build is defined around the Traxxas Slash 4x4 Premium chassis. Everything
+downstream assumes it: the published bill of materials and build videos, the laser-cut
+mounting plates, the VESC motor-controller settings, the tyre and wheelbase numbers in the
+simulator, and the rules of every physical competition (chassis codes TRA74054, TRA6804R,
+TRA68086). Choosing it means the team inherits a community's solved problems instead of
+solving them alone.
+
+\subsection{Why not the team's Tamiya 1:10 chassis}
+
+A motorless Tamiya touring-car kit is available. It would save the chassis cost (about \$350)
+and cost a semester: different wheelbase and track width from the simulator model, no
+brushless motor or controller pairing to copy, no sensor plates, and no competition
+eligibility. That is mechanical engineering, not autonomy, and it is work no one else has
+documented. Recommendation: keep it as a bench chassis for practising sensor mounting and
+wiring, and race on the Slash.
+
+\subsection{Why not a larger scale}
+
+A 1:5 or larger car needs an outdoor-sized track, carries several times the energy, cannot be
+run safely in a lab, and has no autonomous-racing community around it. Traxxas makes no
+road-going car at that scale in any case. Scale 1:10 is where the league, the parts, the
+tracks (33~cm air-duct walls in a lab) and our simulator all are.
+
+\section{Bill of materials, one car}
+
+Prices are September 2026 list prices in USD, rounded; verify at order time.
+
+\begin{tabularx}{\linewidth}{Xrl}
+\toprule
+Item & Est. & Note \\
+\midrule
+Traxxas Slash 4x4 Premium chassis (TRA74054) & 380 & the RoboRacer reference chassis \\
+Velineon 3500 brushless motor & 70 & if not included with the chassis \\
+VESC 6 MkVI motor controller & 260 & the standard controller; has an IMU \\
+NVIDIA Jetson Orin Nano developer kit & 250 & any suitable computer is allowed by the rules \\
+2D lidar: Hokuyo UST-10LX & 1{,}500 & the reference sensor; 40~Hz, 270\textdegree, 10~m \\
+\quad \emph{alternative:} Slamtec RPLidar S2 & (400) & saves \$1{,}100; slower and noisier, still legal \\
+Power: two 3S 5000~mAh LiPo, charger, LiPo bag & 200 & \\
+Power distribution board (RoboRacer powerboard) & 100 & \\
+Mounting plates, standoffs, cables, hub, fasteners & 120 & laser-cut from the published drawings \\
+Spares: tyres, pinion, bumper & 80 & \\
+\midrule
+\textbf{Total with Hokuyo} & \textbf{2{,}960} & \\
+\textbf{Total with RPLidar S2} & \textbf{1{,}860} & \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+The recommended purchase is \textbf{the Hokuyo configuration} for the first car: it is what
+the league and our simulator model, and the lidar is the one part that decides how fast the
+car can safely go. If the budget forces a choice, buy the RPLidar car now and upgrade the lidar
+for competition season.
+
+\section{Track kit}
+
+\begin{tabularx}{\linewidth}{Xrl}
+\toprule
+Item & Est. & Note \\
+\midrule
+Flexible aluminium air duct, 33~cm diameter, 30~m & 150 & the league's track walls; folds flat for storage \\
+Blue and yellow cones, floor tape, lap-timing gate (photo interrupter) & 90 & \\
+\midrule
+\textbf{Total} & \textbf{240} & \\
+\bottomrule
+\end{tabularx}
+
+\section{The ask, in two phases}
+
+\begin{tabularx}{\linewidth}{lXr}
+\toprule
+Phase & Contents & Total \\
+\midrule
+A, this semester & One car with Hokuyo lidar, track kit, 10\,\% contingency & \$3{,}500 \\
+B, next semester & Second car (RPLidar, for head-to-head and as a spare), Intel RealSense D435i depth camera for the cone-perception project, spares & \$2{,}900 \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+Phase A alone gives every qualified team a car to run on. Phase B is what makes the
+head-to-head final and the perception project real.
+
+\section{Timeline}
+
+\begin{tabularx}{\linewidth}{lX}
+\toprule
+When & Milestone \\
+\midrule
+Order + 2 weeks & Car assembled from the published build guide; manual drive; sensors on ROS~2 \\
++ 4 weeks & Starter kit laps the lab track; simulator-to-car gap measured and written up \\
++ 8 weeks & Qualified teams run their own stacks on the car; first internal physical time-attack \\
+Spring & Entry to a RoboRacer physical competition \\
+\bottomrule
+\end{tabularx}
+
+\section{Risks}
+
+\begin{itemize}
+  \item \textbf{Crashes.} The Slash is a bashing truck; the lidar is the fragile part. Bumper, walls of soft duct, and a speed limit for new stacks. Spares are budgeted.
+  \item \textbf{Battery safety.} LiPo bag, supervised charging, a written procedure before the first charge.
+  \item \textbf{Supply.} Hokuyo lead times vary; order it first. Every other part is stocked by hobby and electronics retailers.
+  \item \textbf{Ownership.} The car lives with the autonomous team lead; access is through the same qualification rule as the simulator, so it is never an untested stack's first target.
+\end{itemize}
+
+\bigskip
+\noindent Simulator, devkit, manuals and results: \url{https://github.com/Pranman1/feb-racing}\\
+Leaderboard: \url{https://pranman1.github.io/feb-racing/}\\
+RoboRacer build guide and bill of materials: \url{https://f1tenth.readthedocs.io}\\
+RoboRacer competition rules: \url{https://github.com/f1tenth/roboracer_rules}
+
+\end{document}
