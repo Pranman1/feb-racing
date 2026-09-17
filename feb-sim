@@ -200,7 +200,7 @@ def start_opponent(level, track):
         speed = MAP_OPPONENT_SPEED
     else:
         speed = OPPONENT_SPEED[level]
-        launch = f"ros2 run feb_driver reactive_driver --ros-args -p max_speed:={speed} -p bubble:=0.45 -p use_sim_time:=true"
+        launch = f"ros2 run feb_driver reactive_driver --ros-args -p max_speed:={speed} -p bubble:=0.45 -p follow_gap:=2.0 -p use_sim_time:=true"
     subprocess.run(["docker", "run", "-d", "--rm", "--name", OPPONENT, "-p", f"{OPPONENT_PORT}:4567", "-e", "ROS_LOCALHOST_ONLY=1",
                     "-e", "FEB_FOXGLOVE=0",
                     "-v", f"{track}:/track:ro", "-v", f"{ROOT / 'starter_kit'}:/home/autodrive_devkit/src/stack:ro",

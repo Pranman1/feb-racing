@@ -46,9 +46,15 @@ def teams():
     return yaml.safe_load((ROOT / "submissions.yaml").read_text())["teams"]
 
 
+def qualifying_tracks():
+    """Practice tracks that count for qualification (track.yaml `qualifying`, default true)."""
+    return [p.parent for p in sorted((ROOT / "tracks").glob("*/track.json"))
+            if json.loads(p.read_text()).get("qualifying", True)]
+
+
 def qualified_teams():
-    """Teams with a verified practice result of all laps and at most one collision on every practice track."""
-    track_ids = [p.parent.name for p in sorted((ROOT / "tracks").glob("*/track.json"))]
+    """Teams with a verified practice result of all laps and at most one collision on every qualifying track."""
+    track_ids = [t.name for t in qualifying_tracks()]
     practice = [r for r in results.load_all() if r["event"] == "practice"]
     return [t for t in teams() if rules_mod.qualification(t["name"], track_ids, practice)[1]]
 
@@ -93,7 +99,7 @@ def cmd_event(args):
 
 
 def cmd_nightly(args):
-    tracks = [p.parent for p in sorted((ROOT / "tracks").glob("*/track.json"))]
+    tracks = qualifying_tracks()
     for team in teams():
         for track in tracks:
             attempt(team["image"], team["name"], track, "practice", rules_mod.Rules(), args.gui)
@@ -158,7 +164,7 @@ def cmd_bracket(args):
 
 
 def cmd_qualified(args):
-    track_ids = [p.parent.name for p in sorted((ROOT / "tracks").glob("*/track.json"))]
+    track_ids = [t.name for t in qualifying_tracks()]
     practice = [r for r in results.load_all() if r["event"] == "practice"]
     for t in teams():
         status, ok = rules_mod.qualification(t["name"], track_ids, practice)

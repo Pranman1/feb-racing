@@ -23,8 +23,9 @@ uses its own proxy.
 ./feb-race h2h --teams "Team A" "Team B" --track tracks/loop --laps 10 --gui
 ```
 
-Cars start on a staggered grid centred on the spawn pose: slots 0.6 m apart sideways and
-each further slot 1 m behind the previous one. Each car's laps and collisions are probed in its own container;
+Cars start in single file on the centreline, 2.5 m apart, the higher seed in front (a car
+beside another in a 2.2 m corridor sits inside its neighbour's lidar bubble and both steer into
+the walls; in line, the car behind follows). Each car's laps and collisions are probed in its own container;
 the result files carry `mode: head-to-head`, `race`, `opponents`, `finish_s` (time of the last
 lap plus 10 s per collision) and `position` (most laps first, then finish time). Car-to-car
 contact counts as a collision for both cars and respawns them side by side, as upstream does.
@@ -51,7 +52,9 @@ are written; two cars is the supported race mode.
 Members race the house racer locally: `./feb-sim run --stack "..." --opponent normal`. The house
 racer is the smooth lidar driver from the starter kit at a conservative pace (`slow` 1.5 m/s,
 `normal` 2.0, `fast` 2.5; zero wall contact over eight laps on the loop at 10 Hz), the thing a new
-stack has to overtake. `--opponent map` runs the map-following driver instead (it knows the track
+stack has to overtake. It runs in follow mode (`follow_gap: 2.0`): a car within 2 m straight ahead
+is something to sit behind at a safe distance, never something to steer around, so it does not
+spoil the member's run. Any driver built on the starter kit can turn the same mode on. `--opponent map` runs the map-following driver instead (it knows the track
 and the car's true pose; faster, less smooth). On cone-only tracks the launcher always uses the
 map follower: a lidar gap-follower has no walls to follow there. `--cars 2` alone puts an undriven second car on the
 grid. Tracks with `max_cars: 1` (Porto: 1.3 m corridor) refuse a second car.

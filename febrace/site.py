@@ -50,6 +50,7 @@ def build():
         rows = [r for r in all_results if r["event"] == "practice" and r["track"] == name]
         tracks.append({"id": name, "name": t["name"], "length": t["length"], "direction": t["direction"],
                        "walls": bool(t["walls"]), "cones": bool(t["cones"]), "preview": preview.exists(),
+                       "qualifying": t.get("qualifying", True),
                        "standings": standings(rows), "attempts": len(rows)})
 
     for e in events:
@@ -61,7 +62,7 @@ def build():
         e["track"] = pathlib.Path(str(e["track"])).name
 
     practice = [r for r in all_results if r["event"] == "practice"]
-    track_ids = [t["id"] for t in tracks]
+    track_ids = [t["id"] for t in tracks if t["qualifying"]]
     for team in teams:
         team["qualification"], team["qualified"] = rules_mod.qualification(team["name"], track_ids, practice)
 

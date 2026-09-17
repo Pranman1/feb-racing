@@ -2,6 +2,33 @@
 
 Newest first.
 
+## 2026-09-16 - hardware options report, real circuits, two-car start fixed
+
+- Report for the budget committee: `docs/proposal/hardware-options.pdf` (12 pages): the
+  simulator platform with screenshots, six hardware plans with full bills of materials (compute,
+  lidar, power, mounting, track kit), the Tamiya and 1:5-scale options analysed as infeasible,
+  3D-printed FSAE cones, camera + lidar fusion with the owned RealSense, off-season case, one-on-one
+  racing figures. Plan B (RoboRacer reference car, Hokuyo, track) recommended at ~$3,200.
+- Tracks: `tools/track_from_centerline.py` imports the RoboRacer racetrack database
+  (github.com/f1tenth/f1tenth_racetracks). `tracks/spielberg` is the Red Bull Ring at 1:10
+  (342 m, 2.2 m corridor). `tracks/circuit` is a custom 138 m hairpin/esses/chicane layout.
+  Both are `qualifying: false` (10 laps do not fit the 300 s attempt): shown on the site as
+  showcase, excluded from qualification and nightly reruns. New `qualifying` key documented.
+- Two-car start bug (found while taking race screenshots): both cars took a burst of hits in
+  the first second. Cause: the car behind starts inside its own lidar bubble's view of the car
+  ahead, steers into the wall, and the upstream respawn puts it at checkpoint 1, ahead of the
+  spawn; the slower house racer then leads and the faster member car hits walls trying to pass in
+  a 2.2 m corridor. Fixes: single-file grid 2.5 m apart (car one in front), and a `follow_gap`
+  mode in the reactive driver (the house racer sits behind a car within 2 m instead of steering
+  around it). Spielberg race: 0 hits for both cars over 70 s. On the 36 m loop the faster car
+  laps the house racer within a minute and passing still produces contact; a lane-holding mode
+  was tried and reverted (it scraped corners). Passing in a 2.2 m corridor is the racecraft
+  problem the head-to-head final is meant to test; practice against the house racer is best on
+  the circuit or Spielberg, or with `--opponent fast` (equal speed, no lapping).
+- Starter kit on tight hairpins (the circuit) clips walls at 2.5 m/s; clean on the loop and
+  Spielberg. Noted for the learning path (tune `lat_accel`, `max_speed` per track).
+- Launcher: `FEB_DEVKIT_PORT` override.
+
 ## 2026-09-14 (night) - simulated time end to end: stamps, /clock, RTF, frame cap, camera cache
 
 Context: a note from the RoboRacer session (verified against this fork) showed that under GPU

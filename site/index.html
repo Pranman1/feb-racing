@@ -71,7 +71,7 @@ const pages = {
       <span class="badge ${e.status === 'done' ? 'ok' : e.status === 'live' ? 'bad' : 'info'}">${esc(e.status)}</span></a>`).join('') || '<p class="muted">No events scheduled.</p>'}</div>
     <h2>Practice tracks</h2>
     <p class="muted">Qualify for the first competition with ${d.qualify.laps} laps and at most ${d.qualify.max_collisions} collision on every track below. Progress per team: <a href="#/teams">Teams</a>.</p>
-    <div class="cards">${d.tracks.map(t => `<a class="card" href="#/practice/${esc(t.id)}">${t.preview ? `<img src="tracks/${esc(t.id)}.png" alt="">` : ''}<b>${esc(t.name)}</b>
+    <div class="cards">${d.tracks.map(t => `<a class="card" href="#/practice/${esc(t.id)}">${t.preview ? `<img src="tracks/${esc(t.id)}.png" alt="">` : ''}<b>${esc(t.name)}</b>${t.qualifying ? '' : '<span class="badge info">showcase</span>'}
       <div class="meta">${t.length} m · ${t.direction} · ${t.attempts} attempts${t.standings[0] ? ` · best ${secs(t.standings[0].best_lap_s)} s by ${esc(t.standings[0].team)}` : ''}</div></a>`).join('')}</div>`,
   '/practice': (d) => pages['/'](d),
   '/practice/:id': (d, id) => { const t = d.tracks.find(t => t.id === id); if (!t) return 'Unknown track';
@@ -84,7 +84,7 @@ const pages = {
       Rules: ${r.warmup_laps ?? 1} warm-up + ${r.laps ?? 10} timed laps, +${r.collision_penalty_s ?? 10} s per collision, DSQ above ${r.max_collisions ?? 10} collisions, ${r.timeout_s ?? 300} s limit.</p>${table(e.standings, false)}${races(e)}`; },
   '/teams': (d) => `<h2>Teams</h2>
     <p class="muted">Qualification for the first competition: on every practice track, a verified run of ${d.qualify.laps} laps with at most ${d.qualify.max_collisions} collision. ✓ verified &nbsp; ~ self-reported, awaiting the nightly rerun &nbsp; – not yet.</p>
-    <div class="wrap"><table><thead><tr><th>Team</th><th>Members</th>${d.tracks.map(t => `<th>${esc(t.name)}</th>`).join('')}<th>Image</th></tr></thead><tbody>${d.teams.map(t => `<tr><td>${esc(t.name)}${t.qualified ? '<span class="badge ok">qualified</span>' : ''}</td><td>${(t.members || []).map(esc).join(', ')}</td>${d.tracks.map(tr => `<td>${qualMark((t.qualification || {})[tr.id])}</td>`).join('')}<td><code>${esc(t.image)}</code></td></tr>`).join('')}</tbody></table></div>`,
+    <div class="wrap"><table><thead><tr><th>Team</th><th>Members</th>${d.tracks.filter(t => t.qualifying).map(t => `<th>${esc(t.name)}</th>`).join('')}<th>Image</th></tr></thead><tbody>${d.teams.map(t => `<tr><td>${esc(t.name)}${t.qualified ? '<span class="badge ok">qualified</span>' : ''}</td><td>${(t.members || []).map(esc).join(', ')}</td>${d.tracks.filter(t => t.qualifying).map(tr => `<td>${qualMark((t.qualification || {})[tr.id])}</td>`).join('')}<td><code>${esc(t.image)}</code></td></tr>`).join('')}</tbody></table></div>`,
   '/docs': () => `<h2>How to enter</h2>
     <ol>
       <li>Clone the repo, run <code>./feb-sim setup</code>, then <code>./feb-sim run</code> to drive manually.</li>

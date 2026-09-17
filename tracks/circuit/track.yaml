@@ -1,0 +1,13 @@
+name: FEB Circuit
+direction: ccw
+checkpoints: 30
+start:
+- 12
+- 0
+walls:
+  diameter: 0.33
+resolution: 0.05
+origin:
+- -6.118234375
+- -3.11865625
+qualifying: false     # 10 laps do not fit the 300 s attempt; a showcase and endurance track

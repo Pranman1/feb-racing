@@ -45,7 +45,7 @@ class ReactiveDriver(Node):
                         max_speed=2.5, min_speed=0.9, accel_limit=4.0, decel_limit=6.0, lat_accel=6.0,
                         brake_margin=0.40, clear_pct=3.0, clear_tau=0.30, curv_tau=0.35, goal_tau=0.30, steer_tau=0.20,
                         speed_per_throttle=23.0, throttle_kp=0.02, throttle_ki=0.03, throttle_slew=0.8,
-                        speed_window=0.25)
+                        speed_window=0.25, follow_gap=0.0)
         for key, value in defaults.items():
             self.declare_parameter(key, value)
         self.p = {k: self.get_parameter(k).value for k in defaults}
@@ -105,6 +105,18 @@ class ReactiveDriver(Node):
         ranges = np.clip(ranges, msg.range_min, msg.range_max)
         angles = msg.angle_min + np.arange(len(ranges)) * msg.angle_increment
 
+        # follow mode (the house racer): a car within follow_gap straight ahead is not an obstacle
+        # to steer around but something to sit behind. Its beams are filled with the corridor seen
+        # beside it, so the line stays the corridor's, and the speed target keeps the distance.
+        v_follow = None
+        if self.p["follow_gap"] > 0.0:
+            cone = np.abs(angles) <= math.radians(15.0)
+            ahead = float(ranges[cone].min())
+            if ahead < self.p["follow_gap"]:
+                edges = np.flatnonzero(cone)
+                ranges[cone] = max(ranges[edges[0]], ranges[edges[-1]])
+                v_follow = max(0.5, 2.0 * (ahead - 0.5))
+
         target = self.gap_target(np.minimum(ranges, self.p["range_cap"]), angles)
         # the car keeps turning at the current steering for one actuator delay (plus the time
         # until the next scan) before this command acts: take that heading change off the target
@@ -119,6 +131,8 @@ class ReactiveDriver(Node):
         v_corner = math.sqrt(self.p["lat_accel"] / curvature) if curvature > 1e-3 else self.p["max_speed"]
         v_brake = math.sqrt(2.0 * self.p["decel_limit"] * max(0.0, ahead - self.p["brake_margin"]))
         goal = max(self.p["min_speed"], min(self.p["max_speed"], v_corner, v_brake))
+        if v_follow is not None:
+            goal = min(goal, v_follow)
         self.v_goal += (goal - self.v_goal) * lowpass(dt, self.p["goal_tau"])
         self.speed_cmd += float(np.clip(self.v_goal - self.speed_cmd, -self.p["decel_limit"] * dt, self.p["accel_limit"] * dt))
 

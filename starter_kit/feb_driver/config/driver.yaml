@@ -22,3 +22,4 @@ reactive_driver:
     throttle_ki: 0.03     # integral speed trim
     throttle_slew: 0.8    # throttle units per second
     speed_window: 0.25    # s, window of encoder samples for the speed estimate
+    follow_gap: 0.0       # m; > 0 makes the driver sit behind a car ahead instead of passing it (the house racer uses 2.0)

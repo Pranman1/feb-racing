@@ -45,6 +45,7 @@ ROS `map.yaml`). Grey "unknown" pixels count as not drivable.
 | `direction` | `ccw` or `cw` driving direction |
 | `checkpoints` | lap checkpoints; checkpoint 0 is the finish line |
 | `max_cars` | 1 for corridors too narrow to race side by side (Porto); default 4 |
+| `qualifying` | `false` for showcase tracks whose 10 laps do not fit the 300 s attempt (Spielberg, the circuit); they are excluded from qualification and nightly reruns |
 | `start` | optional `[x, y]` finish-line position; default: the straightest section |
 | `walls.diameter` | air-duct diameter (0.33 m like the league; omit the key for a cone-only track) |
 | `cones.spacing` | metres between cones on each edge, blue left, yellow right (omit for none) |

@@ -80,6 +80,7 @@ track (Porto is one; its resolution and origin come from the ROS \file{map.yaml}
 \texttt{direction} & \texttt{ccw} or \texttt{cw}\\
 \texttt{checkpoints} & lap checkpoints; checkpoint 0 is the finish line\\
 \texttt{max\_cars} & 1 for corridors too narrow to race side by side (Porto); default 4\\
+\texttt{qualifying} & \texttt{false} for showcase tracks too long for the 300~s attempt (Spielberg, the circuit): left out of qualification and nightly reruns\\
 \texttt{start} & optional \texttt{[x, y]} finish-line position; default: the straightest section\\
 \texttt{walls.diameter} & air-duct diameter, 0.33~m like the league; omit for a cone-only track\\
 \texttt{cones.spacing} & metres between cones on each edge, blue left, yellow right; omit for none\\
@@ -155,7 +156,7 @@ simulator --cars 2 --connect :4580  <->  proxy (4580)  <->  container A (4568, s
 
 Each car runs in its own container behind the proxy (\file{febrace/proxy.py}), which rewrites
 the vehicle ids so every container sees its own car as \texttt{roboracer\_1}, unchanged from
-time-attack. Cars start on a two-column grid centred on the spawn pose. Results carry
+time-attack. Cars start in single file, 2.5~m apart, the higher seed in front. Results carry
 \texttt{race}, \texttt{opponents}, \texttt{finish\_s} and \texttt{position} (most laps first,
 then finish time).
 
