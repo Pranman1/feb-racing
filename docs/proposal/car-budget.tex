@@ -67,11 +67,8 @@ Contingency (10\,\%) & 160 & 100 \\
   it. It needs nothing from this budget. Its limit is that nothing in it is real: no grip
   change with the floor, no servo backlash, no battery sag, no lidar seeing chair legs.
   \item \textbf{Owned hardware.} An Intel RealSense depth camera, a RoboSense M1 3D lidar,
-  and a motorless Tamiya 1:10 touring chassis. The camera goes on this car. The M1 is a
-  full-size-vehicle sensor (about 0.7~kg, half-metre blind zone) and does not belong on a
-  1:10 car; it waits for a larger platform. The Tamiya has no motor, controller or sensor
-  deck, does not match the simulator's car, and would cost a semester of mechanical work to
-  save about \$300; it stays a bench mule.
+  and a motorless Tamiya 1:10 touring chassis. The camera goes on this car; the other two are
+  discussed in section~\ref{sec:setaside}.
   \item \textbf{Space.} A lab corridor is enough for a 1:10 track. The Alameda test track is
   for larger vehicles and is not needed here.
 \end{itemize}
@@ -187,27 +184,47 @@ Minimum \$60 with 3D-printed brackets instead of a cut deck.
 \toprule
 Item & USD & \\
 \midrule
-Cardboard walls: flattened boxes, 20~cm strips, taped in loops & 0 & recommended to start \\
+Cardboard walls: flattened boxes cut into 20~cm strips, taped in loops & 0 & \\
 Floor tape (start line, lane marks) & 15 & \\
 FSAE-style cones, 3D-printed at 1:10, 100 pieces & 15 & about 10~g of filament each \\
-Foam pipe insulation or pool noodles as bumpers on corners & 15 & optional \\
-Flexible aluminium duct, 33~cm, 30~m (the league's walls) & 130 & later, if the track gets daily use \\
+Foam pipe insulation on the corners & 15 & \\
 \bottomrule
 \end{tabularx}
 
 \smallskip
-\textbf{Cardboard is the right start.} The lidar sees cardboard as well as duct; a 20~cm wall
-is well above the scan plane; a wall that folds when hit is kinder to the car than one that
-does not; and the cost is zero. Its faults are real: it gets flattened, it has to be re-taped
-every session, and it does not store. Duct is what to buy once the team is running the track
-several times a week and is tired of rebuilding it. The cones are cheap and worth printing on
-day one, because the cone track is where the camera work happens.
+Cardboard is enough for the lab: the lidar sees it as well as any wall, a 20~cm strip is
+well above the scan plane, and a wall that folds when hit is kinder to the car. It has to be
+re-taped each session and does not store. The cones are the part worth printing on day one,
+because the cone track is where the camera work happens. \emph{Later, if the track is in
+daily use, 30~m of 33~cm flexible aluminium duct (about \$130) is the permanent version.}
 
 \subsection{Spares and tools}
 
 Tyres (\$30), pinion and bumper (\$20), zip ties, tape, Velcro (\$10). The team's own tools
 otherwise. A wall hit at 3~m/s breaks a bumper or a servo saver, not the car; a lidar hit
 breaks the lidar.
+
+\section{Options considered and set aside}
+\label{sec:setaside}
+
+\begin{itemize}
+  \item \textbf{The team's Tamiya chassis.} A motorless touring-car kit. It would save the
+  \$500 chassis line and cost a motor, controller and servo (\$200) plus a custom sensor deck
+  with no drawings to copy. Its wheelbase, track width and ground clearance differ from the
+  car the simulator models and from every published build, so nothing transfers and every
+  mounting problem is solved alone. Net saving about \$300 for a semester of mechanical work
+  that teaches no autonomy. It stays a bench mule for wiring and sensor practice.
+  \item \textbf{A 1:4 or 1:5 car with the team's M1 lidar.} No maker sells a 1:4 road car;
+  the nearest are 1:5 trucks. With the owned M1 and the Alameda track counted, a 1:5 build
+  costs about \$3{,}300 to \$3{,}900: chassis \$1{,}300 to \$1{,}900, 8S batteries and
+  charger \$500, a high-current controller \$350, a Jetson Orin NX class computer for the
+  M1's point clouds \$700, deck, roll protection and kill switch \$450. Twice this budget,
+  and it cannot be run on campus: a 10~kg car at 50~km/h needs a closed outdoor area, so
+  every test is a session in Alameda rather than an afternoon in the lab, and it is not a
+  car new members can learn on. The M1 itself (about 0.7~kg, a half-metre blind zone,
+  120\textdegree{} forward view) is a full-size-vehicle sensor that does not fit a 1:10 car's
+  mass or corridor. Both wait for a later budget, after the 1:10 programme has run.
+\end{itemize}
 
 \section{What the money buys, in order}
 
@@ -241,11 +258,10 @@ Semester end & Perception and control lessons carried into the FSAE autonomous w
   \item \textbf{The floor matters.} Lab tile and carpet grip differently; the car will be
   tuned for one floor. A cardboard track moves between sessions; lap times will not be
   comparable week to week until the duct arrives.
-  \item \textbf{Cardboard walls have a life of weeks.} Budget an hour per session for the
-  track, and plan on duct in the second half of the semester.
-  \item \textbf{Out of scope for this budget.} The M1 lidar and any 1:5-scale vehicle, the
-  Alameda track, a second car, and physical competitions. All are possible later; none are
-  needed to get value from this car.
+  \item \textbf{Cardboard walls have a life of weeks.} Budget half an hour per session for
+  the track.
+  \item \textbf{Out of scope for this budget.} The 1:5 car with the M1, a second car, and
+  physical competitions. All are possible later; none are needed to get value from this car.
 \end{itemize}
 
 \bigskip
