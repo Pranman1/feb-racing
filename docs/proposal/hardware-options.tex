@@ -52,10 +52,13 @@ This report lays out five options for closing that gap, from staying software-on
 RoboRacer-standard 1:10 car with a Hokuyo lidar and a lab track, about \$3{,}200}. One car is
 the whole ask: head-to-head racing stays in the simulator, where it already works, because the
 skills built here are meant to transfer to the FSAE car, and a second small car does not
-serve that. The two options the committee asked about, converting the team's Tamiya chassis
-and moving to a 1:4 or 1:5 scale car, are analysed in sections~\ref{sec:tamiya}
-and~\ref{sec:large} and found not feasible for reasons of eligibility, community, track size
-and safety rather than cost. The depth camera the team already owns is not priced.
+serve that. The two options the committee asked about are analysed in sections~\ref{sec:tamiya}
+and~\ref{sec:large}. Converting the team's Tamiya chassis is not feasible for reasons of
+eligibility and community rather than cost. A 1:5-scale car becomes affordable once the team's
+own RoboSense M1 lidar and the Alameda test track are counted, but it can only be run off
+campus, which rules it out as the car members learn on day to day; it is the right second
+step once the 1:10 programme is running. The depth camera and the M1 lidar the team already
+owns are priced at zero wherever they are used.
 
 \begin{table}[H]
 \centering
@@ -67,7 +70,7 @@ Plan & What & Cost (USD) & Verdict \\
 A & One 1:10 car, budget sensors and compute & 1{,}700 & viable; upgrade path to B \\
 \textbf{B} & \textbf{One 1:10 car, RoboRacer reference build} & \textbf{3{,}200} & \textbf{recommended} \\
 C & Convert the team's Tamiya 1:10 chassis & 1{,}300 & not feasible for competition; poor value \\
-D & 1:5-scale vehicle & 6{,}500+ & not feasible: track, safety, no community \\
+D & 1:5-scale vehicle with the team's RoboSense M1 lidar, tested at Alameda & 3{,}500 & viable off campus only; a later step, not the first car \\
 \bottomrule
 \end{tabularx}
 \caption{The options at a glance. All costs include compute, lidar, power, mounting and the lab track kit; prices are September 2026 list prices, rounded, to be verified at order time.}
@@ -224,6 +227,13 @@ plus lidar fusion is possible on day one; nothing to upgrade later. \textbf{Limi
 is half the cost and the most fragile part; a bumper and a speed limit for new stacks are
 part of the plan.
 
+\textbf{Why not the team's RoboSense M1 on this car.} The M1 is a 3D solid-state lidar built
+for full-size vehicles: about 0.7~kg against the Hokuyo's 130~g, a 120\textdegree{} forward
+field of view against 270\textdegree, and a near-field blind zone of roughly half a metre in a
+corridor with under a metre of free space either side. It would dominate the car's mass,
+see nothing beside it, and is outside the league's sensor set. It is the right sensor for the
+1:5 option below and for the FSAE car; on the 1:10 car the 2D lidar is the right tool.
+
 \subsection{Plan C: convert the team's Tamiya 1:10 chassis}
 \label{sec:tamiya}
 
@@ -253,12 +263,14 @@ Track kit & 240 & \\
 \end{itemize}
 The chassis is still useful as a bench mule for wiring and sensor mounting practice, at no cost.
 
-\subsection{Plan D: a 1:5-scale vehicle}
+\subsection{Plan D: a 1:5-scale vehicle with the M1 lidar, tested at Alameda}
 \label{sec:large}
 
 The committee asked about a 1:4 car. No manufacturer makes a 1:4 road car; the nearest
 production platforms are 1:5 short-course trucks (Losi 5IVE-T, Arrma Kraton 8S) and 1:6
-monster trucks (Traxxas X-Maxx). Priced with the same sensors and compute as Plan~B:
+monster trucks (Traxxas X-Maxx). Two things the team already has change this option's cost:
+the RoboSense M1 lidar, which is the right sensor at this scale, and access to a test track in
+Alameda, which removes the need to build a track.
 
 \begin{tabularx}{\linewidth}{p{6.2cm}rX}
 \toprule
@@ -267,23 +279,40 @@ Item & USD & Note \\
 1:5 electric chassis (8S class) & 1{,}300 to 1{,}900 & 8 to 12~kg, 50~km/h and up \\
 8S battery pair and charger & 500 & \\
 High-current controller (VESC 75V/300A class) & 350 & \\
-Compute, lidar, camera mount as Plan~B & 1{,}850 & \\
-Custom deck, roll protection, kill switch & 400 & nothing published to copy \\
-Track: outdoor-sized (see below) & 2{,}000+ & \\
+Compute: NVIDIA Jetson Orin NX class & 700 & the M1's 75{,}000 points per frame need more than an Orin Nano \\
+Lidar: RoboSense M1 & 0 & owned \\
+Depth camera: Intel RealSense & 0 & owned \\
+Custom deck, roll protection, kill switch, remote stop & 450 & nothing published to copy \\
+Track: Alameda test track & 0 & owned access; transport and session costs not included \\
 \midrule
-\textbf{Total} & \textbf{6{,}400 to 7{,}000} & \\
+\textbf{Total} & \textbf{3{,}300 to 3{,}900} & \\
 \bottomrule
 \end{tabularx}
 
 \medskip
-\textbf{Why it is not feasible:}
+\textbf{What it would give the team.} A vehicle with a 3D lidar and a camera at a size where
+the FSAE perception stack runs unchanged: the same sensor, the same point-cloud pipeline, the
+same cone detection, on a car that can be built and crashed without touching the FSAE
+vehicle. For the driverless FSAE goal this is closer to the real thing than any 1:10 car.
+
+\textbf{Why it is not the first car, stated plainly:}
 \begin{itemize}
-  \item \textbf{Track size.} A corridor for a 1:5 car is at least 3~m wide and a lap needs 150~m or more: a parking lot, not a lab. Air-duct walls do not work at that scale; the walls become barriers and the track cannot be stored.
-  \item \textbf{Safety.} A 10~kg vehicle at 50~km/h carries about 1~kJ of kinetic energy, thirty times a 1:10 car. It cannot be run indoors, near people, or by a first-semester member's untested stack. It needs a kill switch, roll protection and a marshal.
-  \item \textbf{No community and no competition.} No autonomous racing series exists at that scale. Every problem, from mounts to motor control, is solved alone.
-  \item \textbf{Not the simulated car.} Nothing built in the simulator transfers.
-  \item \textbf{Cost.} Twice Plan~B before the track, and the track is a separate project.
+  \item \textbf{It cannot be run on campus.} A 10~kg vehicle at 50~km/h needs a closed
+  outdoor area, a kill switch and a marshal. Every test is a trip to Alameda with the car, a
+  generator or charged packs, and a tow of tools: a session, not an afternoon in the lab. Iteration
+  drops from ten runs a day to one or two a week, and the weather has a vote. New members
+  cannot be handed this car to learn on.
+  \item \textbf{Safety.} About 1~kJ of kinetic energy, thirty times the 1:10 car. Untested
+  stacks and first-semester members do not belong near it.
+  \item \textbf{No community and no competition.} No autonomous racing series exists at this
+  scale. Mounts, power and motor control are solved alone.
+  \item \textbf{Not the simulated car.} Nothing built in the simulator transfers until a 1:5
+  vehicle model and an M1 sensor model exist in it; both are on the simulator's future list,
+  and neither is small.
 \end{itemize}
+\textbf{Verdict:} viable and worth planning for as the perception mule that sits between the
+1:10 programme and the FSAE car, once there is a 1:10 car for members to learn on and a stack
+worth putting on it. Not the first purchase.
 
 \section{The track kit}
 \label{sec:track}
@@ -302,7 +331,10 @@ Floor tape, start-line gate (photo interrupter), storage tub & 95 & \\
 
 \medskip
 Thirty metres of duct builds a 12~m by 6~m loop with a hairpin, the same geometry as the FEB
-Loop in the simulator. The cones give the cone version of the same track for camera work, and
+Loop in the simulator, in any lab or corridor on campus, laid and packed away in ten minutes.
+That is the point of it: the Alameda test track exists and is the venue for anything larger,
+but it is off campus, session-based and weather-bound, and the 1:10 programme has to run every
+day. The cones give the cone version of the same track for camera work, and
 scale exactly like the simulator's cone tracks.
 
 \section{Sensor fusion and the driverless connection}
@@ -336,7 +368,8 @@ the starter kit and the house racer.
 \section{Recommendation and timeline}
 
 Fund Plan~B (\$3{,}190 plus 10\,\% contingency, \$3{,}500). Order the lidar first; its
-lead time is the longest.
+lead time is the longest. Revisit Plan~D, the 1:5 car with the M1, once the 1:10 programme has
+run a season and the simulator carries a 1:5 vehicle and M1 sensor model.
 
 \begin{tabularx}{\linewidth}{lX}
 \toprule

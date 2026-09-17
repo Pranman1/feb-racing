@@ -63,6 +63,9 @@ All fixes are in the simulator and the devkit; competitors change nothing.
 
 ## Future plans (not started)
 
+- 1:5 vehicle model and RoboSense M1 sensor model in the simulator: the team owns an M1 and
+  has an outdoor test track in Alameda; the hardware report costs a 1:5 car at ~$3,500 with
+  them and defers it until the simulator can model it.
 - RoboSense M1 on the nose: a solid-state scan pattern (120 x 25 deg, ~0.2 deg, 10 Hz) on the
   existing GPU lidar component, attached at runtime with no mass so the prefab and physics stay
   as they are. Needs a downsampled cloud or a binary side channel (a full 75k-point cloud is
