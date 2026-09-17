@@ -1,0 +1,255 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.2cm,headheight=16pt]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{fancyhdr}
+\usepackage[hidelinks,colorlinks=true,linkcolor=febblue,urlcolor=febblue]{hyperref}
+\definecolor{febblue}{HTML}{1C4687}
+\definecolor{febgold}{HTML}{FDB515}
+\setlength{\parskip}{4pt}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\color{febblue}\textbf{FEB Autonomous}}
+\fancyhead[R]{\color{febblue}1:10 car budget}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrule}{\color{febgold}\hrule width\headwidth height 0.8pt}
+
+\title{\color{febblue}\LARGE A 1:10 Autonomous Car for the Team\\[4pt]\large Budget breakdown under \$2{,}000}
+\author{Formula Electric at Berkeley, Autonomous Team}
+\date{September 2026}
+
+\begin{document}
+\maketitle
+
+\section*{Summary}
+
+We ask for \textbf{\$1{,}750} to build one 1:10-scale autonomous car and a lab track, with a
+minimum configuration at \textbf{\$1{,}100} if the budget is tighter. The car is the
+RoboRacer-standard Traxxas Slash with a 2D lidar, a small computer and a motor controller
+that reports wheel speed. It is what new members learn real robotics on, what the perception
+and control work is tested on between FSAE seasons, and the first place our code meets real
+dynamics. The team's simulator already exists and is in use; this document is about the
+hardware, area by area, with the costs, the choices inside each area, and the realities that
+come with them.
+
+\begin{tabularx}{\linewidth}{Xrr}
+\toprule
+Area & Recommended & Minimum \\
+\midrule
+Chassis and drive & 500 & 330 \\
+Motor controller & 110 & 110 \\
+Compute & 250 & 130 \\
+Lidar & 320 & 100 \\
+Camera & 0 & 0 \\
+Power & 230 & 200 \\
+Mounting and wiring & 80 & 60 \\
+Track and cones & 45 & 15 \\
+Spares and tools & 60 & 40 \\
+\midrule
+Subtotal & 1{,}595 & 985 \\
+Contingency (10\,\%) & 160 & 100 \\
+\textbf{Total} & \textbf{1{,}755} & \textbf{1{,}085} \\
+\bottomrule
+\end{tabularx}
+
+\smallskip
+\noindent USD, September 2026 list prices, rounded. Verify at order time; the lidar moves most.
+
+\section{Where we are}
+
+\begin{itemize}
+  \item \textbf{Simulator.} The team has a working simulator of this exact car, a ROS~2
+  devkit, a starter driving stack and a leaderboard. Members already write and race code in
+  it. It needs nothing from this budget. Its limit is that nothing in it is real: no grip
+  change with the floor, no servo backlash, no battery sag, no lidar seeing chair legs.
+  \item \textbf{Owned hardware.} An Intel RealSense depth camera, a RoboSense M1 3D lidar,
+  and a motorless Tamiya 1:10 touring chassis. The camera goes on this car. The M1 is a
+  full-size-vehicle sensor (about 0.7~kg, half-metre blind zone) and does not belong on a
+  1:10 car; it waits for a larger platform. The Tamiya has no motor, controller or sensor
+  deck, does not match the simulator's car, and would cost a semester of mechanical work to
+  save about \$300; it stays a bench mule.
+  \item \textbf{Space.} A lab corridor is enough for a 1:10 track. The Alameda test track is
+  for larger vehicles and is not needed here.
+\end{itemize}
+
+\section{The car, area by area}
+
+\subsection{Chassis and drive}
+
+\begin{tabularx}{\linewidth}{Xrl}
+\toprule
+Option & USD & \\
+\midrule
+Traxxas Slash 4x4 VXL (TRA68086-4), brushless motor and ESC included & 500 & recommended \\
+Traxxas Slash 2WD VXL (TRA58076-4), brushless & 330 & minimum \\
+\bottomrule
+\end{tabularx}
+
+\smallskip
+The Slash is the chassis every RoboRacer build and drawing assumes, and the one the
+simulator models. The 4x4 is the standard: it carries the sensor deck without lifting the
+front wheels and tolerates novice driving. The 2WD saves \$170 and is fine for lidar-only
+driving on a flat floor, but it spins the rear under a heavy deck and is not what the drawings
+fit; buy it only if the total must come under \$1{,}200. Either comes ready to run with a
+brushless motor; the stock speed controller is replaced by the item below, and the radio and
+receiver stay as the manual-override link.
+
+\subsection{Motor controller}
+
+\begin{tabularx}{\linewidth}{Xrl}
+\toprule
+Option & USD & \\
+\midrule
+Flipsky mini FSESC 6.7 (VESC-compatible) & 110 & recommended \\
+VESC 6 MkVI (reference part) & 260 & not needed at this budget \\
+\bottomrule
+\end{tabularx}
+
+\smallskip
+A VESC-type controller is not optional: it is what gives the software wheel speed
+(odometry), current limits, and a clean serial interface. The reference VESC costs \$150 more
+for better cooling and support; the Flipsky runs the same firmware and is what most student
+builds use.
+
+\subsection{Compute}
+
+\begin{tabularx}{\linewidth}{Xrl}
+\toprule
+Option & USD & \\
+\midrule
+NVIDIA Jetson Orin Nano developer kit & 250 & recommended \\
+Raspberry Pi 5, 8~GB, active cooler, SD card, PSU & 130 & minimum \\
+\bottomrule
+\end{tabularx}
+
+\smallskip
+The Pi runs ROS~2 and a lidar-only driver comfortably and is the cheaper way to a first lap.
+It cannot run camera perception at useful rates, so the day the team wants cone detection
+from the RealSense, it needs the Jetson. Buying the Jetson first avoids buying twice; buying
+the Pi first gets a car on the floor for \$120 less and keeps the Jetson as the upgrade.
+
+\subsection{Lidar}
+
+\begin{tabularx}{\linewidth}{Xrl}
+\toprule
+Option & USD & \\
+\midrule
+Slamtec RPLidar A2M12, 12~m, 12~Hz, 0.25\textdegree & 320 & recommended \\
+Slamtec RPLidar A1M8, 12~m, 5 to 10~Hz, 1\textdegree & 100 & minimum \\
+Hokuyo UST-10LX, 10~m, 40~Hz, 0.25\textdegree & 1{,}500 & the reference; out of this budget \\
+\bottomrule
+\end{tabularx}
+
+\smallskip
+The lidar decides how fast the car can safely go. The reference Hokuyo scans at 40~Hz and is
+what the simulator models; it is also most of a \$3{,}000 build. The A2M12 at 12~Hz is a
+sensible car for 2 to 3~m/s and is what the budget allows. The A1M8 is a \$100 sensor that
+proves the pipeline and nothing more: 8~kHz sample rate, a degree of angular resolution,
+noisy beyond 6~m. Spinning lidars are also the part that breaks in a crash; mount it behind
+the bumper line.
+
+\subsection{Camera}
+
+The team's RealSense goes on the car at no cost. With the lidar it gives the sensor pair for
+cone detection: the camera classifies cones by colour, the lidar gives range and bearing. This
+is the perception work that carries most directly to the FSAE car, and it needs the Jetson.
+
+\subsection{Power}
+
+\begin{tabularx}{\linewidth}{Xrl}
+\toprule
+Item & USD & \\
+\midrule
+Two Traxxas 3S 5000~mAh LiPo packs & 170 & one drives, one charges \\
+Balance charger & 50 & \\
+LiPo safety bag & 10 & \\
+5~V / 5~A buck converter, XT60 splitter, inline fuse & 30 & feeds computer and lidar from the drive pack \\
+\bottomrule
+\end{tabularx}
+
+\smallskip
+Minimum: one pack (\$85 less). The RoboRacer powerboard (\$100) is a cleaner version of the
+converter and splitter with a safe-shutdown line; not needed to start.
+
+\subsection{Mounting and wiring}
+
+Laser-cut deck plates from the published RoboRacer drawings, cut in a campus makerspace
+(about \$30 of acrylic), standoffs and fasteners (\$15), a powered USB hub and cables (\$35).
+Minimum \$60 with 3D-printed brackets instead of a cut deck.
+
+\subsection{Track and cones}
+
+\begin{tabularx}{\linewidth}{Xrl}
+\toprule
+Item & USD & \\
+\midrule
+Cardboard walls: flattened boxes, 20~cm strips, taped in loops & 0 & recommended to start \\
+Floor tape (start line, lane marks) & 15 & \\
+FSAE-style cones, 3D-printed at 1:10, 100 pieces & 15 & about 10~g of filament each \\
+Foam pipe insulation or pool noodles as bumpers on corners & 15 & optional \\
+Flexible aluminium duct, 33~cm, 30~m (the league's walls) & 130 & later, if the track gets daily use \\
+\bottomrule
+\end{tabularx}
+
+\smallskip
+\textbf{Cardboard is the right start.} The lidar sees cardboard as well as duct; a 20~cm wall
+is well above the scan plane; a wall that folds when hit is kinder to the car than one that
+does not; and the cost is zero. Its faults are real: it gets flattened, it has to be re-taped
+every session, and it does not store. Duct is what to buy once the team is running the track
+several times a week and is tired of rebuilding it. The cones are cheap and worth printing on
+day one, because the cone track is where the camera work happens.
+
+\subsection{Spares and tools}
+
+Tyres (\$30), pinion and bumper (\$20), zip ties, tape, Velcro (\$10). The team's own tools
+otherwise. A wall hit at 3~m/s breaks a bumper or a servo saver, not the car; a lidar hit
+breaks the lidar.
+
+\section{What the money buys, in order}
+
+\begin{tabularx}{\linewidth}{lX}
+\toprule
+When & Milestone \\
+\midrule
+Order + 2 weekends & Car assembled from the RoboRacer build guide, radio drive, all sensors on ROS~2 \\
++ 3 weeks & Starter stack drives the cardboard track; simulator-to-car differences written down \\
++ 6 weeks & Members' own stacks on the car; internal time-attack; first cone-detection results from the camera \\
+Semester end & Perception and control lessons carried into the FSAE autonomous work \\
+\bottomrule
+\end{tabularx}
+
+\section{The realities}
+
+\begin{itemize}
+  \item \textbf{One car.} Access has to be scheduled and earned; the simulator's
+  qualification rule is the gate. Expect queueing in the weeks before an internal event.
+  \item \textbf{It will be crashed.} A spinning lidar on the nose of a car driven by student
+  code is a matter of when. The contingency and the spares line are for this. A dead A2M12 is
+  \$320; a dead Hokuyo would be \$1{,}500, which is the other reason it is not in this budget.
+  \item \textbf{The cheap parts cap performance.} At 12~Hz the lidar and the Pi limit safe
+  speed to about 2 to 3~m/s; the simulator car goes faster. Members will feel the gap; that is
+  the point, but it should be said up front.
+  \item \textbf{Time is the scarce resource, not money.} Two weekends of assembly, a month
+  to a first clean lap, and someone has to own the car, the batteries and the charging
+  procedure. If nobody owns it, it becomes a shelf ornament by week six.
+  \item \textbf{Batteries need a procedure.} LiPo bag, supervised charging, no charging
+  unattended, a written checklist before the first charge.
+  \item \textbf{The floor matters.} Lab tile and carpet grip differently; the car will be
+  tuned for one floor. A cardboard track moves between sessions; lap times will not be
+  comparable week to week until the duct arrives.
+  \item \textbf{Cardboard walls have a life of weeks.} Budget an hour per session for the
+  track, and plan on duct in the second half of the semester.
+  \item \textbf{Out of scope for this budget.} The M1 lidar and any 1:5-scale vehicle, the
+  Alameda track, a second car, and physical competitions. All are possible later; none are
+  needed to get value from this car.
+\end{itemize}
+
+\bigskip
+\noindent RoboRacer build guide and drawings: \url{https://f1tenth.readthedocs.io}\\
+Team platform (simulator, devkit, manuals): \url{https://github.com/Pranman1/feb-racing}
+
+\end{document}
