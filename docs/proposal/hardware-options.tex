@@ -47,14 +47,15 @@ driving stack, a competition harness, a leaderboard and two manuals. It onboards
 in an hour and runs a full season (qualification, time-attack, head-to-head final) with no
 hardware. Its one limit is that the code never meets a real car.
 
-This report lays out six options for closing that gap, from staying software-only to a
-1:5-scale vehicle, with a full bill of materials for each, and recommends
-\textbf{Plan~B: one RoboRacer-standard 1:10 car with a Hokuyo lidar and a lab track, about
-\$3{,}000}, with \textbf{Plan~C, a second car, next semester}. Two options the committee asked
-about specifically, converting the team's Tamiya chassis and moving to a 1:4 or 1:5 scale car,
-are analysed in sections~\ref{sec:tamiya} and~\ref{sec:large} and found not to be feasible for reasons of
-eligibility, community, track size and safety rather than cost. The depth camera the team
-already owns is assumed available and is not priced.
+This report lays out five options for closing that gap, from staying software-only to a
+1:5-scale vehicle, with a full bill of materials for each, and recommends \textbf{Plan~B: one
+RoboRacer-standard 1:10 car with a Hokuyo lidar and a lab track, about \$3{,}200}. One car is
+the whole ask: head-to-head racing stays in the simulator, where it already works, because the
+skills built here are meant to transfer to the FSAE car, and a second small car does not
+serve that. The two options the committee asked about, converting the team's Tamiya chassis
+and moving to a 1:4 or 1:5 scale car, are analysed in sections~\ref{sec:tamiya}
+and~\ref{sec:large} and found not feasible for reasons of eligibility, community, track size
+and safety rather than cost. The depth camera the team already owns is not priced.
 
 \begin{table}[H]
 \centering
@@ -63,11 +64,10 @@ already owns is assumed available and is not priced.
 Plan & What & Cost (USD) & Verdict \\
 \midrule
 0 & Simulator only (status quo) & 0 & keep as the base of everything below \\
-A & One 1:10 car, budget sensors and compute & 1{,}400 & viable; upgrade path to B \\
-\textbf{B} & \textbf{One 1:10 car, RoboRacer reference build} & \textbf{3{,}000} & \textbf{recommended} \\
-C & Two 1:10 cars (B + a budget second car) & 4{,}400 & recommended for the following semester \\
-D & Convert the team's Tamiya 1:10 chassis & 1{,}200 & not feasible for competition; poor value \\
-E & 1:5-scale vehicle & 6{,}500+ & not feasible: track, safety, no community \\
+A & One 1:10 car, budget sensors and compute & 1{,}700 & viable; upgrade path to B \\
+\textbf{B} & \textbf{One 1:10 car, RoboRacer reference build} & \textbf{3{,}200} & \textbf{recommended} \\
+C & Convert the team's Tamiya 1:10 chassis & 1{,}300 & not feasible for competition; poor value \\
+D & 1:5-scale vehicle & 6{,}500+ & not feasible: track, safety, no community \\
 \bottomrule
 \end{tabularx}
 \caption{The options at a glance. All costs include compute, lidar, power, mounting and the lab track kit; prices are September 2026 list prices, rounded, to be verified at order time.}
@@ -126,26 +126,38 @@ leaderboard entry follows the same afternoon. To qualify for the first competiti
 completes ten laps with at most one collision on every practice track. Qualified teams race a
 time-attack on a secret track, and the top seeds meet in a two-car knockout final.
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.49\linewidth]{fox2.jpg}\hfill
-\includegraphics[width=0.49\linewidth]{spiel_driver.jpg}
-\caption{Left: Foxglove connected to the devkit, showing the car's topics and the front camera live. Right: the driver's view on Spielberg.}
-\end{figure}
-
 \section{Why hardware, and why in the off-season}
 \label{sec:why}
 
-The FSAE car is not ready for autonomous work for most of the year: it is being designed,
-built, or raced by the rest of the team, and it is never available for an untested stack.
-A 1:10 car fills exactly that gap.
+The FSAE car is not available for autonomous work for most of the year: it is being designed,
+built or raced by the rest of the team, and it is never available to an untested stack. A
+1:10 car is where the autonomous team learns and validates in the meantime, on a table in the
+lab, with skills that carry straight to the full-size car.
 
 \begin{itemize}
-  \item \textbf{Sim-to-real is the point of the exercise.} The simulator's car is the digital twin of the RoboRacer reference vehicle. A stack tuned in the simulator is meant to transfer; without a car the claim is never tested, and members never meet real latency, tyre variation, a lidar that sees the room, or a battery that sags.
-  \item \textbf{Off-season continuity.} Perception, localisation, planning and control are the same problems at 1:10 and at full scale. The 1:10 car is where the team develops and validates them between seasons, on a table in the lab, without waiting for the FSAE vehicle or a test day.
-  \item \textbf{Driverless FSAE readiness.} Formula Student driverless events use cone tracks and camera plus lidar perception. The cone version of every FEBAUTO track exists for this reason; a real car with a camera and a 2D lidar lets the team practise that exact pipeline at small scale.
-  \item \textbf{Competitions and recruiting.} RoboRacer runs physical races at ICRA, IROS and IFAC every year on the rules our league already uses. A car on a table is also what keeps a room full of new members after the first semester.
-  \item \textbf{Cost of not doing it.} The software platform is done and free to run. Its value compounds only if what members build on it reaches hardware.
+  \item \textbf{People need to see a physical effect.} A lap time on a leaderboard keeps a
+  member for a semester; a car that turns because of code they wrote keeps them for years. The
+  motivation to debug a controller at midnight comes from watching it fail on a real car.
+  \item \textbf{Real dynamics cannot be simulated away.} Tyre grip that varies with the floor,
+  a steering servo with backlash, a battery that sags as it drains, a lidar that sees chair
+  legs and reflections: the simulator models none of these faithfully, and the FSAE car has
+  all of them. Members who have tuned a controller against them at 1:10 arrive at the FSAE car
+  knowing what to expect.
+  \item \textbf{Sim-to-real training.} The simulator's car is the digital twin of the
+  RoboRacer reference vehicle. The team's method becomes: develop and race in the simulator,
+  transfer to the 1:10 car, measure the gap, close it, then carry the same pipeline to the
+  FSAE car. Without the car the first transfer never happens and the method is untested.
+  \item \textbf{Perception on real sensors.} Cone detection and colour classification with
+  the camera, lidar clustering, camera plus lidar fusion, localisation against a map: all of it
+  can be built in the simulator, but only real sensors show the lighting, noise, occlusion and
+  latency that decide whether it works. That is the driverless FSAE problem at small scale.
+  \item \textbf{Educating new members in real hardware.} Wiring, power, safety procedures,
+  motor controllers, sensor mounting and calibration, ROS~2 on an embedded computer: the
+  1:10 car teaches every one of these at low cost and low risk before anyone touches the FSAE
+  vehicle.
+  \item \textbf{Competitions and recruiting.} RoboRacer runs physical races at ICRA, IROS
+  and IFAC every year on the rules our league already uses, and a car on a table is what
+  fills a room at the first meeting of the semester.
 \end{itemize}
 
 \section{The options}
@@ -212,15 +224,7 @@ plus lidar fusion is possible on day one; nothing to upgrade later. \textbf{Limi
 is half the cost and the most fragile part; a bumper and a speed limit for new stacks are
 part of the plan.
 
-\subsection{Plan C: two cars}
-
-Plan~B plus a second car built to Plan~A's grade (\$1{,}400, no second track kit): total
-about \$4{,}600, or \$4{,}400 if the second car reuses the first car's charger and spares.
-\textbf{Benefits:} the head-to-head final on real cars, a spare during a competition, and two
-members' stacks testable at once. The budget car is the natural second car because racecraft,
-not sensor grade, is what head-to-head tests. Recommended for the semester after Plan~B.
-
-\subsection{Plan D: convert the team's Tamiya 1:10 chassis}
+\subsection{Plan C: convert the team's Tamiya 1:10 chassis}
 \label{sec:tamiya}
 
 The team owns a motorless Tamiya touring-car chassis. Priced as a full conversion:
@@ -249,7 +253,7 @@ Track kit & 240 & \\
 \end{itemize}
 The chassis is still useful as a bench mule for wiring and sensor mounting practice, at no cost.
 
-\subsection{Plan E: a 1:5-scale vehicle}
+\subsection{Plan D: a 1:5-scale vehicle}
 \label{sec:large}
 
 The committee asked about a 1:4 car. No manufacturer makes a 1:4 road car; the nearest
@@ -308,15 +312,16 @@ used by Formula Student driverless cars at small scale: the camera classifies co
 and the lidar gives precise range and bearing; fusing them yields a cone map, then a track
 boundary, then a raceline. The FEBAUTO simulator publishes both a front camera image and a
 lidar scan on the same topics the real car will use, and its cone tracks exist for exactly
-this pipeline. Plans~B and~C support this on day one; Plan~A's compute is enough for lidar-only
+this pipeline. Plan~B supports this on day one; Plan~A's compute is enough for lidar-only
 driving and can be upgraded to a Jetson for camera work later.
 
-\section{Racing: one on one}
+\section{Racing: one on one, in the simulator}
 
-The head-to-head final is the season's finish. In the simulator two cars race on one track,
-each team's stack in its own container, contact costs both cars a penalty and a respawn, and
-the finishing order is laps then time. The figures below are a race on Spielberg between the
-starter kit and the house racer.
+The head-to-head final is the season's finish and it stays in the simulator: two cars on one
+track, each team's stack in its own container, contact costing both cars a penalty and a
+respawn, finishing order by laps then time. The simulator already does this, so no second
+physical car is asked for. The figures show a race on Spielberg and on the FEB Loop between
+the starter kit and the house racer.
 
 \begin{figure}[H]
 \centering
@@ -327,12 +332,11 @@ starter kit and the house racer.
 \caption{One-on-one AI racing. Top: on Spielberg, the house racer (top of frame, left) closing on the member's car, and a moment earlier as it enters the frame (right). Bottom: on the FEB Loop, both cars in the same corner from above (left) and the whole track with both cars (right). Each car runs an unchanged competitor image behind the harness proxy; contact costs both cars a penalty and a respawn.}
 \end{figure}
 
-With Plan~C the same race runs on two real cars on the lab track.
 
 \section{Recommendation and timeline}
 
-Fund Plan~B now (\$3{,}190 plus 10\,\% contingency, \$3{,}500) and Plan~C's second car next
-semester (\$1{,}400). Order the lidar first; its lead time is the longest.
+Fund Plan~B (\$3{,}190 plus 10\,\% contingency, \$3{,}500). Order the lidar first; its
+lead time is the longest.
 
 \begin{tabularx}{\linewidth}{lX}
 \toprule
@@ -340,8 +344,8 @@ When & Milestone \\
 \midrule
 Order + 2 weeks & Car assembled from the RoboRacer build guide; manual drive; sensors on ROS~2; track laid \\
 + 4 weeks & Starter kit laps the lab track; simulator-to-car gap measured and written up \\
-+ 8 weeks & Qualified teams run their stacks on the car; first internal physical time-attack \\
-Following semester & Second car; head-to-head on hardware; entry to a RoboRacer physical event \\
++ 8 weeks & Qualified teams run their stacks on the car; first physical time-attack; camera and lidar cone perception on the cone track \\
+Following semester & Entry to a RoboRacer physical event; perception pipeline carried to the FSAE car \\
 \bottomrule
 \end{tabularx}
 
