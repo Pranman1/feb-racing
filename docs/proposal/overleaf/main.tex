@@ -6,6 +6,9 @@
 \usepackage{booktabs}
 \usepackage{tabularx}
 \usepackage{enumitem}
+\raggedbottom
+% keep a heading with the start of its section (the needspace trick, no package needed)
+\newcommand{\Needspace}[1]{\par\vskip 0pt plus #1\penalty-100\vskip 0pt plus -#1}
 \usepackage[hidelinks,colorlinks=true,linkcolor=febblue,urlcolor=febblue]{hyperref}
 \definecolor{febblue}{HTML}{1C4687}
 \setlength{\parskip}{4pt}
@@ -26,6 +29,7 @@ reference build. The FSAE car is on a two-year cycle and cannot host autonomous 
 season. The RC car is where the team develops, tests and learns in the meantime, and the
 software pipeline built on it is the one that goes onto the FSAE car next year.
 
+\Needspace{14\baselineskip}
 \section{What the car is and how it drives}
 
 \begin{tabularx}{\linewidth}{lX}
@@ -49,6 +53,7 @@ planner picks a bearing and speed; a controller turns them into steering and thr
 VESC actuates, gated by the dead-man. Same nodes and topic names as the team's simulator, so
 a stack developed there drops onto the car with only the driver nodes swapped.
 
+\Needspace{14\baselineskip}
 \section{Budget}
 
 \begin{tabularx}{\linewidth}{Xrrr}
@@ -77,8 +82,10 @@ RPLidar and a Flipsky controller in place of the two expensive parts; every item
 team keeps, and the lidar upgrades later by bolting on. \textbf{Reference} is the official
 RoboRacer competition bill of materials.
 
+\Needspace{14\baselineskip}
 \section{Options in each area}
 
+\Needspace{10\baselineskip}
 \subsection*{Lidar}
 The lidar sets the speed the car can drive: at 10~Hz it moves 25~cm between scans at 3~m/s.
 All publish the same ROS message, so a swap changes no code; the RPLidar sits on a small
@@ -96,6 +103,7 @@ Hokuyo UST-10LX & 1{,}200 & 40~Hz & 10~m & the reference; what race winners run 
 \bottomrule
 \end{tabularx}
 
+\Needspace{10\baselineskip}
 \subsection*{Compute}
 \begin{tabularx}{\linewidth}{p{4.6cm}rXX}
 \toprule
@@ -129,6 +137,7 @@ It is not part of this ask, and buying it now would mean guessing. Two-year tota
 recommended RC build now plus the FSAE computer next year: about \$2{,}750 with an Orin NX,
 about \$3{,}850 with an AGX Orin.
 
+\Needspace{10\baselineskip}
 \subsection*{Camera}
 \href{https://www.logitech.com/en-us/products/webcams/c920s-pro-hd-webcam.html}{Logitech C920}, \$60,
 rolling shutter, fine at these speeds.
@@ -139,11 +148,13 @@ on-camera inference, so cone detection costs the computer nothing; the recommend
 and weatherproof: FSAE-grade cameras that also fit the RC car, if the club wants the camera
 bought once.
 
+\Needspace{10\baselineskip}
 \subsection*{Controller}
 \href{https://flipsky.net}{Flipsky Mini FSESC 6.7}, \$110: same firmware as the reference,
 what most student builds use. \href{https://trampaboards.com}{VESC 6 MkVI}, \$250: the
 reference part, better cooling and support. Either is a drop-in.
 
+\Needspace{14\baselineskip}
 \section{What we already own, and where it goes}
 
 \begin{itemize}
@@ -155,8 +166,10 @@ reference part, better cooling and support. Either is a drop-in.
   \item \textbf{Alameda test track.} Outdoor sessions for the rig and, later, the FSAE car; not needed for the RC car, which runs in a corridor.
 \end{itemize}
 
+\Needspace{14\baselineskip}
 \section{Why it is worth it}
 
+\Needspace{10\baselineskip}
 \subsection*{This semester}
 \begin{itemize}
   \item The FSAE car is being built and cannot host autonomy; without a platform the team has nothing to run on until next year.
@@ -166,6 +179,7 @@ reference part, better cooling and support. Either is a drop-in.
   \item The simulator and the car share one codebase, so every member's stack has somewhere to go.
 \end{itemize}
 
+\Needspace{10\baselineskip}
 \subsection*{Carrying over to the FSAE car}
 \begin{itemize}
   \item \textbf{Same pipeline.} Cone detection with camera plus lidar, midline between cones, raceline, tracking controller: the Formula Student Driverless stack at small scale.
@@ -174,6 +188,7 @@ reference part, better cooling and support. Either is a drop-in.
   \item \textbf{What does not transfer:} vehicle dynamics and tuned parameters. A 3~kg car says nothing about a 250~kg car's tyres.
 \end{itemize}
 
+\newpage
 \section{Will it work, and the practical realities}
 
 The build is the F1TENTH/RoboRacer platform, assembled by hundreds of university teams since
