@@ -115,6 +115,18 @@ year with a season of data; the owned Xavier carries FSAE perception development
 If the club prefers one purchase for both cars, the Orin NX is the largest that fits the RC
 car and moves to the FSAE car later, at about \$650 more, leaving the RC car needing a Nano then.
 
+\textbf{Why a Jetson from day one.} Jetson to Jetson is the same software: same operating
+system image, same ARM64 build, same CUDA and TensorRT, same ROS~2 packages. Moving the stack
+from the Orin Nano to an Orin NX or AGX Orin is copying it across. Developing on an x86 laptop
+or PC instead means a different architecture, different driver and CUDA versions, and
+recompiling everything, with the porting landing at the worst moment, when the FSAE car is
+finally ready. Building on the Nano now makes the later upgrade trivial.
+
+\textbf{A separate line for the on-car FSAE computer.} If the budget process allows it, the
+FSAE car's computer should be its own item, requested once the team has a season of data on
+what the stack needs: about \$900 for an Orin NX 16~GB or about \$2{,}000 for an AGX Orin.
+It is not part of this ask, and buying it now would mean guessing.
+
 \subsection*{Camera}
 \href{https://www.logitech.com/en-us/products/webcams/c920s-pro-hd-webcam.html}{Logitech C920}, \$60,
 rolling shutter, fine at these speeds.
