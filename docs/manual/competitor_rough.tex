@@ -47,6 +47,11 @@ $[-1, 1]$; the bridge sends them to the simulator; the car moves.
 
 \begin{enumerate}
   \item \textbf{Docker Desktop.} Download from \url{https://docker.com}, install, open it, leave it running.
+  It is the whale icon in the menu bar. On a Mac, containers live in a small Linux virtual machine
+  that exists only while the app is open, so \texttt{docker} commands fail with ``cannot connect to
+  the Docker daemon'' if you quit it. Idle it costs almost nothing; tick \emph{Start Docker Desktop
+  when you sign in} in its settings. (On Linux, Docker is a background service that starts at boot,
+  which is why nothing has to be opened there.)
   \item \textbf{Foxglove.} Download from \url{https://foxglove.dev/download}, open once, sign in with a free account.
   \item \textbf{GitHub CLI.} In Terminal: \texttt{brew install gh}, then \texttt{gh auth login} and follow the prompts.
   \item \textbf{Python 3.} Already on the Mac. If Terminal says otherwise: \texttt{xcode-select --install}.
