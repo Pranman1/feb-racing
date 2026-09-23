@@ -46,7 +46,13 @@ $[-1, 1]$; the bridge sends them to the simulator; the car moves.
 \section{Install, once}
 
 \begin{enumerate}
-  \item \textbf{Docker Desktop.} Download from \url{https://docker.com}, install, open it, leave it running.
+  \item \textbf{Docker Desktop.} Install with \texttt{brew install --cask docker-desktop} (or download
+  from \url{https://docker.com}), then \texttt{open -a Docker}. Do not install \texttt{docker/tap/sbx};
+  that is Docker's agent sandbox tool, not Docker. On first launch it may report ``Failed to install
+  Rosetta'': install Rosetta on the Mac first, \texttt{softwareupdate --install-rosetta
+  --agree-to-license}, then relaunch Docker Desktop and let it retry. Our images run natively on Apple
+  Silicon, so Rosetta is only for other x86 images later. Check with \texttt{docker run --rm hello-world}.
+  Leave the app running.
   It is the whale icon in the menu bar. On a Mac, containers live in a small Linux virtual machine
   that exists only while the app is open, so \texttt{docker} commands fail with ``cannot connect to
   the Docker daemon'' if you quit it. Idle it costs almost nothing; tick \emph{Start Docker Desktop
