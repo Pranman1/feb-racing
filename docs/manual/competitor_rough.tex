@@ -1,0 +1,242 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage[hidelinks,colorlinks=true,linkcolor=febblue,urlcolor=febblue]{hyperref}
+\definecolor{febblue}{HTML}{1C4687}
+\definecolor{codebg}{HTML}{F3F4F6}
+\lstset{basicstyle=\ttfamily\small, backgroundcolor=\color{codebg}, frame=single, framerule=0pt,
+  framesep=4pt, xleftmargin=4pt, breaklines=true, columns=fullflexible, keepspaces=true, showstringspaces=false}
+\setlength{\parskip}{4pt}
+\setlist{nosep}
+
+\title{\color{febblue}\LARGE FEBAUTO Racing: Competitor Setup (rough)\\[4pt]\large macOS, from nothing to a driving car}
+\author{Formula Electric at Berkeley, Autonomous Team}
+\date{September 2026 \quad\textperiodcentered\quad draft, not for distribution}
+
+\begin{document}
+\maketitle
+
+\section*{What you are setting up}
+
+A simulator of the RoboRacer 1:10 car runs natively on your Mac. Your code runs in a Docker
+container that carries ROS~2 and the bridge to the simulator. You never install ROS on the
+Mac. Foxglove shows you the car's sensors live.
+
+\begin{lstlisting}
+feb-racing/                 the repo, your clone
+  feb-sim                   the launcher
+  stack/                    YOUR code (gitignored)
+  starter_kit/feb_driver/   the template you copy into stack/
+  tracks/                   track folders
+~/.feb-sim/app/mac/         the simulator app, downloaded by setup
+Docker Desktop              runs the devkit container
+\end{lstlisting}
+
+The loop: the container mounts \texttt{stack/} and builds it; the bridge turns the simulator's
+stream into ROS~2 topics under \texttt{/autodrive/roboracer\_1/}; your node reads the sensors
+and publishes two floats, \texttt{throttle\_command} and \texttt{steering\_command}, both in
+$[-1, 1]$; the bridge sends them to the simulator; the car moves.
+
+\section{Install, once}
+
+\begin{enumerate}
+  \item \textbf{Docker Desktop.} Download from \url{https://docker.com}, install, open it, leave it running.
+  \item \textbf{Foxglove.} Download from \url{https://foxglove.dev/download}, open once, sign in with a free account.
+  \item \textbf{GitHub CLI.} In Terminal: \texttt{brew install gh}, then \texttt{gh auth login} and follow the prompts.
+  \item \textbf{Python 3.} Already on the Mac. If Terminal says otherwise: \texttt{xcode-select --install}.
+\end{enumerate}
+
+\section{Clone and set up}
+
+\begin{lstlisting}
+git clone https://github.com/Pranman1/feb-racing
+cd feb-racing
+./feb-sim setup --team "Your Team"
+\end{lstlisting}
+
+Pulls the devkit image and downloads the Mac app into \texttt{\textasciitilde/.feb-sim/app/}.
+A few minutes. If the app later refuses to open (``damaged'' or ``cannot be opened''), it is
+unsigned; run once:
+
+\begin{lstlisting}
+xattr -dr com.apple.quarantine ~/.feb-sim/app/mac/"FEB Simulator.app"
+codesign --force --deep -s - ~/.feb-sim/app/mac/"FEB Simulator.app"
+\end{lstlisting}
+
+\section{Drive manually}
+
+\begin{lstlisting}
+./feb-sim run
+\end{lstlisting}
+
+Arrow keys drive. Menu top-left: Manual/Autonomous, Track, Cars, Look, camera. Close the
+window to stop. Nothing drives by itself without a stack.
+
+\section{Drive autonomously with the starter kit}
+
+\begin{lstlisting}
+cp -r starter_kit/feb_driver stack/
+./feb-sim run --stack "ros2 launch feb_driver drive.launch.py"
+\end{lstlisting}
+
+The container builds the package, the simulator opens, the car drives, Foxglove opens on its
+topics. The driver is \texttt{stack/feb\_driver/feb\_driver/reactive\_driver.py}; its numbers
+are in \texttt{stack/feb\_driver/config/driver.yaml}. Edit, save, run the same command again.
+
+\section{Score and post}
+
+\begin{lstlisting}
+./feb-sim practice --stack "ros2 launch feb_driver drive.launch.py"
+./feb-sim submit
+\end{lstlisting}
+
+\section{When something goes wrong}
+
+\begin{lstlisting}
+docker logs feb-devkit        # build errors, your node's output
+./feb-sim shell               # a ROS 2 terminal inside the container
+./feb-sim stop                # kill everything and start over
+\end{lstlisting}
+
+Nothing drives: correct without \texttt{--stack}; with one, read \texttt{docker logs}.
+Port 4567 in use: \texttt{./feb-sim stop}. Docker pull denied: Docker Desktop is not running.
+
+\section{A bare-bones driver from scratch}
+
+The smallest ROS~2 package that drives the car: it steers toward the deepest lidar beam.
+It has no safety bubble and will hit walls in corners; the starter kit is the real thing.
+Create \texttt{stack/my\_driver/} with these files.
+
+\subsection*{\texttt{stack/my\_driver/package.xml}}
+\begin{lstlisting}
+<?xml version="1.0"?>
+<package format="3">
+  <name>my_driver</name>
+  <version>0.0.1</version>
+  <description>Bare-bones driver</description>
+  <maintainer email="you@berkeley.edu">you</maintainer>
+  <license>MIT</license>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <export><build_type>ament_python</build_type></export>
+</package>
+\end{lstlisting}
+
+\subsection*{\texttt{stack/my\_driver/setup.py}}
+\begin{lstlisting}
+from setuptools import setup
+package_name = "my_driver"
+setup(
+    name=package_name, version="0.0.1", packages=[package_name],
+    data_files=[
+        ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
+        ("share/" + package_name, ["package.xml"]),
+        ("share/" + package_name + "/launch", ["launch/drive.launch.py"]),
+    ],
+    install_requires=["setuptools"], zip_safe=True,
+    entry_points={"console_scripts": ["driver = my_driver.driver:main"]},
+)
+\end{lstlisting}
+
+\subsection*{\texttt{stack/my\_driver/setup.cfg}}
+\begin{lstlisting}
+[develop]
+script_dir=$base/lib/my_driver
+[install]
+install_scripts=$base/lib/my_driver
+\end{lstlisting}
+
+\subsection*{Two empty files}
+\texttt{stack/my\_driver/resource/my\_driver} and \texttt{stack/my\_driver/my\_driver/\_\_init\_\_.py}.
+
+\subsection*{\texttt{stack/my\_driver/my\_driver/driver.py}}
+\begin{lstlisting}
+import math
+import numpy as np
+import rclpy
+from rclpy.node import Node
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
+from sensor_msgs.msg import LaserScan
+from std_msgs.msg import Float32
+
+NS = "/autodrive/roboracer_1/"
+QOS = QoSProfile(reliability=QoSReliabilityPolicy.RELIABLE,
+                 history=QoSHistoryPolicy.KEEP_LAST, depth=10)
+MAX_STEER = 0.5236   # rad; the command is normalised to [-1, 1]
+
+
+class Driver(Node):
+    def __init__(self):
+        super().__init__("driver")
+        self.throttle = self.create_publisher(Float32, NS + "throttle_command", QOS)
+        self.steering = self.create_publisher(Float32, NS + "steering_command", QOS)
+        self.create_subscription(LaserScan, NS + "lidar", self.on_scan, QOS)
+
+    def on_scan(self, scan):
+        ranges = np.asarray(scan.ranges, dtype=float)
+        ranges[~np.isfinite(ranges)] = scan.range_max
+        angles = scan.angle_min + np.arange(len(ranges)) * scan.angle_increment
+        ahead = np.abs(angles) < math.radians(90)          # front half only
+        target = angles[ahead][np.argmax(ranges[ahead])]   # bearing of the deepest beam
+        steer = float(np.clip(target / MAX_STEER, -1.0, 1.0))
+        speed = 0.08 if abs(steer) < 0.3 else 0.05          # 0 is a hard brake: never send it while moving
+        self.steering.publish(Float32(data=steer))
+        self.throttle.publish(Float32(data=speed))
+
+
+def main():
+    rclpy.init()
+    node = Driver()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    node.destroy_node()
+    rclpy.shutdown()
+\end{lstlisting}
+
+\subsection*{\texttt{stack/my\_driver/launch/drive.launch.py}}
+\begin{lstlisting}
+from launch import LaunchDescription
+from launch_ros.actions import Node
+
+def generate_launch_description():
+    return LaunchDescription([
+        Node(package="my_driver", executable="driver", name="driver",
+             parameters=[{"use_sim_time": True}], output="screen", emulate_tty=True),
+    ])
+\end{lstlisting}
+
+\subsection*{Run it}
+\begin{lstlisting}
+./feb-sim run --stack "ros2 launch my_driver drive.launch.py"
+\end{lstlisting}
+
+\section{What the car gives and takes}
+
+\begin{tabularx}{\linewidth}{lX}
+\toprule
+Topic (under \texttt{/autodrive/roboracer\_1/}) & Meaning \\
+\midrule
+\texttt{lidar} & \texttt{LaserScan}, 1080 beams over 270\textdegree, 0.06 to 10~m \\
+\texttt{imu} & orientation, angular velocity, linear acceleration \\
+\texttt{left\_encoder}, \texttt{right\_encoder} & wheel angle in rad; radius 0.059~m \\
+\texttt{front\_camera} & image \\
+\texttt{throttle\_command}, \texttt{steering\_command} & \textbf{you publish these}: \texttt{Float32} in $[-1, 1]$; throttle 0 is a hard brake; steering $\pm 1 = \pm 0.5236$~rad \\
+\texttt{ips}, \texttt{odom}, lap and collision counters & ground truth: training only, barred at race time \\
+\bottomrule
+\end{tabularx}
+
+\smallskip
+Publish as many topics of your own as you like; only the two commands reach the car. Use
+message stamps or \texttt{use\_sim\_time}, never the wall clock, for speeds and integrals.
+Throttle about 0.1 is roughly 2~m/s.
+
+\end{document}
