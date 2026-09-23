@@ -58,7 +58,7 @@ Item & Minimum & Recommended & Reference \\
 Chassis: \href{https://traxxas.com/products/landing/fiesta-st-rally-vxl/}{Traxxas Fiesta ST Rally VXL} & 430 & 430 & 430 \\
 Controller: \href{https://flipsky.net}{Flipsky Mini FSESC 6.7} / \href{https://trampaboards.com}{VESC 6 MkVI} & 110 & 110 & 250 \\
 Compute: \href{https://www.raspberrypi.com/products/raspberry-pi-5/}{Raspberry Pi 5 8~GB kit} / \href{https://www.sparkfun.com/products/22098}{Jetson Orin Nano Super} + 500~GB NVMe & 130 & 350 & 350 \\
-Lidar: LDS-01 (owned) / \href{https://www.slamtec.com/en/Lidar/S2}{RPLidar S2} / \href{https://www.robotshop.com/en/hokuyo-ust-10lx-scanning-laser-rangefinder.html}{Hokuyo UST-10LX} & 0 & 400 & 1{,}200 \\
+Lidar: RPLidar A1M8 (owned) / \href{https://www.slamtec.com/en/Lidar/S2}{RPLidar S2} / \href{https://www.robotshop.com/en/hokuyo-ust-10lx-scanning-laser-rangefinder.html}{Hokuyo UST-10LX} & 0 & 400 & 1{,}200 \\
 Camera: \href{https://www.logitech.com/en-us/products/webcams/c920s-pro-hd-webcam.html}{Logitech C920} / \href{https://shop.luxonis.com/products/oak-d-lite-1}{Luxonis OAK-D Lite} / \href{https://store.realsenseai.com/buy-intel-realsense-depth-camera-d435i.html}{RealSense D435i} & 60 & 150 & 335 \\
 Batteries: two Zeee 3S 6000~mAh, balance charger, LiPo bag & 135 & 135 & 135 \\
 Power distribution: 5~V converter, barrel-jack pigtail, balance extender, fuse, switch / \href{https://orders.ambimat.com}{RoboRacer powerboard} & 40 & 40 & 125 \\
@@ -72,7 +72,7 @@ Spares: tyres, pinion, bumper & 40 & 60 & 60 \\
 
 \smallskip
 Prices are September 2026 list prices, rounded. \textbf{Minimum} drives slow laps on the
-lidar we own and a Pi. \textbf{Recommended} is the official build with a time-of-flight
+RPLidar we own and a Pi. \textbf{Recommended} is the official build with a time-of-flight
 RPLidar and a Flipsky controller in place of the two expensive parts; every item is one the
 team keeps, and the lidar upgrades later by bolting on. \textbf{Reference} is the official
 RoboRacer competition bill of materials.
@@ -88,8 +88,7 @@ printed adapter plate and the Hokuyo bolts straight to the deck.
 \toprule
 Lidar & USD & Rate & Range & Reality \\
 \midrule
-LDS-01 (owned) & 0 & 5~Hz & 3.5~m & laps at 1 to 1.5~m/s; walls in a 2~m corridor are always in range; no useful map \\
-\href{https://www.slamtec.com/en/Lidar/A1}{RPLidar A1M8} & 100 & 5 to 10~Hz & 12~m & proves the pipeline; 1\textdegree{} resolution \\
+\href{https://www.slamtec.com/en/Lidar/A1}{RPLidar A1M8} (owned) & 0 & 5 to 10~Hz & 12~m & laps at 1 to 2~m/s; 1\textdegree{} resolution, coarse maps; runs the car until the S2 arrives \\
 \href{https://www.slamtec.com/en/Lidar/A2}{RPLidar A2M12} & 320 & 12~Hz & 12~m & fine indoors; noisy on dark surfaces \\
 \href{https://www.slamtec.com/en/Lidar/S2}{RPLidar S2} & 400 & 10~Hz & 30~m & time of flight; clean maps; to 3~m/s \\
 \href{https://www.slamtec.com/en/Lidar/A3}{RPLidar A3} & 600 & 15 to 20~Hz & 25~m & fastest cheap unit \\
@@ -134,8 +133,8 @@ reference part, better cooling and support. Either is a drop-in.
 \section{What we already own, and where it goes}
 
 \begin{itemize}
-  \item \textbf{LDS-01 lidar.} Onto the RC car for the first month: slow laps until the S2 arrives.
-  \item \textbf{RoboSense M1 3D lidar.} Not for the RC car: 0.7~kg, half-metre blind zone, 120\textdegree{} view. It is an FSAE sensor; with the Xavier it forms a perception rig for cone-track data this semester.
+  \item \textbf{RPLidar A1M8.} Onto the RC car for the first month: laps at 1 to 2~m/s until the S2 arrives, then a spare.
+  \item \textbf{RoboSense M1 3D lidar.} It can be bolted to the RC car on a custom plate, and the car would drive, badly: 0.7~kg on a 3~kg car spoils the handling, its half-metre blind zone hides the nearest wall in a 2~m corridor, and its 120\textdegree{} forward view gives wall-following nothing to work with. It is an FSAE sensor; with the Xavier it forms a perception rig for cone-track data this semester.
   \item \textbf{AGX Xavier 16~GB.} Computer for that rig and a bridge for the FSAE car; not for the RC car.
   \item \textbf{RealSense D435i.} Second camera on the rig.
   \item \textbf{Tamiya 1:10 chassis.} Motorless touring kit: no drawings, no match to the simulator, a semester of mechanical work to save \$300. Bench mule.
@@ -173,7 +172,7 @@ eligible for RoboRacer physical events as built; a lidar upgrade is what would m
 \begin{itemize}
   \item \textbf{One owner.} The car needs a named person for assembly, batteries and access, or it goes unused. This is the main risk.
   \item \textbf{Time.} Two to four weekends to assemble and integrate; first autonomous lap within a month; mapping, racelines and perception fill the semester.
-  \item \textbf{Speed.} 1 to 1.5~m/s on the LDS-01, about 3~m/s on the S2, faster only with the Hokuyo. The simulator car goes faster; members will feel the gap.
+  \item \textbf{Speed.} 1 to 2~m/s on the A1M8, about 3~m/s on the S2, faster only with the Hokuyo. The simulator car goes faster; members will feel the gap.
   \item \textbf{Access.} One car; time on it is earned through the simulator's qualification rule.
   \item \textbf{Batteries.} LiPo bag, supervised charging, a written procedure before the first charge.
   \item \textbf{Wear.} Bumpers and servo savers break; the spares line covers it.
