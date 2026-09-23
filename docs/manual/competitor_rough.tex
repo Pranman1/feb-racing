@@ -96,6 +96,56 @@ are in \texttt{stack/feb\_driver/config/driver.yaml}. Edit, save, run the same c
 ./feb-sim submit
 \end{lstlisting}
 
+\section{Looking inside: extra terminals and Foxglove}
+
+\subsection*{More terminals into the devkit}
+
+The container keeps running while the simulator is open. Open as many Terminal tabs as you
+like and, in each, from the repo folder:
+
+\begin{lstlisting}
+./feb-sim shell
+\end{lstlisting}
+
+That drops you into a ROS~2 shell inside the container, with the environment already sourced.
+Useful commands there:
+
+\begin{lstlisting}
+ros2 topic list                                          # everything on the graph
+ros2 topic hz /autodrive/roboracer_1/lidar               # is the sensor stream alive, at what rate
+ros2 topic echo /autodrive/roboracer_1/throttle_command  # what your node is sending
+ros2 topic echo --once /autodrive/roboracer_1/imu
+ros2 node list                                           # your node should be here
+ros2 node info /driver
+ros2 param list /driver                                  # live parameters
+ros2 bag record -a -o /home/autodrive_devkit/src/stack/mybag   # lands in your stack/ folder on the Mac
+\end{lstlisting}
+
+\texttt{exit} leaves the shell; the container keeps running. \texttt{docker exec -it feb-devkit
+bash} is the same thing without the launcher. Files you write under
+\texttt{/home/autodrive\_devkit/src/stack} inside the container appear in \texttt{stack/} on the
+Mac, and the other way round.
+
+\subsection*{Foxglove}
+
+Installed in step~2 of the install list; sign in once. After that, \texttt{./feb-sim run} opens
+Foxglove connected to your car a few seconds after the simulator window. If it does not, or
+you want a second window: in Foxglove choose \emph{Open connection}, \emph{Foxglove WebSocket},
+address \texttt{ws://localhost:8765}.
+
+Panels worth adding (the \emph{+} at the top right of a panel):
+\begin{itemize}
+  \item \textbf{3D}: add the topic \texttt{/autodrive/roboracer\_1/lidar}; set the display frame to the lidar's frame. The scan appears as points around the car.
+  \item \textbf{Image}: \texttt{/autodrive/roboracer\_1/front\_camera}.
+  \item \textbf{Plot}: \texttt{throttle\_command.data} and \texttt{steering\_command.data} against time; add \texttt{left\_encoder.position[0]} to watch the wheel.
+  \item \textbf{Raw Messages}: any topic, to read exact values.
+  \item \textbf{Topics} (left sidebar): every topic with its rate; a dash means nothing is publishing.
+\end{itemize}
+
+Save the layout (\emph{Layout}, \emph{Save}) and it comes back next time. Foxglove also opens the
+bags that \texttt{practice} records under \texttt{runs/<id>/}, and any bag you record yourself:
+\emph{Open local file}.
+
 \section{When something goes wrong}
 
 \begin{lstlisting}
