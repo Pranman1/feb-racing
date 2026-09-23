@@ -97,8 +97,18 @@ cp -r starter_kit/feb_driver stack/
 \end{lstlisting}
 
 The container builds the package, the simulator opens, the car drives, Foxglove opens on its
-topics. The driver is \texttt{stack/feb\_driver/feb\_driver/reactive\_driver.py}; its numbers
-are in \texttt{stack/feb\_driver/config/driver.yaml}. Edit, save, run the same command again.
+topics.
+
+\textbf{What the starter driver is.} A complete ROS~2 package. The driver is one commented file,
+\texttt{stack/feb\_driver/feb\_driver/reactive\_driver.py}, a ``follow the gap'' controller: clean
+the lidar scan, blank a safety bubble around the nearest obstacle, aim at the widest gap, pick a
+speed from the room ahead, publish steering and throttle. Its numbers are in
+\texttt{stack/feb\_driver/config/driver.yaml}.
+
+\textbf{Editing code.} \texttt{stack/} is a plain folder on your Mac; open it in any editor. With
+VS~Code: \texttt{code stack/} from the repo folder, or File, Open Folder. Edit, save, run the same
+\texttt{./feb-sim run} command again; the container rebuilds your packages in seconds. No plugin
+or remote setup: the container reads the files straight from your disk.
 
 \section{Score and post}
 
@@ -106,6 +116,12 @@ are in \texttt{stack/feb\_driver/config/driver.yaml}. Edit, save, run the same c
 ./feb-sim practice --stack "ros2 launch feb_driver drive.launch.py"
 ./feb-sim submit
 \end{lstlisting}
+
+\texttt{practice} runs one attempt the way a competition does: headless simulator, a warm-up lap
+plus ten timed laps, 10~s per collision, 300~s limit; it writes \texttt{runs/<id>/result.json} and a
+bag. \texttt{submit} opens a pull request with that file; a check validates and merges it, and your
+time appears on the site's practice board as \emph{unverified}. The organiser's nightly rerun of your
+registered image on the same track turns it \emph{verified}.
 
 \section{Looking inside: extra terminals and Foxglove}
 
@@ -132,7 +148,17 @@ ros2 param list /driver                                  # live parameters
 ros2 bag record -a -o /home/autodrive_devkit/src/stack/mybag   # lands in your stack/ folder on the Mac
 \end{lstlisting}
 
-\texttt{exit} leaves the shell; the container keeps running. \texttt{docker exec -it feb-devkit
+\texttt{exit} leaves the shell; the container keeps running.
+
+\textbf{Devkit on its own.} The launcher starts the devkit and the simulator together because
+that is what you want most of the time, but they are independent. The devkit alone, for
+building, replaying bags or running tests without a simulator:
+\begin{lstlisting}
+docker run --rm -it -p 4567:4567 -v "$PWD/stack:/home/autodrive_devkit/src/stack" \
+    ghcr.io/pranman1/feb-devkit bash
+\end{lstlisting}
+Inside, \texttt{source install/setup.bash} after \texttt{colcon build}. The simulator alone is the
+app in \texttt{\textasciitilde/.feb-sim/app/mac}, keyboard driving, no ROS. \texttt{docker exec -it feb-devkit
 bash} is the same thing without the launcher. Files you write under
 \texttt{/home/autodrive\_devkit/src/stack} inside the container appear in \texttt{stack/} on the
 Mac, and the other way round.
