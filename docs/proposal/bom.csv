@@ -19,7 +19,7 @@ Power distribution,DC barrel extension 5.5x2.5mm,Amazon,https://www.amazon.com/d
 Power distribution,3S balance plug extension leads 5-pack,Amazon,https://www.amazon.com/dp/B07PX37XX5,8.99,now
 Manual control,8BitDo Ultimate 2C wireless gamepad,Amazon,https://www.amazon.com/dp/B0FX3TJ5RX,29.99,now
 Sensors,RPLidar A1M8 (owned),--,https://www.slamtec.com/en/Lidar/A1,0,now
-Sensors,Intel RealSense D435IF (354 list; 455 at checkout with tax and shipping; the only all-in line),RealSense store,https://store.realsenseai.com/buy-intel-realsense-depth-camera-d435if.html,455.0,now
+Sensors,Intel RealSense D435IF (checkout 455 with tax and shipping; counted in the tax and shipping lines),RealSense store,https://store.realsenseai.com/buy-intel-realsense-depth-camera-d435if.html,354.0,now
 Sensors,Alternative not chosen: Logitech C920 webcam,Amazon,https://www.amazon.com/dp/B006JH8T3S,67.39,note
 Hardware,M2-M5 screw assortment 4-20mm,Amazon,https://www.amazon.com/dp/B0FGX9JGC5,21.99,now
 Hardware,M3 hex standoffs 14mm,McMaster,https://www.mcmaster.com/94868A009,3.68,now
@@ -30,9 +30,9 @@ Hardware,M2.5 standoffs 10mm (Jetson),McMaster,https://www.mcmaster.com/95947A00
 Hardware,Zip ties 4 inch,Amazon,https://www.amazon.com/dp/B078Y7MH6Z,12.99,now
 Spares,Spares allowance (Traxxas parts finder),Traxxas,https://traxxas.com/products/parts,60.0,now
 Upgrades,RPLidar S2 30 m ToF (Slamtec listing; Seeed US warehouse 398.99 and RobotShop are fallbacks),Amazon,https://www.amazon.com/dp/B0G4M3J1L8,349.0,s2
-,Parts now,,,2052.14,
-,Parts now + S2,,,2401.14,
-,Sales tax 10.25% on US-shipped items (with S2),,,159.02,
-,Shipping and duty (VESC UK 75; power board India 70; domestic 45),,,190.00,
-,All in now,,,2365.38,
-,All in now + S2,,,2750.16,
+,Parts now,,,1951.14,
+,Parts now + S2,,,2300.14,
+,Sales tax 10.25% on US-shipped items (with S2),,,195.30,
+,Shipping and duty (VESC UK 75; power board India 70; camera 65; domestic 45),,,255.00,
+,All in now,,,2365.67,
+,All in now + S2,,,2750.44,
