@@ -5,10 +5,10 @@
 \usepackage{xcolor}
 \usepackage{booktabs}
 \usepackage{tabularx}
+\usepackage{longtable}
 \usepackage{enumitem}
 \raggedbottom
-% keep a heading with the start of its section (the needspace trick, no package needed)
-\newcommand{\Needspace}[1]{\par\vskip 0pt plus #1\penalty-100\vskip 0pt plus -#1}
+\usepackage{needspace}
 \usepackage[hidelinks,colorlinks=true,linkcolor=febblue,urlcolor=febblue]{hyperref}
 \definecolor{febblue}{HTML}{1C4687}
 \setlength{\parskip}{4pt}
@@ -23,9 +23,10 @@
 
 \section*{The ask}
 
-One 1:10-scale autonomous car on the RoboRacer (F1TENTH) standard: \textbf{\$1{,}835
-recommended}, \$1{,}105 minimum using sensors we already own, \$3{,}045 for the official
-reference build. The FSAE car is on a two-year cycle and cannot host autonomous work this
+One 1:10-scale autonomous car on the RoboRacer (F1TENTH) standard: \textbf{\$1{,}550 now},
+a complete car on the lidar and camera we already own, plus \textbf{\$400 for the lidar
+upgrade} when funds allow (\$1{,}950 together); \$3{,}250 for the official reference build.
+Every item is listed with its shop link in Section~\ref{sec:bom}. The FSAE car is on a two-year cycle and cannot host autonomous work this
 season. The RC car is where the team develops, tests and learns in the meantime, and the
 software pipeline built on it is the one that goes onto the FSAE car next year.
 
@@ -58,29 +59,115 @@ a stack developed there drops onto the car with only the driver nodes swapped.
 
 \begin{tabularx}{\linewidth}{Xrrr}
 \toprule
-Item & Minimum & Recommended & Reference \\
+Item & Now & With S2 & Reference \\
 \midrule
-Chassis: \href{https://traxxas.com/products/landing/fiesta-st-rally-vxl/}{Traxxas Fiesta ST Rally VXL} & 430 & 430 & 430 \\
-Controller: \href{https://flipsky.net}{Flipsky Mini FSESC 6.7} / \href{https://trampaboards.com}{VESC 6 MkVI} & 110 & 110 & 250 \\
-Compute: \href{https://www.raspberrypi.com/products/raspberry-pi-5/}{Raspberry Pi 5 8~GB kit} / \href{https://www.sparkfun.com/products/22098}{Jetson Orin Nano Super} + 500~GB NVMe & 130 & 350 & 350 \\
-Lidar: RPLidar A1M8 (owned) / \href{https://www.slamtec.com/en/Lidar/S2}{RPLidar S2} / \href{https://www.robotshop.com/en/hokuyo-ust-10lx-scanning-laser-rangefinder.html}{Hokuyo UST-10LX} & 0 & 400 & 1{,}200 \\
-Camera: \href{https://www.logitech.com/en-us/products/webcams/c920s-pro-hd-webcam.html}{Logitech C920} / \href{https://shop.luxonis.com/products/oak-d-lite-1}{Luxonis OAK-D Lite} / \href{https://store.realsenseai.com/buy-intel-realsense-depth-camera-d435i.html}{RealSense D435i} & 60 & 150 & 335 \\
-Batteries: two Zeee 3S 6000~mAh, balance charger, LiPo bag & 135 & 135 & 135 \\
-Power distribution: 5~V converter, barrel-jack pigtail, balance extender, fuse, switch / \href{https://orders.ambimat.com}{RoboRacer powerboard} & 40 & 40 & 125 \\
-Joystick, antenna, PPM cable, bullet adapters, USB cables, display emulator & 70 & 70 & 70 \\
-Deck plates (cut on campus from the \href{https://f1tenth.readthedocs.io}{RoboRacer drawings}), standoffs, fastener kits & 90 & 90 & 90 \\
-Spares: tyres, pinion, bumper & 40 & 60 & 60 \\
+Chassis, batteries, charger, bag & 560 & 560 & 560 \\
+Computer: Jetson Orin Nano Super, NVMe, display plug, antenna, cable & 522 & 522 & 522 \\
+Motor controller: Flipsky Mini FSESC 4.20 / VESC 6 MkVI, cables, adapters & 112 & 112 & 276 \\
+Power: RoboRacer powerboard, pigtail, balance extender & 164 & 164 & 164 \\
+Joystick & 30 & 30 & 30 \\
+Lidar: RPLidar A1M8 (owned) / RPLidar S2 / Hokuyo UST-10LX & 0 & 399 & 1{,}200 \\
+Camera: RealSense D435i (owned) / RealSense D435i & 0 & 0 & 334 \\
+Deck (cut on campus), standoffs, fastener kits & 101 & 101 & 101 \\
+Spares allowance & 60 & 60 & 60 \\
 \midrule
-\textbf{Total} & \textbf{1{,}105} & \textbf{1{,}835} & \textbf{3{,}045} \\
+\textbf{Total} & \textbf{1{,}549} & \textbf{1{,}948} & \textbf{3{,}247} \\
 \bottomrule
 \end{tabularx}
 
 \smallskip
-Prices are September 2026 list prices, rounded. \textbf{Minimum} drives slow laps on the
-RPLidar we own and a Pi. \textbf{Recommended} is the official build with a time-of-flight
-RPLidar and a Flipsky controller in place of the two expensive parts; every item is one the
-team keeps, and the lidar upgrades later by bolting on. \textbf{Reference} is the official
-RoboRacer competition bill of materials.
+Prices are September 2026 shop prices (Section~\ref{sec:bom}). \textbf{Now} is the
+official build with the sensors we own and a cheaper motor controller: a complete car that
+drives laps at 1 to 2~m/s. \textbf{With S2} adds the time-of-flight RPLidar, which bolts on
+later without any other change; it is the one upgrade that matters. \textbf{Reference} is
+the official RoboRacer bill of materials at today's prices (NVIDIA raised Jetson prices by
+60 to 100\% in July 2026, which is why the computer costs \$399, not \$249).
+
+\Needspace{14\baselineskip}
+\section{Exact bill of materials}
+\label{sec:bom}
+
+Every line links to the shop page. Prices are what the pages showed on 24 September 2026
+(Amazon prices from the official RoboRacer sheet of May 2026, which we checked against
+the listings). ``Now'' is the car we can build today; ``S2'' is the lidar upgrade line.
+The official sheet: \href{https://docs.google.com/spreadsheets/d/1WT-UdjLTnyrb7CvHcuCxKLnRIN8DWroQ/edit}{RoboRacer master BOM}.
+
+\small
+\begin{longtable}{p{11.6cm}lr}
+\toprule
+Item & Shop & USD \\
+\midrule
+\endfirsthead
+\toprule
+Item & Shop & USD \\
+\midrule
+\endhead
+\multicolumn{3}{l}{\textbf{Chassis and batteries}} \\
+\href{https://traxxas.com/products/landing/fiesta-st-rally-vxl/}{Traxxas Ford Fiesta ST Rally VXL, 74276-4} (backordered at some dealers; Amazon B0D5M8D2R8 also lists it) & Traxxas & 429.95 \\
+\href{https://zeeebattery.com/products/zeee-3s-lipo-battery-6000mah-11-1v-80c-ec5}{Zeee 3S 6000~mAh 80C hard case, EC5, 2-pack} (\href{https://a.co/d/07viD7OJ}{Amazon} 89.99) & Zeee & 88.99 \\
+\href{https://a.co/d/04M3SdSJ}{LiPo balance charger with EC5 lead} & Amazon & 33.99 \\
+\href{https://a.co/d/0gqCuJEP}{Zeee fireproof LiPo bag} & Amazon & 6.99 \\
+\multicolumn{3}{l}{\textbf{Computer}} \\
+\href{https://www.sparkfun.com/nvidia-jetson-orin-nano-developer-kit.html}{NVIDIA Jetson Orin Nano Super Developer Kit} (backorder; \href{https://www.seeedstudio.com/NVIDIAr-Jetson-Orintm-Nano-Developer-Kit-p-5617.html}{Seeed} 450.30; \href{https://www.amazon.com/dp/B0BZJTQ5YP}{Amazon}); Wi-Fi card and antennas included & SparkFun & 399.00 \\
+\href{https://a.co/d/0fV5xrP8}{NVMe SSD, 500~GB, M.2 2280} (sheet price; street price about 60) & Amazon & 100.00 \\
+\href{https://www.amazon.com/dp/B071CGCTMY}{DisplayPort dummy plug} (headless boot) & Amazon & 6.99 \\
+\href{https://www.amazon.com/dp/B07V1W759Z}{7~dBi Wi-Fi antenna with MHF4 cable} (range; the mount is a campus print) & Amazon & 7.99 \\
+\href{https://a.co/d/0hjc5X8u}{Short USB-A to micro-USB cable, Jetson to controller} & Amazon & 7.99 \\
+\multicolumn{3}{l}{\textbf{Motor controller}} \\
+\href{https://www.amazon.com/dp/B08725X8CT}{Flipsky Mini FSESC 4.20 50~A} (3S to 13S; \href{https://flipsky.net}{flipsky.net} 85, on sale 56) & Amazon & 85.00 \\
+\href{https://www.adafruit.com/product/3893}{JST-PH 3-pin to header cable} (controller PPM port to steering servo) & Adafruit & 1.25 \\
+\href{https://www.amazon.com/dp/B076F64ZCJ}{Header pins} (three are used) & Amazon & 8.99 \\
+\href{https://www.amazon.com/dp/B07Z4FRQNX}{Bullet adapters, 4~mm male to 3.5~mm female, 3-pack} (Traxxas motor leads are 3.5~mm; match the controller's bullets on arrival) & Amazon & 7.99 \\
+\href{https://www.amazon.com/dp/B09MQ1MJRD}{EC5 female to XT60 male adapters, 3-pack} (battery to controller) & Amazon & 8.99 \\
+\multicolumn{3}{l}{\textbf{Power distribution}} \\
+\href{https://orders.ambimat.com/product/roboracer-power-board-1-qty-non-rohs-compliant/}{RoboRacer power board, 1 unit} (19~V to the Jetson, 12~V and 5~V rails, switch, fused; 125 each for three or more) & Ambimat & 145.00 \\
+\href{https://a.co/d/08r6C0zE}{Barrel jack to pigtail, 2.5~x~5.5~mm} (power board to Jetson) & Amazon & 9.99 \\
+\href{https://a.co/d/04z1CrzG}{3S balance plug extender} (battery to power board) & Amazon & 8.99 \\
+\multicolumn{3}{l}{\textbf{Manual control}} \\
+\href{https://a.co/d/04eI03bz}{8BitDo Ultimate 2C wireless gamepad} (dead-man and manual drive) & Amazon & 29.99 \\
+\multicolumn{3}{l}{\textbf{Sensors}} \\
+RPLidar A1M8, owned; \href{https://www.slamtec.com/en/Lidar/A1}{spec} & -- & 0 \\
+Intel RealSense D435i, owned; \href{https://store.realsenseai.com/buy-intel-realsense-depth-camera-d435i.html}{spec} & -- & 0 \\
+\multicolumn{3}{l}{\textbf{Deck and hardware}} \\
+\href{https://drive.google.com/drive/folders/1NU4FZzvMEGKCOFzDBvnjyePnnSMvsZPG}{Platform deck, laser cut from the official DXF} (3~mm acrylic sheet, campus cutter) & material & 20.00 \\
+\href{https://drive.google.com/drive/folders/1sy-XiJJ4hmhEKf5qQbUaPYY6Aw-L31Gk}{Antenna mount} and A1M8 adapter plate, campus 3D printer & print & 0 \\
+\href{https://a.co/d/0ePVll7A}{M3 socket-head screw kit} & Amazon & 22.86 \\
+\href{https://www.amazon.com/dp/B07SBQ1JX5}{M5 socket-head screw kit} (two M5~x~20 are used) & Amazon & 8.66 \\
+\href{https://www.mcmaster.com/94868A009}{M3 hex standoffs, 14~mm} & McMaster & 3.68 \\
+\href{https://www.mcmaster.com/94868A013}{M3 hex standoffs, 25~mm} & McMaster & 10.76 \\
+\href{https://www.mcmaster.com/94868A190}{M3 hex standoffs, 45~mm} & McMaster & 27.90 \\
+\href{https://www.mcmaster.com/94500A213/}{M2.5~x~6~mm screws} (Jetson) & McMaster & 5.30 \\
+\href{https://www.mcmaster.com/95947A005/}{M2.5 standoffs, 10~mm} (Jetson) & McMaster & 2.16 \\
+\multicolumn{3}{l}{\textbf{Spares}} \\
+Allowance: bumper, servo saver, tyres, pinion, ordered from the \href{https://traxxas.com/products/parts}{Traxxas parts finder} as they break & Traxxas & 60.00 \\
+\midrule
+\textbf{Now} & & \textbf{1{,}549} \\
+\midrule
+\multicolumn{3}{l}{\textbf{Lidar upgrade}} \\
+\href{https://www.seeedstudio.com/RPLiDAR-S2-Low-Cost-360-Degree-Laser-Range-Scanner-30M-Range-p-5198.html}{RPLidar S2, 30~m time of flight} (354.99 on sale today; \href{https://www.robotshop.com/products/rplidar-s2-360-laser-scanner-30-m}{RobotShop} also stocks it) & Seeed & 398.99 \\
+\midrule
+\textbf{Now plus S2} & & \textbf{1{,}948} \\
+\bottomrule
+\end{longtable}
+\normalsize
+
+\smallskip
+\textbf{Fitting \$1{,}800 with the S2.} At today's sale prices (S2 at 355, controller at 56)
+the total is \$1{,}875. Replacing the power board with a
+\href{https://www.pololu.com/product/2851}{Pololu 5~V 5~A regulator} (32.95) for the lidar,
+with the Jetson fed from the balance extender through the barrel pigtail, saves \$112 and
+lands at \$1{,}760 to \$1{,}835; it costs one evening of soldering and loses the fuse and switch.
+Cheapest of all is buying the S2 as a second, later request: the car does not wait for it.
+
+\textbf{What the A1M8 costs us.} Same ROS message, same software, a printed plate instead of
+the Hokuyo bolt pattern, USB power instead of 12~V, so nothing about the build gets harder.
+What changes is the ceiling: 8{,}000 samples a second at 5 to 10~Hz gives about 1\textdegree{}
+resolution, ranges reliable to roughly 6~m indoors, and a scan that takes 100 to 180~ms while
+the car moves, so the laps are 1 to 2~m/s and the maps are coarse. Cones at 6~m give two to four
+returns, enough for the cone pipeline. Triangulation lidars also wash out in direct sunlight,
+so the A1M8 car stays indoors. The S2 lifts all of that (30~m, 32{,}000 samples a second, works
+outdoors) and is the one part that makes the car fast.
+
 
 \Needspace{14\baselineskip}
 \section{Options in each area}
@@ -96,9 +183,9 @@ printed adapter plate and the Hokuyo bolts straight to the deck.
 Lidar & USD & Rate & Range & Reality \\
 \midrule
 \href{https://www.slamtec.com/en/Lidar/A1}{RPLidar A1M8} (owned) & 0 & 5 to 10~Hz & 12~m & laps at 1 to 2~m/s; 1\textdegree{} resolution, coarse maps; runs the car until the S2 arrives \\
-\href{https://www.slamtec.com/en/Lidar/A2}{RPLidar A2M12} & 320 & 12~Hz & 12~m & fine indoors; noisy on dark surfaces \\
-\href{https://www.slamtec.com/en/Lidar/S2}{RPLidar S2} & 400 & 10~Hz & 30~m & time of flight; clean maps; to 3~m/s \\
-\href{https://www.slamtec.com/en/Lidar/A3}{RPLidar A3} & 600 & 15 to 20~Hz & 25~m & fastest cheap unit \\
+\href{https://www.slamtec.com/en/Lidar/A2}{RPLidar A2M12} & 229 & 12~Hz & 12~m & fine indoors; noisy on dark surfaces \\
+\href{https://www.slamtec.com/en/Lidar/S2}{RPLidar S2} & 399 & 10~Hz & 30~m & time of flight; clean maps; to 3~m/s \\
+\href{https://www.slamtec.com/en/Lidar/A3}{RPLidar A3} & 599 & 15 to 20~Hz & 25~m & fastest cheap unit \\
 Hokuyo UST-10LX & 1{,}200 & 40~Hz & 10~m & the reference; what race winners run \\
 \bottomrule
 \end{tabularx}
@@ -110,10 +197,10 @@ Hokuyo UST-10LX & 1{,}200 & 40~Hz & 10~m & the reference; what race winners run 
 Computer & USD & On the RC car & On the FSAE car \\
 \midrule
 \href{https://www.raspberrypi.com/products/raspberry-pi-5/}{Raspberry Pi 5, 8~GB} & 130 & lidar-only driving; no camera perception & no \\
-\href{https://www.sparkfun.com/products/22098}{Jetson Orin Nano Super, 8~GB} & 250 + 100 NVMe & the official part; fits the deck; enough for everything the car does & no: a 3D lidar and several cameras need more \\
-\href{https://www.nvidia.com/en-us/autonomous-machines/embedded-systems/jetson-orin/}{Jetson Orin NX 16~GB} on the Nano carrier & about 900 & fits; overkill & a first driverless stack: M1 lidar, two cameras, detector \\
+\href{https://www.sparkfun.com/products/22098}{Jetson Orin Nano Super, 8~GB} & 399 + 100 NVMe & the official part; fits the deck; enough for everything the car does & no: a 3D lidar and several cameras need more \\
+\href{https://www.nvidia.com/en-us/autonomous-machines/embedded-systems/jetson-orin/}{Jetson Orin NX 16~GB} on the Nano carrier & about 1{,}200 & fits; overkill & a first driverless stack: M1 lidar, two cameras, detector \\
 Jetson AGX Xavier 16~GB (owned, 2018) & 0 & no: 630~g box, does not fit the deck & a bridge for one or two seasons; last software is JetPack~5 \\
-\href{https://www.nvidia.com/en-us/autonomous-machines/embedded-systems/jetson-orin/}{Jetson AGX Orin 64~GB} & 2{,}000 & no: 1.4~kg & the full answer, when the stack needs it \\
+\href{https://www.nvidia.com/en-us/autonomous-machines/embedded-systems/jetson-orin/}{Jetson AGX Orin 64~GB} & 3{,}500 & no: 1.4~kg & the full answer, when the stack needs it \\
 \bottomrule
 \end{tabularx}
 
@@ -121,7 +208,7 @@ Jetson AGX Xavier 16~GB (owned, 2018) & 0 & no: 630~g box, does not fit the deck
 Recommended: the Orin Nano on the RC car, permanently. The FSAE computer is decided next
 year with a season of data; the owned Xavier carries FSAE perception development until then.
 If the club prefers one purchase for both cars, the Orin NX is the largest that fits the RC
-car and moves to the FSAE car later, at about \$650 more, leaving the RC car needing a Nano then.
+car and moves to the FSAE car later, at about \$800 more, leaving the RC car needing a Nano then.
 
 \textbf{Why a Jetson from day one.} Jetson to Jetson is the same software: same operating
 system image, same ARM64 build, same CUDA and TensorRT, same ROS~2 packages. Moving the stack
@@ -132,17 +219,19 @@ finally ready. Building on the Nano now makes the later upgrade trivial.
 
 \textbf{A separate line for the on-car FSAE computer.} If the budget process allows it, the
 FSAE car's computer should be its own item, requested once the team has a season of data on
-what the stack needs: about \$900 for an Orin NX 16~GB or about \$2{,}000 for an AGX Orin.
-It is not part of this ask, and buying it now would mean guessing. Two-year total,
-recommended RC build now plus the FSAE computer next year: about \$2{,}750 with an Orin NX,
-about \$3{,}850 with an AGX Orin.
+what the stack needs: about \$1{,}200 for an Orin NX 16~GB on a carrier board or about
+\$3{,}500 for an AGX Orin developer kit, at the July 2026 prices. It is not part of this ask,
+and buying it now would mean guessing. Two-year total, RC car with the S2 now plus the FSAE
+computer next year: about \$3{,}150 with an Orin NX, about \$5{,}450 with an AGX Orin.
 
 \Needspace{10\baselineskip}
 \subsection*{Camera}
-\href{https://www.logitech.com/en-us/products/webcams/c920s-pro-hd-webcam.html}{Logitech C920}, \$60,
-rolling shutter, fine at these speeds.
-\href{https://shop.luxonis.com/products/oak-d-lite-1}{OAK-D Lite}, \$150, stereo depth and
-on-camera inference, so cone detection costs the computer nothing; the recommended pick.
+The \textbf{RealSense D435i we own} goes on the car: colour for cone classes, depth as a
+bonus, and it is the camera in the official bill of materials. Nothing to buy. If a second
+camera is ever needed: \href{https://www.amazon.com/dp/B006JH8T3S}{Logitech C920}, \$75,
+rolling shutter, fine at these speeds;
+\href{https://shop.luxonis.com/products/oak-d-lite-1}{OAK-D Lite}, \$269, stereo depth and
+on-camera inference.
 \href{https://shop.luxonis.com/products/oak-d-pro-w}{OAK-D Pro W} or
 \href{https://store.stereolabs.com/products/zed-2i}{ZED 2i}, \$400 to \$500, global shutter
 and weatherproof: FSAE-grade cameras that also fit the RC car, if the club wants the camera
@@ -150,21 +239,26 @@ bought once.
 
 \Needspace{10\baselineskip}
 \subsection*{Controller}
-\href{https://flipsky.net}{Flipsky Mini FSESC 6.7}, \$110: same firmware as the reference,
-what most student builds use. \href{https://trampaboards.com}{VESC 6 MkVI}, \$250: the
-reference part, better cooling and support. Either is a drop-in.
+The controller must accept the car's 3S pack (9 to 12.6~V). The
+\href{https://www.amazon.com/dp/B08725X8CT}{Flipsky Mini FSESC 4.20 50~A}, \$85 (\$56 on sale
+at \href{https://flipsky.net}{flipsky.net}), runs 3S to 13S on VESC~4.12 hardware, the design the
+original F1TENTH cars raced on; USB cable included. The
+\href{https://trampaboards.com/vesc-6-mkvi--12s-c-1630.html}{VESC 6 MkVI}, \$250, is the
+reference part: better cooling and support. Note that the popular Flipsky Mini FSESC 6.7
+is rated 14~V minimum (4S) and does \emph{not} suit this car. Either listed unit is a drop-in.
 
 \Needspace{14\baselineskip}
 \section{What we already own, and where it goes}
 
 \begin{itemize}
-  \item \textbf{RPLidar A1M8.} Onto the RC car for the first month: laps at 1 to 2~m/s until the S2 arrives, then a spare.
+  \item \textbf{RPLidar A1M8.} Onto the RC car: laps at 1 to 2~m/s until the S2 arrives, then a spare. USB-powered, four screws on a printed plate.
   \item \textbf{RoboSense M1 3D lidar.} It can be bolted to the RC car on a custom plate, and the car would drive, badly: 0.7~kg on a 3~kg car spoils the handling, its half-metre blind zone hides the nearest wall in a 2~m corridor, and its 120\textdegree{} forward view gives wall-following nothing to work with. It is an FSAE sensor; with the Xavier it forms a perception rig for cone-track data this semester.
   \item \textbf{AGX Xavier 16~GB.} Computer for that rig and a bridge for the FSAE car; not for the RC car.
-  \item \textbf{RealSense D435i.} Second camera on the rig.
+  \item \textbf{RealSense D435i.} The RC car's camera (it is the official part); the rig borrows it when the car is idle.
   \item \textbf{Tamiya 1:10 chassis.} Motorless touring kit: no drawings, no match to the simulator, a semester of mechanical work to save \$300. Bench mule.
   \item \textbf{Alameda test track.} Outdoor sessions for the rig and, later, the FSAE car; not needed for the RC car, which runs in a corridor.
 \end{itemize}
+
 
 \Needspace{14\baselineskip}
 \section{Why it is worth it}
@@ -188,12 +282,12 @@ reference part, better cooling and support. Either is a drop-in.
   \item \textbf{What does not transfer:} vehicle dynamics and tuned parameters. A 3~kg car says nothing about a 250~kg car's tyres.
 \end{itemize}
 
-\newpage
+\Needspace{14\baselineskip}
 \section{Will it work, and the practical realities}
 
 The build is the F1TENTH/RoboRacer platform, assembled by hundreds of university teams since
-2016 from a public build guide; the parts list is that guide's own with cheaper sensor and
-controller choices. Driving laps is a solved problem, and our simulator already runs the same
+2016 from a public build guide; the parts list is that guide's own with the sensors we own
+and a cheaper controller. Driving laps is a solved problem, and our simulator already runs the same
 car and software. The car can run the whole pipeline: mapping, localisation, a raceline and a
 proper controller; the cheaper sensors cap speed, not capability. The recommended car is
 eligible for RoboRacer physical events as built; a lidar upgrade is what would make it fast.
@@ -209,7 +303,7 @@ eligible for RoboRacer physical events as built; a lidar upgrade is what would m
 \end{itemize}
 
 \bigskip
-\noindent RoboRacer build guide and bill of materials: \url{https://f1tenth.readthedocs.io}\\
+\noindent RoboRacer build guide: \url{https://f1tenth.readthedocs.io}; official master BOM: \href{https://docs.google.com/spreadsheets/d/1WT-UdjLTnyrb7CvHcuCxKLnRIN8DWroQ/edit}{Google Sheet}\\
 Team simulator and manuals: \url{https://github.com/Pranman1/feb-racing}
 
 \end{document}

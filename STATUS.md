@@ -269,3 +269,7 @@ All fixes are in the simulator and the devkit; competitors change nothing.
 
 **Not yet exercised end to end** (needs the build): lap counting on generated checkpoints, the
 ghost, cones, the track menu, 2-car spawning with the RCT. All compile; expect small fixes.
+
+## 2026-09-24
+- Proposal (`docs/proposal/overleaf/main.tex`): itemised bill of materials with a shop link and price per line (`docs/proposal/bom.csv` for ordering). Re-priced after NVIDIA's July 2026 Jetson increase (Orin Nano Super $399). Corrected the controller: Flipsky Mini FSESC 6.7 is 4S-minimum and cannot run on 3S; the build now lists the Flipsky Mini FSESC 4.20 (3S-13S) or the VESC 6 MkVI. Totals: $1,549 now on the owned A1M8 and RealSense, $1,948 with the RPLidar S2, $3,247 official reference.
+- `starter_kit/feb_cone_driver` (uncommitted, in progress): cone-track baseline driver, lidar+camera fusion, chain ordering, centreline, pure pursuit; completes laps but can stall on a cone; lidar-based stall recovery added, untested.
