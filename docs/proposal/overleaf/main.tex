@@ -23,9 +23,10 @@
 
 \section*{The ask}
 
-One 1:10-scale autonomous car on the RoboRacer (F1TENTH) standard: \textbf{\$1{,}734 now}, a
-complete car on the RPLidar we already own, plus \textbf{\$400 for the lidar upgrade} when
-funds allow (\$2{,}133 together); \$3{,}199 for the official reference build. Every item is listed
+One 1:10-scale autonomous car on the RoboRacer (F1TENTH) standard: \textbf{\$1{,}931 now}, a
+complete car on the RPLidar we already own with a RealSense camera bought new (\$1{,}597 if the
+team's RealSense turns up), plus \textbf{\$400 for the lidar upgrade} when funds allow
+(\$2{,}330 together); \$3{,}199 for the official reference build. Every item is listed
 with its shop link and today's price in Section~\ref{sec:bom}. The FSAE car is on a two-year cycle and cannot host autonomous work this
 season. The RC car is where the team develops, tests and learns in the meantime, and the
 software pipeline built on it is the one that goes onto the FSAE car next year.
@@ -61,29 +62,31 @@ a stack developed there drops onto the car with only the driver nodes swapped.
 \toprule
 Item & Now & With S2 & Reference \\
 \midrule
-Chassis, batteries, charger, bag & 508 & 508 & 508 \\
+Chassis, batteries, charger, bag & 439 & 439 & 539 \\
 Computer: Jetson Orin Nano Super, NVMe, display plug and cable, antennas, USB & 542 & 542 & 542 \\
 Motor controller: VESC 6 MkVI, cables, adapters & 277 & 277 & 277 \\
 Power: RoboRacer power board, barrel lead, balance extender & 164 & 164 & 164 \\
 Joystick & 30 & 30 & 30 \\
 Lidar: RPLidar A1M8 (owned) / RPLidar S2 / Hokuyo UST-10LX & 0 & 399 & 1{,}200 \\
-Camera: Logitech C920 / RealSense D435i & 67 & 67 & 334 \\
+Camera: RealSense D435i (\$0 if found in the lab; C920 webcam 67) & 334 & 334 & 334 \\
 Screws, standoffs, zip ties & 85 & 85 & 85 \\
 Spares allowance & 60 & 60 & 60 \\
 \midrule
-\textbf{Total} & \textbf{1{,}734} & \textbf{2{,}133} & \textbf{3{,}199} \\
+\textbf{Total} & \textbf{1{,}931} & \textbf{2{,}330} & \textbf{3{,}199} \\
 \bottomrule
 \end{tabularx}
 
 \smallskip
 Prices are what the shops showed on 24 September 2026 (Section~\ref{sec:bom}).
-\textbf{Now} is the official build with the lidar we own and a webcam: a complete car
-that drives laps at 1 to 2~m/s. \textbf{With S2} adds the
+\textbf{Now} is the official build with the lidar we own: a complete car that drives laps
+at 1 to 2~m/s. \textbf{With S2} adds the
 time-of-flight RPLidar, which bolts on later without any other change; it is the one upgrade
 that matters. \textbf{Reference} is the official RoboRacer bill of materials at today's
 prices (NVIDIA raised Jetson prices by 60 to 100\% in July 2026, so the computer is \$399,
-not \$249). If the RealSense D435i turns up in the lab, the camera line is \$0; if we buy
-one instead of the webcam, add \$267. Laser cutting and 3D printing (deck, antenna mount,
+not \$249). The camera is budgeted as bought: if the team's RealSense D435i turns up, the
+total drops by \$334 to \$1{,}597; a \$67 webcam would do the cone job at \$1{,}665. The Fiesta VXL
+chassis is sold out almost everywhere this month, so the list carries the in-stock 2S Fiesta
+at \$330; if a VXL is found, add \$100. Laser cutting and 3D printing (deck, antenna mount,
 lidar plate) are not in the budget: they go through the student shop account.
 
 \Needspace{14\baselineskip}
@@ -91,13 +94,13 @@ lidar plate) are not in the budget: they go through the student shop account.
 \label{sec:bom}
 
 Every line links to the shop page and shows the price it displayed on 24 September 2026;
-Amazon was checked line by line and used wherever it was cheaper (the chassis is \$399 there
-against \$430 from Traxxas). The list follows the
+Amazon was checked line by line and used wherever it was cheaper and in stock. The list follows the
 \href{https://docs.google.com/spreadsheets/d/1WT-UdjLTnyrb7CvHcuCxKLnRIN8DWroQ/edit}{official RoboRacer master BOM}
 (May 2026) and the
 \href{https://f1tenth.readthedocs.io/en/foxy_test/getting_started/build_car/index.html}{build guide}
-step by step, with two substitutions: our RPLidar for the Hokuyo, and a webcam for the
-RealSense until we know whether we own one. The motor controller is the reference VESC~6.
+step by step, with two substitutions: our RPLidar for the Hokuyo, and the in-stock 2S
+Fiesta for the sold-out VXL. The motor controller is the reference VESC~6 and the camera the
+reference RealSense.
 Not in the list, on purpose: the laser-cut deck, the printed antenna mount and lidar plate
 (student shop account), hex keys (in the Traxxas box), and a monitor and keyboard for first
 boot (borrowed).
@@ -113,7 +116,8 @@ Item & Shop & USD \\
 \midrule
 \endhead
 \multicolumn{3}{l}{\textbf{Chassis and batteries}} \\
-\href{https://www.amazon.com/dp/B0D5M8D2R8}{Traxxas Ford Fiesta ST Rally VXL, 74276-4} (\href{https://traxxas.com/products/landing/fiesta-st-rally-vxl/}{Traxxas} 429.95; brushless motor, servo and radio included) & Amazon & 399.00 \\
+\href{https://www.amazon.com/dp/B0CRHYCNVZ}{Traxxas Ford Fiesta ST Rally 4x4 BL-2s, 74154-4} (in stock; same chassis and body as the reference; 2S-rated brushless motor, driven by our VESC at our speeds; servo and radio included) & Amazon & 329.95 \\
+\quad Reference part if found in stock: Traxxas Ford Fiesta ST Rally VXL, 74276-4, orange or green, 429.95 (\href{https://www.amazon.com/dp/B0D5M8D2R8}{Amazon}, \href{https://crashnbashhobbies.com/traxxas-74276-4-grn-ford-fiesta-rally-vxl-4x4.html}{Crash n Bash}); add 100 & -- & (+100) \\
 \href{https://www.amazon.com/dp/B09N91KV46}{Zeee 3S 6000~mAh 120C, EC5, 2-pack} & Amazon & 64.79 \\
 \href{https://www.amazon.com/dp/B0F6MP2Q5D}{B6AC 80~W LiPo balance charger} & Amazon & 37.99 \\
 \href{https://www.amazon.com/dp/B0FWBMK87X}{Zeee fireproof LiPo bag} & Amazon & 6.29 \\
@@ -138,7 +142,8 @@ Item & Shop & USD \\
 \href{https://www.amazon.com/dp/B0FX3TJ5RX}{8BitDo Ultimate 2C wireless gamepad} (dead-man switch and manual driving) & Amazon & 29.99 \\
 \multicolumn{3}{l}{\textbf{Sensors}} \\
 RPLidar A1M8, owned (\href{https://www.slamtec.com/en/Lidar/A1}{spec}) & -- & 0 \\
-\href{https://www.amazon.com/dp/B006JH8T3S}{Logitech C920 webcam} (colour for cone classes; buy only if the RealSense is not found) & Amazon & 67.39 \\
+\href{https://store.realsenseai.com/buy-intel-realsense-depth-camera-d435i.html}{Intel RealSense D435i} (the official part and the FSAE car's camera; in stock at the RealSense store; \$0 if the team's unit is found) & RealSense & 334.00 \\
+\quad Cheaper alternative, not chosen: \href{https://www.amazon.com/dp/B006JH8T3S}{Logitech C920 webcam}, colour only, 67.39 & Amazon & (67.39) \\
 \multicolumn{3}{l}{\textbf{Hardware}} \\
 \href{https://www.amazon.com/dp/B0FGX9JGC5}{M2 to M5 screw assortment, 4 to 20~mm} (covers the M3 deck screws and the M5 controller screws) & Amazon & 21.99 \\
 \href{https://www.mcmaster.com/94868A009}{M3 hex standoffs, 14~mm} & McMaster & 3.68 \\
@@ -150,15 +155,14 @@ RPLidar A1M8, owned (\href{https://www.slamtec.com/en/Lidar/A1}{spec}) & -- & 0 
 \multicolumn{3}{l}{\textbf{Spares}} \\
 Allowance: bumper, servo saver, tyres, pinion, from the \href{https://traxxas.com/products/parts}{Traxxas parts finder} as they break & Traxxas & 60.00 \\
 \midrule
-\textbf{Now} & & \textbf{1{,}734} \\
+\textbf{Now} & & \textbf{1{,}931} \\
 \midrule
 \multicolumn{3}{l}{\textbf{Upgrades}} \\
 \href{https://www.seeedstudio.com/RPLiDAR-S2-Low-Cost-360-Degree-Laser-Range-Scanner-30M-Range-p-5198.html}{RPLidar S2, 30~m time of flight} (354.99 on sale today; \href{https://www.robotshop.com/products/rplidar-s2-360-laser-scanner-30-m}{RobotShop} also stocks it) & Seeed & 398.99 \\
-\href{https://store.realsenseai.com/buy-intel-realsense-depth-camera-d435i.html}{Intel RealSense D435i} in place of the C920 (the official part and the FSAE camera; out of stock at the store today; \href{https://www.amazon.com/dp/B07BLS5477}{Amazon} lists the D435 at 519) & RealSense & 334.00 \\
 \midrule
-\textbf{Now plus S2} & & \textbf{2{,}133} \\
-\textbf{Now with the D435i instead of the C920} & & \textbf{2{,}000} \\
-\textbf{Now plus S2, with the D435i} & & \textbf{2{,}399} \\
+\textbf{Now plus S2} & & \textbf{2{,}330} \\
+\textbf{Now, if the team's RealSense is found} & & \textbf{1{,}597} \\
+\textbf{Now, with the C920 webcam instead} & & \textbf{1{,}665} \\
 \bottomrule
 \end{longtable}
 \normalsize
@@ -168,7 +172,7 @@ Allowance: bumper, servo saver, tyres, pinion, from the \href{https://traxxas.co
 the Traxxas ESC and receiver, keep motor and servo, three 45~mm standoffs, battery), upper deck
 (controller on M5 screws, antenna bracket on two 45~mm standoffs, Jetson on M2.5 standoffs,
 power board on 25~mm standoffs, lidar on four M3 screws), wiring (three bullet adapters on the
-motor leads, battery to controller through the EC5 to XT60 adapter, balance lead to the power
+motor leads, battery to controller through the EC5 to XT90 adapter, balance lead to the power
 board, barrel lead to the Jetson, servo on the PPM cable, lidar and controller on USB, zip ties
 away from the driveshaft), then software on the NVMe. The Orin Nano developer kit has four
 USB-A ports: lidar, controller, camera and joystick receiver fill them exactly; a hub is only
@@ -177,7 +181,7 @@ needed for a fifth device.
 \textbf{Where the money could be saved, and why we do not.} A
 \href{https://www.amazon.com/dp/B08725X8CT}{Flipsky Mini FSESC 4.20 50~A} (\$72, 3S to 13S,
 VESC~4.12 hardware, runs the same firmware) in place of the VESC 6 MkVI takes \$178 off every
-total: \$1{,}556 now, \$1{,}955 with the S2. It is what many student builds use, but it does not match
+total: \$1{,}753 now, \$2{,}152 with the S2. It is what many student builds use, but it does not match
 the deck's mounting holes or the sheet's connectors, so it means drilling, adapters and a
 week of surprises. We keep the reference part. (The Flipsky Mini FSESC 6.7 is 14~V minimum
 and cannot be used at all.) The S2 lidar is best bought as a second, later request: the car
@@ -249,11 +253,11 @@ computer next year: about \$3{,}150 with an Orin NX, about \$5{,}450 with an AGX
 
 \Needspace{10\baselineskip}
 \subsection*{Camera}
-The cone pipeline needs colour; range comes from the lidar. A
-\href{https://www.amazon.com/dp/B006JH8T3S}{Logitech C920}, \$67, does that and is what the
-budget lists. The \href{https://store.realsenseai.com/buy-intel-realsense-depth-camera-d435i.html}{RealSense D435i},
-\$334, is the official part and the FSAE car's camera, so the same driver and calibration
-carry over; first check whether the team already has one.
+The cone pipeline needs colour; range comes from the lidar. The
+\href{https://store.realsenseai.com/buy-intel-realsense-depth-camera-d435i.html}{RealSense D435i},
+\$334, is the official part and the FSAE car's camera, so the same driver and calibration carry
+over; it is what the budget lists, and it drops out if the team's own unit is found. A
+\href{https://www.amazon.com/dp/B006JH8T3S}{Logitech C920}, \$67, would do the cone job alone.
 \href{https://shop.luxonis.com/products/oak-d-lite-1}{OAK-D Lite}, \$269, stereo depth and
 on-camera inference, is the third option.
 \href{https://shop.luxonis.com/products/oak-d-pro-w}{OAK-D Pro W} or
@@ -278,7 +282,7 @@ drilling the deck and sorting connectors; noted, not chosen. The popular Flipsky
   \item \textbf{RPLidar A1M8.} Onto the RC car: laps at 1 to 2~m/s until the S2 arrives, then a spare. USB-powered, four screws on a printed plate.
   \item \textbf{RoboSense M1 3D lidar.} It can be bolted to the RC car on a custom plate, and the car would drive, badly: 0.7~kg on a 3~kg car spoils the handling, its half-metre blind zone hides the nearest wall in a 2~m corridor, and its 120\textdegree{} forward view gives wall-following nothing to work with. It is an FSAE sensor; with the Xavier it forms a perception rig for cone-track data this semester.
   \item \textbf{AGX Xavier 16~GB.} Computer for that rig and a bridge for the FSAE car; not for the RC car.
-  \item \textbf{RealSense D435i, if we still have one.} Then it is the RC car's camera (it is the official part) and the webcam line drops out.
+  \item \textbf{RealSense D435i, if we still have one.} Then it is the RC car's camera and \$334 comes off the budget.
   \item \textbf{Tamiya 1:10 chassis.} Motorless touring kit: no drawings, no match to the simulator, a semester of mechanical work to save \$300. Bench mule.
   \item \textbf{Alameda test track.} Outdoor sessions for the rig and, later, the FSAE car; not needed for the RC car, which runs in a corridor.
 \end{itemize}

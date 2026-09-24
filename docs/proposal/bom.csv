@@ -1,5 +1,5 @@
 group,item,shop,link,usd,stage
-Chassis and batteries,Traxxas Ford Fiesta ST Rally VXL 74276-4,Amazon,https://www.amazon.com/dp/B0D5M8D2R8,399.0,now
+Chassis and batteries,Traxxas Ford Fiesta ST Rally 4x4 BL-2s 74154-4 (in stock; VXL 74276-4 sold out, +100 if found),Amazon,https://www.amazon.com/dp/B0CRHYCNVZ,329.95,now
 Chassis and batteries,Zeee 3S 6000mAh 120C EC5 2-pack,Amazon,https://www.amazon.com/dp/B09N91KV46,64.79,now
 Chassis and batteries,B6AC 80W LiPo balance charger,Amazon,https://www.amazon.com/dp/B0F6MP2Q5D,37.99,now
 Chassis and batteries,Zeee fireproof LiPo bag,Amazon,https://www.amazon.com/dp/B0FWBMK87X,6.29,now
@@ -19,7 +19,8 @@ Power distribution,DC barrel extension 5.5x2.5mm,Amazon,https://www.amazon.com/d
 Power distribution,3S balance plug extension leads 5-pack,Amazon,https://www.amazon.com/dp/B07PX37XX5,8.99,now
 Manual control,8BitDo Ultimate 2C wireless gamepad,Amazon,https://www.amazon.com/dp/B0FX3TJ5RX,29.99,now
 Sensors,RPLidar A1M8 (owned),--,https://www.slamtec.com/en/Lidar/A1,0,now
-Sensors,Logitech C920 webcam,Amazon,https://www.amazon.com/dp/B006JH8T3S,67.39,now
+Sensors,Intel RealSense D435i (0 if the team's unit is found),RealSense store,https://store.realsenseai.com/buy-intel-realsense-depth-camera-d435i.html,334.0,now
+Sensors,Alternative not chosen: Logitech C920 webcam,Amazon,https://www.amazon.com/dp/B006JH8T3S,67.39,note
 Hardware,M2-M5 screw assortment 4-20mm,Amazon,https://www.amazon.com/dp/B0FGX9JGC5,21.99,now
 Hardware,M3 hex standoffs 14mm,McMaster,https://www.mcmaster.com/94868A009,3.68,now
 Hardware,M3 hex standoffs 25mm,McMaster,https://www.mcmaster.com/94868A013,10.76,now
@@ -29,9 +30,8 @@ Hardware,M2.5 standoffs 10mm (Jetson),McMaster,https://www.mcmaster.com/95947A00
 Hardware,Zip ties 4 inch,Amazon,https://www.amazon.com/dp/B078Y7MH6Z,12.99,now
 Spares,Spares allowance (Traxxas parts finder),Traxxas,https://traxxas.com/products/parts,60.0,now
 Upgrades,RPLidar S2 30 m ToF,Seeed,https://www.seeedstudio.com/RPLiDAR-S2-Low-Cost-360-Degree-Laser-Range-Scanner-30M-Range-p-5198.html,398.99,s2
-Upgrades,Intel RealSense D435i,RealSense,https://store.realsenseai.com/buy-intel-realsense-depth-camera-d435i.html,334.0,d435
-,Total now,,,1733.58,
-,Total now + S2,,,2132.57,
-,Total now with D435i,,,2000.19,
-,Total now + S2 with D435i,,,2399.18,
+,Total now,,,1931.14,
+,Total now + S2,,,2330.13,
+,Total now if RealSense found in lab,,,1597.14,
+,Total now with C920 instead,,,1664.53,
 ,Alternative: Flipsky Mini FSESC 4.20 50A instead of the VESC 6 (saves 177.76; not chosen),Amazon,https://www.amazon.com/dp/B08725X8CT,71.99,note
