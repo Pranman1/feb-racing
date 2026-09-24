@@ -1,6 +1,7 @@
 # Manuals
 
 - `competitor.pdf`: for a new member, from install to a leaderboard entry and a competition image.
+- `competitor_mac.pdf`: the same for a Mac, every step from an empty machine (Docker Desktop, Rosetta, Foxglove); standalone, built with `tectonic competitor_mac.tex`.
 - `organiser.pdf`: for the organiser, from tracks and events to race day, releases and maintenance.
 
 Both share `preamble.tex` and `platform.tex` (the platform and the rules). Rebuild:
