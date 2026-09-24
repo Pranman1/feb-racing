@@ -1,0 +1,39 @@
+% macOS install and clone steps
+
+\section{Install, once}
+
+\begin{enumerate}
+  \item \textbf{Docker Desktop.} Install with \texttt{brew install --cask docker-desktop} (or download
+  from \url{https://docker.com}), then \texttt{open -a Docker}. Do not install \texttt{docker/tap/sbx};
+  that is Docker's agent sandbox tool, not Docker. On first launch it may report ``Failed to install
+  Rosetta'': install Rosetta on the Mac first, \texttt{softwareupdate --install-rosetta
+  --agree-to-license}, then relaunch Docker Desktop and let it retry. Our images run natively on Apple
+  Silicon, so Rosetta is only for other x86 images later. Check with \texttt{docker run --rm hello-world}.
+  Leave the app running.
+  It is the whale icon in the menu bar. On a Mac, containers live in a small Linux virtual machine
+  that exists only while the app is open, so \texttt{docker} commands fail with ``cannot connect to
+  the Docker daemon'' if you quit it. Idle it costs almost nothing; tick \emph{Start Docker Desktop
+  when you sign in} in its settings. (On Linux, Docker is a background service that starts at boot,
+  which is why nothing has to be opened there.)
+  \item \textbf{Foxglove.} Download from \url{https://foxglove.dev/download}, open once, sign in with a free account.
+  \item \textbf{GitHub CLI.} In Terminal: \texttt{brew install gh}, then \texttt{gh auth login} and follow the prompts.
+  \item \textbf{Python 3.} Already on the Mac. If Terminal says otherwise: \texttt{xcode-select --install}.
+\end{enumerate}
+
+\section{Clone and set up}
+
+\begin{lstlisting}
+git clone https://github.com/Pranman1/feb-racing
+cd feb-racing
+./feb-sim setup --team "Your Team"
+\end{lstlisting}
+
+Pulls the devkit image and downloads the Mac app into \texttt{\textasciitilde/.feb-sim/app/}.
+A few minutes. If the app later refuses to open (``damaged'' or ``cannot be opened''), it is
+unsigned; run once:
+
+\begin{lstlisting}
+xattr -dr com.apple.quarantine ~/.feb-sim/app/mac/"FEB Simulator.app"
+codesign --force --deep -s - ~/.feb-sim/app/mac/"FEB Simulator.app"
+\end{lstlisting}
+

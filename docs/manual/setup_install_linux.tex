@@ -1,0 +1,33 @@
+% Linux install and clone steps (Ubuntu 22.04 and 24.04; other distributions differ only in the package commands)
+
+\section{Install, once}
+
+\begin{enumerate}
+  \item \textbf{Docker.} \texttt{sudo apt install docker.io}. Then
+  \texttt{sudo usermod -aG docker \$USER} and log out and back in, so that \texttt{docker ps}
+  works without \texttt{sudo}. Docker is a background service here; it starts at boot and nothing
+  has to be opened. Check with \texttt{docker run --rm hello-world}.
+  \item \textbf{Python 3, git, curl, unzip.} \texttt{sudo apt install python3 git curl unzip}.
+  \item \textbf{GitHub CLI.} On Ubuntu 24.04, \texttt{sudo apt install gh}. On 22.04 the packaged
+  version is too old: follow the three lines at
+  \url{https://github.com/cli/cli/blob/trunk/docs/install_linux.md}. Then \texttt{gh auth login}.
+  \item \textbf{Foxglove.} Download the \texttt{.deb} from \url{https://foxglove.dev/download} and
+  \texttt{sudo apt install ./foxglove-studio-*.deb}; open it once, sign in with a free account.
+\end{enumerate}
+
+The simulator needs Vulkan. Intel and AMD GPUs work with the stock Mesa drivers; NVIDIA needs
+the proprietary driver (\texttt{sudo ubuntu-drivers install}). Run from a desktop session, not
+over plain SSH, so the app has a display.
+
+\section{Clone and set up}
+
+\begin{lstlisting}
+git clone https://github.com/Pranman1/feb-racing
+cd feb-racing
+./feb-sim setup --team "Your Team"
+\end{lstlisting}
+
+Pulls the devkit image and downloads the Linux build into \texttt{\textasciitilde/.feb-sim/app/}.
+A few minutes. If \texttt{./feb-sim run} later fails with a Vulkan error, the GPU driver is the
+thing to fix; \texttt{vulkaninfo --summary} (package \texttt{vulkan-tools}) shows what is found.
+

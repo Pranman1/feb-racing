@@ -1,34 +1,11 @@
-\documentclass[11pt,a4paper]{article}
-\usepackage[margin=2.2cm]{geometry}
-\usepackage[T1]{fontenc}
-\usepackage{lmodern}
-\usepackage{xcolor}
-\usepackage{booktabs}
-\usepackage{tabularx}
-\usepackage{enumitem}
-\usepackage{listings}
-\usepackage{tikz}
-\usetikzlibrary{arrows.meta}
-\usepackage[hidelinks,colorlinks=true,linkcolor=febblue,urlcolor=febblue]{hyperref}
-\definecolor{febblue}{HTML}{1C4687}
-\definecolor{codebg}{HTML}{F3F4F6}
-\lstset{basicstyle=\ttfamily\small, backgroundcolor=\color{codebg}, frame=single, framerule=0pt,
-  framesep=4pt, xleftmargin=4pt, breaklines=true, columns=fullflexible, keepspaces=true, showstringspaces=false}
-\setlength{\parskip}{4pt}
-\setlist{nosep}
-
-\title{\color{febblue}\LARGE FEBAUTO Racing: Competitor Setup on macOS\\[4pt]\large From nothing to a driving car, step by step}
-\author{Formula Electric at Berkeley, Autonomous Team}
-\date{September 2026}
-
-\begin{document}
-\maketitle
+% Shared body of the three competitor setup manuals. The including file defines
+% \OSname, \OSkey, \OSappdir, \OSterm and \OSdockerfix, then inputs this.
 
 \section*{What you are setting up}
 
-A simulator of the RoboRacer 1:10 car runs natively on your Mac. Your code runs in a Docker
+A simulator of the RoboRacer 1:10 car runs natively on your \OSname. Your code runs in a Docker
 container that carries ROS~2 and the bridge to the simulator. You never install ROS on the
-Mac. Foxglove shows you the car's sensors live.
+\OSname{} itself. Foxglove shows you the car's sensors live.
 
 \begin{lstlisting}
 feb-racing/                 the repo, your clone
@@ -36,8 +13,8 @@ feb-racing/                 the repo, your clone
   stack/                    YOUR code (gitignored)
   starter_kit/feb_driver/   the template you copy into stack/
   tracks/                   track folders
-~/.feb-sim/app/mac/         the simulator app, downloaded by setup
-Docker Desktop              runs the devkit container
+~/.feb-sim/app/<os>/        the simulator app, downloaded by setup
+Docker                      runs the devkit container
 \end{lstlisting}
 
 The loop: the container mounts \texttt{stack/} and builds it; the bridge turns the simulator's
@@ -45,42 +22,7 @@ stream into ROS~2 topics under \texttt{/autodrive/roboracer\_1/}; your node read
 and publishes two floats, \texttt{throttle\_command} and \texttt{steering\_command}, both in
 $[-1, 1]$; the bridge sends them to the simulator; the car moves.
 
-\section{Install, once}
-
-\begin{enumerate}
-  \item \textbf{Docker Desktop.} Install with \texttt{brew install --cask docker-desktop} (or download
-  from \url{https://docker.com}), then \texttt{open -a Docker}. Do not install \texttt{docker/tap/sbx};
-  that is Docker's agent sandbox tool, not Docker. On first launch it may report ``Failed to install
-  Rosetta'': install Rosetta on the Mac first, \texttt{softwareupdate --install-rosetta
-  --agree-to-license}, then relaunch Docker Desktop and let it retry. Our images run natively on Apple
-  Silicon, so Rosetta is only for other x86 images later. Check with \texttt{docker run --rm hello-world}.
-  Leave the app running.
-  It is the whale icon in the menu bar. On a Mac, containers live in a small Linux virtual machine
-  that exists only while the app is open, so \texttt{docker} commands fail with ``cannot connect to
-  the Docker daemon'' if you quit it. Idle it costs almost nothing; tick \emph{Start Docker Desktop
-  when you sign in} in its settings. (On Linux, Docker is a background service that starts at boot,
-  which is why nothing has to be opened there.)
-  \item \textbf{Foxglove.} Download from \url{https://foxglove.dev/download}, open once, sign in with a free account.
-  \item \textbf{GitHub CLI.} In Terminal: \texttt{brew install gh}, then \texttt{gh auth login} and follow the prompts.
-  \item \textbf{Python 3.} Already on the Mac. If Terminal says otherwise: \texttt{xcode-select --install}.
-\end{enumerate}
-
-\section{Clone and set up}
-
-\begin{lstlisting}
-git clone https://github.com/Pranman1/feb-racing
-cd feb-racing
-./feb-sim setup --team "Your Team"
-\end{lstlisting}
-
-Pulls the devkit image and downloads the Mac app into \texttt{\textasciitilde/.feb-sim/app/}.
-A few minutes. If the app later refuses to open (``damaged'' or ``cannot be opened''), it is
-unsigned; run once:
-
-\begin{lstlisting}
-xattr -dr com.apple.quarantine ~/.feb-sim/app/mac/"FEB Simulator.app"
-codesign --force --deep -s - ~/.feb-sim/app/mac/"FEB Simulator.app"
-\end{lstlisting}
+\input{setup_install_\OSkey}
 
 \section{Drive manually}
 
@@ -107,7 +49,7 @@ the lidar scan, blank a safety bubble around the nearest obstacle, aim at the wi
 speed from the room ahead, publish steering and throttle. Its numbers are in
 \texttt{stack/feb\_driver/config/driver.yaml}.
 
-\textbf{Editing code.} \texttt{stack/} is a plain folder on your Mac; open it in any editor. With
+\textbf{Editing code.} \texttt{stack/} is a plain folder on your \OSname; open it in any editor. With
 VS~Code: \texttt{code stack/} from the repo folder, or File, Open Folder. Edit, save, run the same
 \texttt{./feb-sim run} command again; the container rebuilds your packages in seconds. No plugin
 or remote setup: the container reads the files straight from your disk.
@@ -129,7 +71,7 @@ registered image on the same track turns it \emph{verified}.
 
 \subsection*{More terminals into the devkit}
 
-The container keeps running while the simulator is open. Open as many Terminal tabs as you
+The container keeps running while the simulator is open. Open as many \OSterm{} windows as you
 like and, in each, from the repo folder:
 
 \begin{lstlisting}
@@ -147,7 +89,7 @@ ros2 topic echo --once /autodrive/roboracer_1/imu
 ros2 node list                                           # your node should be here
 ros2 node info /driver
 ros2 param list /driver                                  # live parameters
-ros2 bag record -a -o /home/autodrive_devkit/src/stack/mybag   # lands in your stack/ folder on the Mac
+ros2 bag record -a -o /home/autodrive_devkit/src/stack/mybag   # lands in your stack/ folder
 \end{lstlisting}
 
 \texttt{exit} leaves the shell; the container keeps running.
@@ -160,10 +102,10 @@ docker run --rm -it -p 4567:4567 -v "$PWD/stack:/home/autodrive_devkit/src/stack
     ghcr.io/pranman1/feb-devkit bash
 \end{lstlisting}
 Inside, \texttt{source install/setup.bash} after \texttt{colcon build}. The simulator alone is the
-app in \texttt{\textasciitilde/.feb-sim/app/mac}, keyboard driving, no ROS. \texttt{docker exec -it feb-devkit
+app in \texttt{\textasciitilde/.feb-sim/app/\OSappdir}, keyboard driving, no ROS. \texttt{docker exec -it feb-devkit
 bash} is the same thing without the launcher. Files you write under
-\texttt{/home/autodrive\_devkit/src/stack} inside the container appear in \texttt{stack/} on the
-Mac, and the other way round.
+\texttt{/home/autodrive\_devkit/src/stack} inside the container appear in \texttt{stack/} on your
+\OSname, and the other way round.
 
 \subsection*{Foxglove}
 
@@ -194,7 +136,7 @@ docker logs feb-devkit        # build errors, your node's output
 \end{lstlisting}
 
 Nothing drives: correct without \texttt{--stack}; with one, read \texttt{docker logs}.
-Port 4567 in use: \texttt{./feb-sim stop}. Docker pull denied: Docker Desktop is not running.
+Port 4567 in use: \texttt{./feb-sim stop}. Docker pull denied, or ``cannot connect to the Docker daemon'': \OSdockerfix.
 
 \section{Keeping up to date}
 
@@ -232,7 +174,7 @@ Publish as many topics of your own as you like; only the two commands reach the 
 message stamps or \texttt{use\_sim\_time}, never the wall clock, for speeds and integrals.
 Throttle about 0.1 is roughly 2~m/s.
 
+
+
 \appendix
 \input{starter_driver}
-
-\end{document}

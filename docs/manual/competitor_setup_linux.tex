@@ -1,0 +1,17 @@
+\documentclass[11pt,a4paper]{article}
+\input{preamble}
+\newcommand{\OSname}{machine}
+\newcommand{\OSkey}{linux}
+\newcommand{\OSappdir}{linux}
+\newcommand{\OSterm}{terminal}
+\newcommand{\OSdockerfix}{the Docker service is stopped (\texttt{sudo systemctl start docker}) or you are not in the \texttt{docker} group yet}
+
+\begin{document}
+\febtitle{Competitor setup: Linux}{%
+  \textbf{Part I} & Install, clone, first drive\\[3pt]
+  \textbf{Part II} & The starter driver, scoring, looking inside\\[3pt]
+  \textbf{Appendix} & The starter package, file by file\\}
+
+\input{setup_body}
+
+\end{document}

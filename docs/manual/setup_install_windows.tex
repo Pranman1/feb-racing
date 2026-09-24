@@ -1,0 +1,45 @@
+% Windows install and clone steps
+
+\section{Install, once}
+
+The launcher is a Python script run from a Unix-style shell; on Windows that shell is Git Bash,
+which comes with Git. Every command in this manual is typed into a Git Bash window.
+
+\begin{enumerate}
+  \item \textbf{WSL 2.} Open PowerShell as administrator and run \texttt{wsl --install}. Reboot
+  when it asks. Docker Desktop runs its Linux containers inside WSL~2.
+  \item \textbf{Docker Desktop.} Download from \url{https://docker.com} and install. In Settings,
+  General, keep \emph{Use the WSL 2 based engine} ticked. Start it and wait until the whale icon in
+  the tray stops animating; leave it running whenever you use the simulator, or \texttt{docker}
+  commands fail with ``cannot connect to the Docker daemon''. Tick \emph{Start Docker Desktop when
+  you sign in} in its settings. Check in Git Bash later with \texttt{docker run --rm hello-world}.
+  \item \textbf{Git for Windows.} Download from \url{https://git-scm.com} and install with the
+  defaults. It provides Git Bash.
+  \item \textbf{Python 3.} Install from \url{https://python.org}; on the first installer page tick
+  \emph{Add python.exe to PATH}. In Git Bash, \texttt{python --version} should answer.
+  \item \textbf{GitHub CLI.} In PowerShell: \texttt{winget install GitHub.cli}. Then, in a new Git
+  Bash window, \texttt{gh auth login} and follow the prompts.
+  \item \textbf{Foxglove.} Download the installer from \url{https://foxglove.dev/download}, open it
+  once, sign in with a free account.
+\end{enumerate}
+
+The simulator is a native Windows build and needs a GPU with current drivers. On a laptop with
+two GPUs, add the app to Windows \emph{Graphics settings} and set it to the high-performance
+one; the app is \texttt{FEB Simulator.exe} under
+\texttt{\%USERPROFILE\%\textbackslash.feb-sim\textbackslash app\textbackslash windows}.
+
+\section{Clone and set up}
+
+In Git Bash:
+
+\begin{lstlisting}
+git clone https://github.com/Pranman1/feb-racing
+cd feb-racing
+./feb-sim setup --team "Your Team"
+\end{lstlisting}
+
+Pulls the devkit image and downloads the Windows app into \texttt{\textasciitilde/.feb-sim/app/}
+(that is \texttt{C:\textbackslash Users\textbackslash you\textbackslash.feb-sim}). A few minutes.
+The app is not signed, so the first launch shows a SmartScreen warning: click \emph{More info},
+then \emph{Run anyway}, once.
+
