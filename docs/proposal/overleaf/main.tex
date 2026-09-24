@@ -23,9 +23,9 @@
 
 \section*{The ask}
 
-One 1:10-scale autonomous car on the RoboRacer (F1TENTH) standard: \textbf{\$1{,}555 now}, a
+One 1:10-scale autonomous car on the RoboRacer (F1TENTH) standard: \textbf{\$1{,}734 now}, a
 complete car on the RPLidar we already own, plus \textbf{\$400 for the lidar upgrade} when
-funds allow (\$1{,}954 together); \$3{,}199 for the official reference build. Every item is listed
+funds allow (\$2{,}133 together); \$3{,}199 for the official reference build. Every item is listed
 with its shop link and today's price in Section~\ref{sec:bom}. The FSAE car is on a two-year cycle and cannot host autonomous work this
 season. The RC car is where the team develops, tests and learns in the meantime, and the
 software pipeline built on it is the one that goes onto the FSAE car next year.
@@ -63,7 +63,7 @@ Item & Now & With S2 & Reference \\
 \midrule
 Chassis, batteries, charger, bag & 508 & 508 & 508 \\
 Computer: Jetson Orin Nano Super, NVMe, display plug and cable, antennas, USB & 542 & 542 & 542 \\
-Motor controller: Flipsky Mini FSESC 4.20 / VESC 6 MkVI, cables, adapters & 98 & 98 & 276 \\
+Motor controller: VESC 6 MkVI, cables, adapters & 277 & 277 & 277 \\
 Power: RoboRacer power board, barrel lead, balance extender & 164 & 164 & 164 \\
 Joystick & 30 & 30 & 30 \\
 Lidar: RPLidar A1M8 (owned) / RPLidar S2 / Hokuyo UST-10LX & 0 & 399 & 1{,}200 \\
@@ -71,14 +71,14 @@ Camera: Logitech C920 / RealSense D435i & 67 & 67 & 334 \\
 Screws, standoffs, zip ties & 85 & 85 & 85 \\
 Spares allowance & 60 & 60 & 60 \\
 \midrule
-\textbf{Total} & \textbf{1{,}555} & \textbf{1{,}954} & \textbf{3{,}199} \\
+\textbf{Total} & \textbf{1{,}734} & \textbf{2{,}133} & \textbf{3{,}199} \\
 \bottomrule
 \end{tabularx}
 
 \smallskip
 Prices are what the shops showed on 24 September 2026 (Section~\ref{sec:bom}).
-\textbf{Now} is the official build with the lidar we own, a webcam and a cheaper motor
-controller: a complete car that drives laps at 1 to 2~m/s. \textbf{With S2} adds the
+\textbf{Now} is the official build with the lidar we own and a webcam: a complete car
+that drives laps at 1 to 2~m/s. \textbf{With S2} adds the
 time-of-flight RPLidar, which bolts on later without any other change; it is the one upgrade
 that matters. \textbf{Reference} is the official RoboRacer bill of materials at today's
 prices (NVIDIA raised Jetson prices by 60 to 100\% in July 2026, so the computer is \$399,
@@ -96,8 +96,8 @@ against \$430 from Traxxas). The list follows the
 \href{https://docs.google.com/spreadsheets/d/1WT-UdjLTnyrb7CvHcuCxKLnRIN8DWroQ/edit}{official RoboRacer master BOM}
 (May 2026) and the
 \href{https://f1tenth.readthedocs.io/en/foxy_test/getting_started/build_car/index.html}{build guide}
-step by step, with three substitutions: our RPLidar for the Hokuyo, a 3S-capable Flipsky for
-the VESC~6, and a webcam for the RealSense until we know whether we own one.
+step by step, with two substitutions: our RPLidar for the Hokuyo, and a webcam for the
+RealSense until we know whether we own one. The motor controller is the reference VESC~6.
 Not in the list, on purpose: the laser-cut deck, the printed antenna mount and lidar plate
 (student shop account), hex keys (in the Traxxas box), and a monitor and keyboard for first
 boot (borrowed).
@@ -125,11 +125,11 @@ Item & Shop & USD \\
 \href{https://www.amazon.com/dp/B07V1W759Z}{10~dBi Wi-Fi antennas with MHF4 cables, 2-pack} (external antennas on the printed mount, for range) & Amazon & 8.99 \\
 \href{https://www.amazon.com/dp/B095JZSHXQ}{Short micro-USB cables, 5-pack} (Jetson to controller) & Amazon & 7.19 \\
 \multicolumn{3}{l}{\textbf{Motor controller}} \\
-\href{https://www.amazon.com/dp/B08725X8CT}{Flipsky Mini FSESC 4.20 50~A} (3S to 13S; \href{https://flipsky.net}{flipsky.net} 85, 56 on sale) & Amazon & 71.99 \\
+\href{https://trampaboards.com/vesc-6-mkv-in-cnc-t6-silicone-sealed-aluminium-box-with-genuine-xt90-connectors--vedder-electronic-speed-controller-trampa-special-p-27536.html}{VESC 6 MkVI in aluminium box, XT90} (the reference part; ships from the UK, price from the official sheet) & Trampa & 249.75 \\
 \href{https://www.adafruit.com/product/3893}{JST-PH 3-pin to header cable} (controller PPM port to the steering servo) & Adafruit & 1.25 \\
 \href{https://www.amazon.com/dp/B076F64ZCJ}{Header pins} (three are used on the servo lead) & Amazon & 7.39 \\
 \href{https://www.amazon.com/dp/B07Z4FRQNX}{Bullet adapters, 4~mm male to 3.5~mm female, 5-pack} (motor leads are 3.5~mm; check the controller's bullet size on arrival) & Amazon & 8.58 \\
-\href{https://www.amazon.com/dp/B09MQ1MJRD}{EC5 female to XT60 male adapters, 3-pack} (battery to controller) & Amazon & 8.99 \\
+\href{https://www.amazon.com/dp/B07MG5SXKC}{EC5 female to XT90 male adapters, 3-pack} (battery to controller) & Amazon & 9.99 \\
 \multicolumn{3}{l}{\textbf{Power distribution}} \\
 \href{https://orders.ambimat.com/product/roboracer-power-board-1-qty-non-rohs-compliant/}{RoboRacer power board, 1 unit} (19~V to the Jetson, 12~V and 5~V rails, switch, fused; 125 each for three or more) & Ambimat & 145.00 \\
 \href{https://www.amazon.com/dp/B0BZ3YT59F}{DC barrel extension, 5.5~x~2.5~mm} (power board to Jetson) & Amazon & 9.99 \\
@@ -150,15 +150,15 @@ RPLidar A1M8, owned (\href{https://www.slamtec.com/en/Lidar/A1}{spec}) & -- & 0 
 \multicolumn{3}{l}{\textbf{Spares}} \\
 Allowance: bumper, servo saver, tyres, pinion, from the \href{https://traxxas.com/products/parts}{Traxxas parts finder} as they break & Traxxas & 60.00 \\
 \midrule
-\textbf{Now} & & \textbf{1{,}555} \\
+\textbf{Now} & & \textbf{1{,}734} \\
 \midrule
 \multicolumn{3}{l}{\textbf{Upgrades}} \\
 \href{https://www.seeedstudio.com/RPLiDAR-S2-Low-Cost-360-Degree-Laser-Range-Scanner-30M-Range-p-5198.html}{RPLidar S2, 30~m time of flight} (354.99 on sale today; \href{https://www.robotshop.com/products/rplidar-s2-360-laser-scanner-30-m}{RobotShop} also stocks it) & Seeed & 398.99 \\
 \href{https://store.realsenseai.com/buy-intel-realsense-depth-camera-d435i.html}{Intel RealSense D435i} in place of the C920 (the official part and the FSAE camera; out of stock at the store today; \href{https://www.amazon.com/dp/B07BLS5477}{Amazon} lists the D435 at 519) & RealSense & 334.00 \\
 \midrule
-\textbf{Now plus S2} & & \textbf{1{,}954} \\
-\textbf{Now with the D435i instead of the C920} & & \textbf{1{,}821} \\
-\textbf{Now plus S2, with the D435i} & & \textbf{2{,}220} \\
+\textbf{Now plus S2} & & \textbf{2{,}133} \\
+\textbf{Now with the D435i instead of the C920} & & \textbf{2{,}000} \\
+\textbf{Now plus S2, with the D435i} & & \textbf{2{,}399} \\
 \bottomrule
 \end{longtable}
 \normalsize
@@ -174,12 +174,14 @@ away from the driveshaft), then software on the NVMe. The Orin Nano developer ki
 USB-A ports: lidar, controller, camera and joystick receiver fill them exactly; a hub is only
 needed for a fifth device.
 
-\textbf{Fitting \$1{,}800 with the S2.} Today's sale prices (S2 at 355, controller at 56 from
-Flipsky) bring the S2 build to about \$1{,}894. Swapping the power board for a
-\href{https://www.pololu.com/product/2851}{Pololu 5~V 5~A regulator} (32.95) for the lidar,
-with the Jetson fed from the balance extender through the barrel lead, saves \$112 more and
-costs one evening of soldering plus the fuse and switch. The clean option is to buy the S2 as
-a second, later request: the car does not wait for it.
+\textbf{Where the money could be saved, and why we do not.} A
+\href{https://www.amazon.com/dp/B08725X8CT}{Flipsky Mini FSESC 4.20 50~A} (\$72, 3S to 13S,
+VESC~4.12 hardware, runs the same firmware) in place of the VESC 6 MkVI takes \$178 off every
+total: \$1{,}556 now, \$1{,}955 with the S2. It is what many student builds use, but it does not match
+the deck's mounting holes or the sheet's connectors, so it means drilling, adapters and a
+week of surprises. We keep the reference part. (The Flipsky Mini FSESC 6.7 is 14~V minimum
+and cannot be used at all.) The S2 lidar is best bought as a second, later request: the car
+does not wait for it.
 
 \textbf{What the A1M8 costs us.} Same ROS message, same software, a printed plate instead of
 the Hokuyo bolt pattern, USB power instead of 12~V, so nothing about the build gets harder.
@@ -262,12 +264,12 @@ bought once.
 \Needspace{10\baselineskip}
 \subsection*{Controller}
 The controller must accept the car's 3S pack (9 to 12.6~V). The
-\href{https://www.amazon.com/dp/B08725X8CT}{Flipsky Mini FSESC 4.20 50~A}, \$85 (\$56 on sale
-at \href{https://flipsky.net}{flipsky.net}), runs 3S to 13S on VESC~4.12 hardware, the design the
-original F1TENTH cars raced on; USB cable included. The
 \href{https://trampaboards.com/vesc-6-mkvi--12s-c-1630.html}{VESC 6 MkVI}, \$250, is the
-reference part: better cooling and support. Note that the popular Flipsky Mini FSESC 6.7
-is rated 14~V minimum (4S) and does \emph{not} suit this car. Either listed unit is a drop-in.
+reference part: it fits the deck, matches the sheet's cables and adapters, and is what the
+build guide photographs. The \href{https://www.amazon.com/dp/B08725X8CT}{Flipsky Mini FSESC
+4.20}, \$72, runs the same firmware on older hardware and would save \$178 at the cost of
+drilling the deck and sorting connectors; noted, not chosen. The popular Flipsky Mini FSESC
+6.7 is rated 14~V minimum (4S) and does \emph{not} suit this car.
 
 \Needspace{14\baselineskip}
 \section{What we already own, and where it goes}

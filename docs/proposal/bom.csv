@@ -9,11 +9,11 @@ Computer,DisplayPort dummy plug,Amazon,https://www.amazon.com/dp/B071CGCTMY,6.27
 Computer,DisplayPort to HDMI cable 6 ft,Amazon,https://www.amazon.com/dp/B0FMYG4CYS,17.99,now
 Computer,10 dBi Wi-Fi antennas with MHF4 cables 2-pack,Amazon,https://www.amazon.com/dp/B07V1W759Z,8.99,now
 Computer,Short micro-USB cables 5-pack,Amazon,https://www.amazon.com/dp/B095JZSHXQ,7.19,now
-Motor controller,Flipsky Mini FSESC 4.20 50A (3S-13S),Amazon,https://www.amazon.com/dp/B08725X8CT,71.99,now
+Motor controller,VESC 6 MkVI (reference part),Trampa,https://trampaboards.com/vesc-6-mkv-in-cnc-t6-silicone-sealed-aluminium-box-with-genuine-xt90-connectors--vedder-electronic-speed-controller-trampa-special-p-27536.html,249.75,now
 Motor controller,JST-PH 3-pin to header cable,Adafruit,https://www.adafruit.com/product/3893,1.25,now
 Motor controller,Header pins,Amazon,https://www.amazon.com/dp/B076F64ZCJ,7.39,now
 Motor controller,Bullet adapters 4mm male to 3.5mm female,Amazon,https://www.amazon.com/dp/B07Z4FRQNX,8.58,now
-Motor controller,EC5 female to XT60 male adapters 3-pack,Amazon,https://www.amazon.com/dp/B09MQ1MJRD,8.99,now
+Motor controller,EC5 female to XT90 male adapters 3-pack,Amazon,https://www.amazon.com/dp/B07MG5SXKC,9.99,now
 Power distribution,RoboRacer power board (1 unit),Ambimat,https://orders.ambimat.com/product/roboracer-power-board-1-qty-non-rohs-compliant/,145.0,now
 Power distribution,DC barrel extension 5.5x2.5mm,Amazon,https://www.amazon.com/dp/B0BZ3YT59F,9.99,now
 Power distribution,3S balance plug extension leads 5-pack,Amazon,https://www.amazon.com/dp/B07PX37XX5,8.99,now
@@ -30,7 +30,8 @@ Hardware,Zip ties 4 inch,Amazon,https://www.amazon.com/dp/B078Y7MH6Z,12.99,now
 Spares,Spares allowance (Traxxas parts finder),Traxxas,https://traxxas.com/products/parts,60.0,now
 Upgrades,RPLidar S2 30 m ToF,Seeed,https://www.seeedstudio.com/RPLiDAR-S2-Low-Cost-360-Degree-Laser-Range-Scanner-30M-Range-p-5198.html,398.99,s2
 Upgrades,Intel RealSense D435i,RealSense,https://store.realsenseai.com/buy-intel-realsense-depth-camera-d435i.html,334.0,d435
-,Total now,,,1554.82,
-,Total now + S2,,,1953.81,
-,Total now with D435i,,,1821.43,
-,Total now + S2 with D435i,,,2220.42,
+,Total now,,,1733.58,
+,Total now + S2,,,2132.57,
+,Total now with D435i,,,2000.19,
+,Total now + S2 with D435i,,,2399.18,
+,Alternative: Flipsky Mini FSESC 4.20 50A instead of the VESC 6 (saves 177.76; not chosen),Amazon,https://www.amazon.com/dp/B08725X8CT,71.99,note
