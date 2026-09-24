@@ -30,7 +30,43 @@ Linux & \cmd{sudo apt install docker.io python3 gh}, then add yourself to the \t
 \medskip
 Start Docker Desktop before anything else. Log the GitHub CLI in once: \cmd{gh auth login}. Open
 Foxglove once and sign in (free account); it is how you look at your car's data, see
-section~\ref{sec:foxglove}.
+section~\ref{sec:foxglove}. Mac users: \file{competitor\_mac.pdf} is this manual's install
+chapter with every click spelled out, including the Rosetta and Docker Desktop details.
+
+\medskip
+\textbf{Windows, step by step.} The launcher is a Python script run from a Unix-style shell;
+Git Bash is the simplest.
+\begin{enumerate}[leftmargin=*]
+  \item Open PowerShell as administrator and run \cmd{wsl --install}. Reboot when it asks. This
+  turns on WSL~2, which Docker Desktop needs.
+  \item Install Docker Desktop from \url{https://docker.com}. In its settings, General, keep
+  ``Use the WSL 2 based engine'' ticked. Start it and wait for the whale icon to stop animating.
+  \item Install Python~3 from \url{https://python.org}; on the first installer page tick
+  ``Add python.exe to PATH''.
+  \item Install Git for Windows from \url{https://git-scm.com}; it brings Git Bash. Every
+  \cmd{./feb-sim} command in this manual is typed in a Git Bash window.
+  \item \cmd{winget install GitHub.cli}, then in Git Bash \cmd{gh auth login}.
+  \item Install Foxglove from \url{https://foxglove.dev/download}, open it once, sign in.
+\end{enumerate}
+The simulator is a native Windows build; it needs a GPU with up-to-date drivers and, on a
+laptop with two GPUs, run it on the discrete one (Windows Graphics settings, add the app under
+\file{\%USERPROFILE\%\textbackslash.feb-sim\textbackslash app\textbackslash windows}).
+
+\medskip
+\textbf{Linux, step by step} (Ubuntu 22.04 or 24.04; other distributions differ only in the
+package commands).
+\begin{enumerate}[leftmargin=*]
+  \item \cmd{sudo apt install docker.io python3 git curl unzip}.
+  \item \cmd{sudo usermod -aG docker \$USER}, then log out and back in so \cmd{docker ps} works
+  without \cmd{sudo}.
+  \item GitHub CLI: on 24.04 \cmd{sudo apt install gh}; on 22.04 follow
+  \url{https://github.com/cli/cli/blob/trunk/docs/install_linux.md} (three lines), then
+  \cmd{gh auth login}.
+  \item Foxglove: download the \file{.deb} from \url{https://foxglove.dev/download} and
+  \cmd{sudo apt install ./foxglove-studio-*.deb}; open it once, sign in.
+\end{enumerate}
+The simulator needs Vulkan: Intel and AMD GPUs work with the stock Mesa drivers, NVIDIA needs
+the proprietary driver. Run from a desktop session, not over plain SSH.
 
 \subsection{Get the repo and the simulator}
 
