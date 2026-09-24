@@ -33,5 +33,7 @@ Upgrades,RPLidar S2 30 m ToF,Seeed,https://www.seeedstudio.com/RPLiDAR-S2-Low-Co
 ,Total now,,,1931.14,
 ,Total now + S2,,,2330.13,
 ,Total now if RealSense found in lab,,,1597.14,
+,Total now + S2 if RealSense found in lab,,,1996.13,
 ,Total now with C920 instead,,,1664.53,
+,Total now + S2 with C920 instead,,,2063.52,
 ,Alternative: Flipsky Mini FSESC 4.20 50A instead of the VESC 6 (saves 177.76; not chosen),Amazon,https://www.amazon.com/dp/B08725X8CT,71.99,note
