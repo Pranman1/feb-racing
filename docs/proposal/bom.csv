@@ -19,7 +19,7 @@ Power distribution,DC barrel extension 5.5x2.5mm,Amazon,https://www.amazon.com/d
 Power distribution,3S balance plug extension leads 5-pack,Amazon,https://www.amazon.com/dp/B07PX37XX5,8.99,now
 Manual control,8BitDo Ultimate 2C wireless gamepad,Amazon,https://www.amazon.com/dp/B0FX3TJ5RX,29.99,now
 Sensors,RPLidar A1M8 (owned),--,https://www.slamtec.com/en/Lidar/A1,0,now
-Sensors,Intel RealSense D435i (provided by a team member; 334 if bought),RealSense store,https://store.realsenseai.com/buy-intel-realsense-depth-camera-d435i.html,0,now
+Sensors,Intel RealSense D435IF with cable (DigiKey 99C9LT; 376.25 list + duty and shipping at checkout),DigiKey,https://www.digikey.com/en/products/result?keywords=99C9LT,455.0,now
 Sensors,Alternative not chosen: Logitech C920 webcam,Amazon,https://www.amazon.com/dp/B006JH8T3S,67.39,note
 Hardware,M2-M5 screw assortment 4-20mm,Amazon,https://www.amazon.com/dp/B0FGX9JGC5,21.99,now
 Hardware,M3 hex standoffs 14mm,McMaster,https://www.mcmaster.com/94868A009,3.68,now
@@ -30,6 +30,6 @@ Hardware,M2.5 standoffs 10mm (Jetson),McMaster,https://www.mcmaster.com/95947A00
 Hardware,Zip ties 4 inch,Amazon,https://www.amazon.com/dp/B078Y7MH6Z,12.99,now
 Spares,Spares allowance (Traxxas parts finder),Traxxas,https://traxxas.com/products/parts,60.0,now
 Upgrades,RPLidar S2 30 m ToF,Seeed,https://www.seeedstudio.com/RPLiDAR-S2-Low-Cost-360-Degree-Laser-Range-Scanner-30M-Range-p-5198.html,398.99,s2
-,Total now,,,1597.14,
-,Total now + S2 at list,,,1996.13,
-,Total now + S2 at sale (354.99),,,1952.13,
+,Total now,,,2052.14,
+,Total now + S2 at list,,,2451.13,
+,Total now + S2 at sale (354.99),,,2407.13,
