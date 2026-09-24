@@ -1,0 +1,202 @@
+% Appendix shared by the competitor manuals: the starter package, file by file, and the
+% driver's logic per scan. Needs tikz and listings loaded by the including document.
+
+\section{The starter package, file by file}
+\label{app:starter}
+
+\texttt{starter\_kit/feb\_driver} is a normal ROS~2 Python package. After
+\texttt{cp -r starter\_kit/feb\_driver stack/} these are the files you own (the Python files live in the inner \texttt{feb\_driver/} folder):
+
+\begin{tabularx}{\linewidth}{p{4.4cm}X}
+\toprule
+File & What it is \\
+\midrule
+\texttt{package.xml} & The ROS~2 manifest: the package name \texttt{feb\_driver}, its version and
+its dependencies (\texttt{rclpy}, \texttt{sensor\_msgs}, \texttt{std\_msgs}). \texttt{colcon}
+reads it to know the package exists. You only touch it to add a dependency. \\
+\texttt{setup.py} & Python packaging. The line that matters is the entry point
+\texttt{reactive\_driver = feb\_driver.reactive\_driver:main}: it is what makes
+\texttt{ros2 run feb\_driver reactive\_driver} exist. It also installs \texttt{launch/} and
+\texttt{config/} so launch files can find them. Add a line here for every new node. \\
+\texttt{setup.cfg} & Two lines telling \texttt{colcon} where to put the installed scripts. Never edited. \\
+\texttt{resource/feb\_driver} & An empty marker file ROS~2 uses to index the package. Never edited. \\
+\texttt{\_\_init\_\_.py} & Empty; makes the folder a Python module. \\
+\texttt{reactive\_driver.py} & The driver, about 170 lines, explained below. \\
+\texttt{config/driver.yaml} & Every tuning number, one per line with a comment. The launch file
+hands it to the node, so you change behaviour here without touching code. \\
+\texttt{launch/drive.launch.py} & Starts one node, \texttt{reactive\_driver}, with the yaml and
+\texttt{use\_sim\_time} set, so the node's clock follows the simulator. This is what
+\texttt{--stack "ros2 launch feb\_driver drive.launch.py"} runs. \\
+\texttt{sysid\_probe.py}, \texttt{launch/sysid.launch.py} & Stage 2. Drives with the
+same steering but a fixed throttle schedule (three steps, a coast, a chirp) while recording a
+bag, to measure how the car responds. \\
+\texttt{tools/sysid\_fit.py} & Fits that bag: steady-state gain (the \texttt{speed\_per\_throttle}
+number), idle brake, throttle lag and effective wheelbase. Run inside the container. \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+The node subscribes to three topics and publishes two, all under
+\texttt{/autodrive/roboracer\_1/}: in, \texttt{lidar} (\texttt{LaserScan}, 1081 ranges over
+$\pm135^\circ$) and \texttt{left\_encoder}, \texttt{right\_encoder} (\texttt{JointState}, wheel
+angle); out, \texttt{steering\_command} and \texttt{throttle\_command} (\texttt{Float32}).
+Steering is normalised, $-1$ to $1$ meaning $-30^\circ$ to $30^\circ$. Throttle is $0$ to $1$
+and \textbf{0 is a hard brake}, not coasting.
+
+\section{How the driver drives, one scan at a time}
+\label{app:driver}
+
+Every lidar scan, about ten times a second, \texttt{on\_scan} runs the steps below and
+publishes one steering and one throttle value. The figure shows one scan from above, in a corridor that bends left; the right wall is the nearest thing the lidar sees.
+
+\begin{center}
+\begin{tikzpicture}[scale=1.1, every node/.style={font=\small}]
+  \begin{scope}
+  \clip (-4.0,-1.5) rectangle (4.4,5.0);
+  \draw[line width=1.8pt, gray!75] (1.000,-2.800) -- (1.000,2.200) -- (1.000,2.200) -- (0.994,2.370) -- (0.978,2.539) -- (0.950,2.707) -- (0.911,2.873) -- (0.862,3.036) -- (0.802,3.195) -- (0.732,3.350) -- (0.652,3.500) -- (0.562,3.644) -- (0.463,3.783) -- (0.355,3.914) -- (0.238,4.038) -- (0.114,4.155) -- (-0.017,4.263) -- (-0.156,4.362) -- (-0.300,4.452) -- (-0.450,4.532) -- (-0.605,4.602) -- (-0.764,4.662) -- (-0.927,4.711) -- (-1.093,4.750) -- (-1.261,4.778) -- (-1.430,4.794) -- (-1.600,4.800);
+  \draw[line width=1.8pt, gray!75] (-1.600,-2.800) -- (-1.600,1.400) -- (-1.600,1.400) -- (-1.602,1.452) -- (-1.607,1.504) -- (-1.615,1.556) -- (-1.627,1.607) -- (-1.642,1.657) -- (-1.661,1.706) -- (-1.683,1.754) -- (-1.707,1.800) -- (-1.735,1.844) -- (-1.765,1.887) -- (-1.799,1.927) -- (-1.834,1.966) -- (-1.873,2.001) -- (-1.913,2.035) -- (-1.956,2.065) -- (-2.000,2.093) -- (-2.046,2.117) -- (-2.094,2.139) -- (-2.143,2.158) -- (-2.193,2.173) -- (-2.244,2.185) -- (-2.296,2.193) -- (-2.348,2.198) -- (-2.400,2.200);
+  \fill[febblue, opacity=0.13] (0,0) -- (-1.600,0.000) -- (-1.600,0.140) -- (-1.600,0.282) -- (-1.600,0.429) -- (-1.600,0.582) -- (-1.600,0.746) -- (-1.600,0.924) -- (-1.600,1.120) -- (-1.600,1.343) -- (-1.636,1.636) -- (-3.857,4.596) -- (-3.441,4.915) -- (-3.000,5.196) -- (-2.536,5.438) -- (-2.052,5.638) -- (-1.281,4.780) -- (-0.825,4.681) -- (-0.394,4.502) -- (0.000,4.249) -- (0.344,3.926) -- (0.625,3.543) -- (0.834,3.111) -- (0.961,2.640) -- (1.000,2.145) -- (1.000,1.732) -- (1.000,1.428) -- (1.000,1.192) -- (1.000,1.000) -- (1.000,0.839) -- (1.000,0.700) -- (1.000,0.577) -- (1.000,0.466) -- cycle;
+  \draw[gray!30, very thin] (0,0) -- (-1.600,-1.600);
+  \draw[gray!30, very thin] (0,0) -- (-1.600,-1.343);
+  \draw[gray!30, very thin] (0,0) -- (-1.600,-1.120);
+  \draw[gray!30, very thin] (0,0) -- (-1.600,-0.924);
+  \draw[gray!30, very thin] (0,0) -- (-1.600,-0.746);
+  \draw[gray!30, very thin] (0,0) -- (-1.600,-0.582);
+  \draw[gray!30, very thin] (0,0) -- (-1.600,-0.429);
+  \draw[gray!30, very thin] (0,0) -- (-1.600,-0.282);
+  \draw[gray!30, very thin] (0,0) -- (-1.600,-0.140);
+  \draw[gray!55, thin] (0,0) -- (-1.600,0.000);
+  \draw[gray!55, thin] (0,0) -- (-1.600,0.140);
+  \draw[gray!55, thin] (0,0) -- (-1.600,0.282);
+  \draw[gray!55, thin] (0,0) -- (-1.600,0.429);
+  \draw[gray!55, thin] (0,0) -- (-1.600,0.582);
+  \draw[gray!55, thin] (0,0) -- (-1.600,0.746);
+  \draw[gray!55, thin] (0,0) -- (-1.600,0.924);
+  \draw[gray!55, thin] (0,0) -- (-1.600,1.120);
+  \draw[gray!55, thin] (0,0) -- (-1.600,1.343);
+  \draw[gray!55, thin] (0,0) -- (-1.636,1.636);
+  \draw[gray!55, thin] (0,0) -- (-3.857,4.596);
+  \draw[gray!55, thin] (0,0) -- (-3.441,4.915);
+  \draw[gray!55, thin] (0,0) -- (-3.000,5.196);
+  \draw[gray!55, thin] (0,0) -- (-2.536,5.438);
+  \draw[gray!55, thin] (0,0) -- (-2.052,5.638);
+  \draw[gray!55, thin] (0,0) -- (-1.281,4.780);
+  \draw[gray!55, thin] (0,0) -- (-0.825,4.681);
+  \draw[gray!55, thin] (0,0) -- (-0.394,4.502);
+  \draw[gray!55, thin] (0,0) -- (0.000,4.249);
+  \draw[gray!55, thin] (0,0) -- (0.344,3.926);
+  \draw[gray!55, thin] (0,0) -- (0.625,3.543);
+  \draw[gray!55, thin] (0,0) -- (0.834,3.111);
+  \draw[gray!55, thin] (0,0) -- (0.961,2.640);
+  \draw[gray!55, thin] (0,0) -- (1.000,2.145);
+  \draw[gray!55, thin] (0,0) -- (1.000,1.732);
+  \draw[gray!55, thin] (0,0) -- (1.000,1.428);
+  \draw[gray!55, thin] (0,0) -- (1.000,1.192);
+  \draw[gray!55, thin] (0,0) -- (1.000,1.000);
+  \draw[gray!55, thin] (0,0) -- (1.000,0.839);
+  \draw[gray!55, thin] (0,0) -- (1.000,0.700);
+  \draw[gray!55, thin] (0,0) -- (1.000,0.577);
+  \draw[gray!55, thin] (0,0) -- (1.000,0.466);
+  \draw[gray!30, very thin] (0,0) -- (1.000,-0.087);
+  \draw[gray!30, very thin] (0,0) -- (1.000,-0.176);
+  \draw[gray!30, very thin] (0,0) -- (1.000,-0.268);
+  \draw[gray!30, very thin] (0,0) -- (1.000,-0.364);
+  \draw[gray!30, very thin] (0,0) -- (1.000,-0.466);
+  \draw[gray!30, very thin] (0,0) -- (1.000,-0.577);
+  \draw[gray!30, very thin] (0,0) -- (1.000,-0.700);
+  \draw[gray!30, very thin] (0,0) -- (1.000,-0.839);
+  \draw[gray!30, very thin] (0,0) -- (1.000,-1.000);
+  \draw[red!70, thick] (0,0) -- (1.000,0.364);
+  \draw[red!70, thick] (0,0) -- (1.000,0.268);
+  \draw[red!70, thick] (0,0) -- (1.000,0.176);
+  \draw[red!70, thick] (0,0) -- (1.000,0.087);
+  \draw[red!70, thick] (0,0) -- (1.000,0.000);
+  \fill[red] (1.000,0.000) circle (2.4pt);
+  \draw[red, dashed, thick] (1.000,0.000) circle (0.400);
+  \draw[febblue, line width=1.6pt] (0,0) -- (-3.857,4.596);
+  \draw[febblue!80, thick, dash pattern=on 3pt off 2pt] (0,0) -- (-0.825,4.681);
+  \draw[-{Stealth[length=8pt]}, line width=2pt, black] (0,0) -- (-1.080,2.031);
+  \draw[green!45!black, dashed] (-0.235,0) -- (-0.235,4.15); \draw[green!45!black, dashed] (0.235,0) -- (0.235,4.15);
+  \fill[black!80] (-0.135,-0.27) rectangle (0.135,0.27);
+  \end{scope}
+  \node[anchor=west] (n) at (2.90,-0.20) {nearest return, 1.0 m};
+  \draw[gray!60, thin] (n.west) -- (1.000,0.000);
+  \node[anchor=west] (n) at (2.90,-0.60) {bubble 0.4 m: beams within $\pm22^\circ$ blanked};
+  \draw[gray!60, thin] (n.west) -- (0.700,0.000);
+  \node[anchor=east] (n) at (-3.60,1.00) {widest gap};
+  \draw[gray!60, thin] (n.east) -- (-0.960,0.554);
+  \node[anchor=east] (n) at (-3.60,3.90) {deepest beam};
+  \draw[gray!60, thin] (n.east) -- (-3.278,3.907);
+  \node[anchor=east] (n) at (-3.60,3.30) {gap middle};
+  \draw[gray!60, thin] (n.east) -- (-0.578,3.276);
+  \node[anchor=west] (n) at (2.90,2.90) {target: 0.6 deepest + 0.4 middle};
+  \draw[gray!60, thin] (n.west) -- (-1.080,2.031);
+  \node[anchor=west] (n) at (2.90,2.20) {room ahead: 3rd percentile of ranges};
+  \draw[gray!60, thin] (n.west) -- (0.235, 3.748586362432566);
+  \node[anchor=west] (n) at (2.90,1.90) {inside the car's own 0.47 m corridor};
+  \node[anchor=west] (n) at (2.90,0.40) {car, lidar at the origin};
+  \draw[gray!60, thin] (n.west) -- (0.135, 0.0);
+  \node[anchor=west] (n) at (2.90,-1.20) {beams behind the car: outside the gap search};
+  \draw[gray!60, thin] (n.west) -- (0.700,-0.404);
+\end{tikzpicture}
+\end{center}
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Clean the scan.} Any beam that returned nothing (infinity) is set to the lidar's
+  maximum range, and every range is clipped to the sensor's limits. This is the numpy array
+  \texttt{ranges}; \texttt{angles} is the matching bearing of each beam.
+  \item \textbf{Find the nearest return and blank a bubble around it.} Only beams within
+  $\pm$\texttt{gap\_fov} (1.6 rad, about $\pm 92^\circ$) count. The shortest of them is the
+  nearest obstacle, the red dot. Every beam whose bearing is within
+  $\arctan(\texttt{bubble}/r_{\min})$ of that beam is set to zero: at $r_{\min}=1.0$~m and
+  \texttt{bubble}$=0.4$~m that is $\pm 22^\circ$, the red beams. A zeroed beam can never be
+  chosen as a direction, so the car never aims through a gap that passes within 0.4~m of the
+  closest thing it sees. That is the whole safety idea, and it is why the car brushes walls when
+  \texttt{bubble} is too small and refuses corners when it is too big.
+  \item \textbf{Pick the widest gap.} The non-zero beams are split into runs of consecutive
+  beams; the longest run is the gap (blue). Inside it, two candidates: the deepest beam (the
+  longest range) and the middle beam of the run. The target bearing is a blend,
+  \texttt{deep\_weight} $\times$ deepest $+$ $(1-\texttt{deep\_weight})$ $\times$ middle, $0.6/0.4$
+  by default. Pure deepest cuts corners tight and hunts; pure middle is smooth but wide.
+  \item \textbf{Turn the bearing into steering.} The car is still turning at its current
+  steering angle for the actuator delay (0.25~s) plus one scan period before the new command
+  takes effect, so the heading change over that time is subtracted from the target first
+  (delay compensation). Then \texttt{steer\_gain} scales the bearing (0.7: a $20^\circ$ target
+  asks for $14^\circ$ of steering), the result is clipped to the $\pm 30^\circ$ limit, low-passed
+  with \texttt{steer\_tau} and rate-limited to the actuator's 3.2~rad/s. Without the filtering,
+  a target that jumps from one beam to the next would flick the wheel full lock every scan.
+  \item \textbf{Measure the room ahead.} Take the beams whose end point lies inside the car's
+  own corridor (a strip 0.235~m either side of the centreline, the green dashes). The 3rd
+  percentile of their forward distance is the clearance: not the minimum, which one noisy beam
+  would spoil, but close to it. It is low-passed, except that a genuinely close obstacle
+  (under \texttt{brake\_margin} $+0.3$~m) passes straight through so braking is immediate.
+  \item \textbf{Pick a speed.} Three ceilings: \texttt{max\_speed} (2.5~m/s); the cornering
+  speed $\sqrt{\texttt{lat\_accel}/\kappa}$ from the slowly filtered steering, where
+  $\kappa=\tan(\delta)/L$ is the path curvature; and the braking speed
+  $\sqrt{2\,\texttt{decel\_limit}\,(\mathrm{clearance}-\texttt{brake\_margin})}$, the fastest speed
+  from which the car can still stop before the clearance. The goal is the smallest of the
+  three, floored at \texttt{min\_speed} (0.9~m/s) so the car never parks in a corner. The goal
+  is low-passed and then slewed at \texttt{accel\_limit} up and \texttt{decel\_limit} down.
+  \item \textbf{Speed to throttle.} The wheel encoders give the measured speed (wheel angle
+  change over the last 0.25~s times the wheel radius). Throttle is feed-forward plus trim:
+  feed-forward is $v_{\mathrm{target}}/\texttt{speed\_per\_throttle}$ (23 m/s per unit throttle,
+  measured with the sysid tools, so 1~m/s needs about 0.043); trim is a small PI on the speed
+  error, clipped to half of the feed-forward. Because of that clip the command can never reach
+  zero while speed is wanted, and zero would be a hard brake. Finally the throttle is
+  slew-limited to 0.8 per second. A textbook PI speed loop without these two guards surges and
+  brakes in a 0.8~s cycle on this simulator; this one holds speed at 10~Hz.
+  \item \textbf{Publish.} Steering divided by $30^\circ$ goes to \texttt{steering\_command},
+  the throttle to \texttt{throttle\_command}. On shutdown the node publishes $0, 0$ once so the
+  car stops.
+\end{enumerate}
+
+\textbf{Follow mode} (\texttt{follow\_gap} $> 0$, used by the house racer as the opponent):
+if something sits within that distance in a $\pm 15^\circ$ cone straight ahead, it is treated
+as a car to sit behind, not a wall to steer around. Its beams are replaced by the corridor seen
+beside it, so the steering keeps the corridor's line, and the speed goal is capped to hold the
+distance.
+
+\textbf{Where to start tuning.} \texttt{bubble} and \texttt{deep\_weight} decide the line;
+\texttt{max\_speed}, \texttt{lat\_accel} and \texttt{brake\_margin} decide how fast it dares.
+Change one number, run the same command, watch the lap time. The sysid tools are for when
+you want the throttle law to match the car rather than guess.

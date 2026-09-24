@@ -7,6 +7,8 @@
 \usepackage{tabularx}
 \usepackage{enumitem}
 \usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta}
 \usepackage[hidelinks,colorlinks=true,linkcolor=febblue,urlcolor=febblue]{hyperref}
 \definecolor{febblue}{HTML}{1C4687}
 \definecolor{codebg}{HTML}{F3F4F6}
@@ -229,5 +231,8 @@ Topic (under \texttt{/autodrive/roboracer\_1/}) & Meaning \\
 Publish as many topics of your own as you like; only the two commands reach the car. Use
 message stamps or \texttt{use\_sim\_time}, never the wall clock, for speeds and integrals.
 Throttle about 0.1 is roughly 2~m/s.
+
+\appendix
+\input{starter_driver}
 
 \end{document}
