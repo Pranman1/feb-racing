@@ -4,7 +4,7 @@ Newest first.
 
 ## 2026-09-16 - hardware options report, real circuits, two-car start fixed
 
-- Report for the budget committee: `docs/proposal/hardware-options.pdf` (12 pages): the
+- Report for the budget committee (superseded 2026-09-24 by `docs/proposal/overleaf/main.pdf`; the old file is deleted): 12 pages, the
   simulator platform with screenshots, six hardware plans with full bills of materials (compute,
   lidar, power, mounting, track kit), the Tamiya and 1:5-scale options analysed as infeasible,
   3D-printed FSAE cones, camera + lidar fusion with the owned RealSense, off-season case, one-on-one
@@ -271,5 +271,5 @@ All fixes are in the simulator and the devkit; competitors change nothing.
 ghost, cones, the track menu, 2-car spawning with the RCT. All compile; expect small fixes.
 
 ## 2026-09-24
-- Proposal (`docs/proposal/overleaf/main.tex`): itemised bill of materials with a shop link and price per line (`docs/proposal/bom.csv` for ordering). Re-priced after NVIDIA's July 2026 Jetson increase (Orin Nano Super $399). Corrected the controller: Flipsky Mini FSESC 6.7 is 4S-minimum and cannot run on 3S; the build now lists the Flipsky Mini FSESC 4.20 (3S-13S) or the VESC 6 MkVI. Totals: $1,549 now on the owned A1M8 and RealSense, $1,948 with the RPLidar S2, $3,247 official reference.
+- Proposal `docs/proposal/overleaf/main.tex` / `.pdf` is now the single budget document; the earlier drafts (`car-budget`, `hardware-options`, `rc-budget`, `figs/`) are deleted. It carries an itemised bill of materials with a shop link and the 24 Sep 2026 price on every line (Amazon checked line by line, used where cheaper), the same list in `docs/proposal/bom.csv`, a walk through the official build guide confirming the list covers the whole build, and a camera line (Logitech C920, or RealSense D435i if none is found in the lab). Laser cutting and 3D printing are excluded on purpose (student shop account). Re-priced after NVIDIA's July 2026 Jetson increase (Orin Nano Super $399). Corrected the controller: Flipsky Mini FSESC 6.7 is 4S-minimum and cannot run on 3S; the build lists the Flipsky Mini FSESC 4.20 (3S-13S) or the VESC 6 MkVI. Totals: $1,555 now on the owned A1M8, $1,954 with the RPLidar S2, $1,821 with a D435i instead of the webcam, $3,199 official reference.
 - `starter_kit/feb_cone_driver` (uncommitted, in progress): cone-track baseline driver, lidar+camera fusion, chain ordering, centreline, pure pursuit; completes laps but can stall on a cone; lidar-based stall recovery added, untested.
