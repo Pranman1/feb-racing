@@ -32,7 +32,7 @@ cone_driver:
     stall_time: 2.0       # s of the lidar scene not changing while driving before we assume we are stuck
     reverse_time: 1.2     # s to back away with the wheel turned the other way
     reverse_throttle: 0.12
-    chain_step: 1.8       # m, the largest gap between consecutive cones of one colour when ordering them
+    chain_step: 1.8       # m, the smallest allowed gap between consecutive cones of one colour when ordering them (grows to twice the spacing in view)
     speed_per_throttle: 23.0
     throttle_kp: 0.02
     throttle_ki: 0.03

@@ -206,13 +206,17 @@ class Racer(Node):
         weights = np.array([w for _, _, _, w in obs], dtype=float)
 
         moving = self.scene_moving(msg)
+        if len(cones) >= 2:
+            self.last_seen_t = t
         if self.mode == "MAPPING":
             self.mapping_step(z_rel, colours, weights)
             steer, throttle = self.follow_local(clusters, cones, dt)
+            if t - self.last_seen_t > self.p["lost_after"] + 1.5 and self.reverse_until is None:
+                self.get_logger().warn("no cones in view: backing up")     # nosed out of the corridor
+                self.reverse_until = t + 1.5
+                self.stalled_since = t
         else:
             matched = self.localise(z_rel, colours)
-            if len(cones) >= 2:
-                self.last_seen_t = t
             # localisation health: after a few seconds without matches the map position is not
             # to be trusted, so the local follower (the mapping-lap driver) takes over until the
             # map is matched again; with nothing in view at all, stop rather than bolt
@@ -390,6 +394,19 @@ class Racer(Node):
             rest.remove(best)
         return out
 
+    def chain_step(self, cones):
+        """Largest gap between consecutive cones of one colour when ordering them: twice the
+        spacing of the cones in view (one may be missing), never below the configured minimum.
+        Tracks are laid out with anything from 1 m to 5 m between cones."""
+        gaps = []
+        for i, (x, y, c) in enumerate(cones):
+            same = [math.hypot(x - u, y - v) for j, (u, v, d) in enumerate(cones) if j != i and d == c]
+            if same:
+                gaps.append(min(same))
+        if len(gaps) < 2:
+            return self.p["chain_step"]
+        return float(np.clip(2.0 * np.median(gaps), self.p["chain_step"], 6.0))
+
     def local_centreline(self, cones):
         """Midpoints between the ordered chains. A blue chain cone pairs with the yellow cone that
         lies across the track to its RIGHT (right of the chain's direction of travel), never the
@@ -399,8 +416,9 @@ class Racer(Node):
         # the orange start cones stand on the boundary lines: for driving they count as the
         # colour of the side they are on
         cones = [(x, y, (BLUE if y > 0.0 else YELLOW) if c == ORANGE else c) for x, y, c in cones]
-        left = self.chain([c for c in cones if c[2] == BLUE and c[0] > -1.0], self.p["chain_step"])
-        right = self.chain([c for c in cones if c[2] == YELLOW and c[0] > -1.0], self.p["chain_step"])
+        step = self.chain_step(cones)
+        left = self.chain([c for c in cones if c[2] == BLUE and c[0] > -1.0], step)
+        right = self.chain([c for c in cones if c[2] == YELLOW and c[0] > -1.0], step)
         half = self.p["track_width"] / 2.0
 
         def tangents(chain):

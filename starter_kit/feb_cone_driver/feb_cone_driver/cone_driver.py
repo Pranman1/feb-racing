@@ -233,6 +233,19 @@ class ConeDriver(Node):
         self.prev = out
         return [(x, y, colour) for x, y, colour, age in out if colour is not None]
 
+    def chain_step(self, cones):
+        """Largest gap between consecutive cones of one colour when ordering them: twice the
+        spacing of the cones in view (one may be missing), never below the configured minimum.
+        Tracks are laid out with anything from 1 m to 5 m between cones."""
+        gaps = []
+        for i, (x, y, c) in enumerate(cones):
+            same = [math.hypot(x - u, y - v) for j, (u, v, d) in enumerate(cones) if j != i and d == c]
+            if same:
+                gaps.append(min(same))
+        if len(gaps) < 2:
+            return self.p["chain_step"]
+        return float(np.clip(2.0 * np.median(gaps), self.p["chain_step"], 6.0))
+
     def chain(self, cones, max_step):
         """Order one colour's cones along the track: start at the cone nearest the car, then
         repeatedly take the unused cone within max_step that continues the chain's direction
@@ -271,8 +284,9 @@ class ConeDriver(Node):
         Unpaired cones are offset by half the track width along their chain's normal."""
         # the orange start cones stand on the boundary lines: they count as the side they are on
         cones = [(x, y, (BLUE if y > 0.0 else YELLOW) if c == ORANGE else c) for x, y, c in cones]
-        left = self.chain([c for c in cones if c[2] == BLUE and c[0] > -1.0], self.p["chain_step"])
-        right = self.chain([c for c in cones if c[2] == YELLOW and c[0] > -1.0], self.p["chain_step"])
+        step = self.chain_step(cones)
+        left = self.chain([c for c in cones if c[2] == BLUE and c[0] > -1.0], step)
+        right = self.chain([c for c in cones if c[2] == YELLOW and c[0] > -1.0], step)
         half = self.p["track_width"] / 2.0
 
         def tangents(chain):
