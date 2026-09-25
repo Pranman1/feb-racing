@@ -70,7 +70,7 @@ class ConeDriver(Node):
         self.throttle = 0.0
         self.integral = 0.0
         self.last_t = None
-        self.prev_ranges = None      # last scan, to tell whether the world is moving past us
+        self.prev_clusters = None    # last scan's cone clusters, to tell whether the world moves past us
         self.stalled_since = None    # sim time the lidar scene stopped changing although we were driving
         self.reverse_until = None    # sim time until which we back away from whatever we are stuck on
 
@@ -319,7 +319,7 @@ class ConeDriver(Node):
         self.last_t = t
 
         clusters = self.cone_clusters(msg)
-        moving = self.scene_moving(msg)
+        moving = self.scene_moving(clusters, dt)
         cones = self.fuse(clusters, dt)
         line = self.centreline(cones)
         self.publish_debug(msg.header, cones, line)
@@ -360,13 +360,13 @@ class ConeDriver(Node):
                 return
             self.reverse_until, self.stalled_since = None, None
             self.throttle, self.integral = 0.0, 0.0
-        if not moving and (self.throttle > 0.02 or target is None):
-            self.stalled_since = self.stalled_since or t
+        if moving:
+            self.stalled_since = None
+        elif self.throttle > 0.02 or target is None:
+            self.stalled_since = self.stalled_since or t      # sticky: a throttle dip does not reset it
             if t - self.stalled_since > self.p["stall_time"]:
                 self.get_logger().warn("stuck, backing up")
                 self.reverse_until = t + self.p["reverse_time"]
-        else:
-            self.stalled_since = None
         step = (wanted - self.steer) * min(1.0, dt / self.p["steer_tau"])
         self.steer += float(np.clip(step, -MAX_STEER_RATE * dt, MAX_STEER_RATE * dt))
 
@@ -379,14 +379,23 @@ class ConeDriver(Node):
         self.pub_throttle.publish(Float32(data=self.throttle))
         self.pub_steering.publish(Float32(data=self.steer / MAX_STEER))
 
-    def scene_moving(self, msg):
-        """True when the ranges changed since the last scan, i.e. the car is actually moving."""
-        ranges = np.asarray(msg.ranges, dtype=float)
-        prev, self.prev_ranges = self.prev_ranges, ranges
-        if prev is None or len(prev) != len(ranges):
+    def scene_moving(self, clusters, dt):
+        """True when the world moves past the car: cone clusters matched to last scan's by
+        nearest neighbour must have moved forward about speed * dt (or at least a little while
+        the throttle is on and the wheels are blocked). Stuck on a cone, the steering rocks the
+        body but nothing moves forward."""
+        cur = np.array(clusters, float).reshape(-1, 2)
+        prev, self.prev_clusters = self.prev_clusters, cur
+        if prev is None or len(prev) < 3 or len(cur) < 3:
             return True
-        ok = np.isfinite(prev) & np.isfinite(ranges) & (prev < self.p["max_range"]) & (ranges < self.p["max_range"])
-        return bool(ok.sum() < 20 or np.mean(np.abs(ranges[ok] - prev[ok])) > 0.01)
+        d = np.linalg.norm(cur[:, None, :] - prev[None, :, :], axis=2)
+        j = d.argmin(axis=1)
+        near = d.min(axis=1) < 0.5
+        if near.sum() < 3:
+            return True
+        forward = np.median(np.abs(cur[near, 0] - prev[j[near], 0]))
+        expected = max(self.speed * dt, 0.03 if self.throttle > 0.04 else 0.0)
+        return bool(expected <= 0.0 or forward > 0.4 * expected)
 
     def throttle_law(self, v, v_t, dt):
         """Feed-forward plus a trim bounded to half of it (throttle 0 is a hard brake here)."""

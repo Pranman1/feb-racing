@@ -1,0 +1,54 @@
+# Cone racer parameters. Every value has a comment in racer.py's DEFAULTS.
+racer:
+  ros__parameters:
+    # camera: HSV bounds (h_lo, s_lo, v_lo, h_hi, s_hi, v_hi) and the image band where cones live,
+    # calibrated on this car against ground truth; the scene is dark, so value floors are low
+    hsv_blue: [105, 220, 8, 135, 255, 255]
+    hsv_yellow: [18, 150, 8, 40, 255, 255]
+    hsv_orange: [0, 150, 15, 15, 255, 255]
+    band_top: 0.20            # fraction of image height; rows above are sky
+    band_bottom: 0.36         # rows below are the car's own body
+    band_floor: 0.21          # a blob that ends above this is sky
+    orange_min_px: 35         # smaller orange-hued blobs are shaded yellow cones
+    min_blob_px: 3
+    match_px_frac: 0.04       # a lidar cone takes a blob's colour only within this fraction of the width
+    # lap 1: the mapping lap, driven by the simple follower
+    map_speed: 1.2
+    map_min_speed: 0.8
+    lookahead: 1.0
+    # slam
+    keyframe_dist: 0.4        # m between graph poses
+    slam_range: 5.0           # m; cones farther than this are not used for the map
+    new_landmark_dist: 0.6    # m; a cone farther than this from every known cone of its colour is new
+    min_lap_length: 15.0      # m travelled before the car may declare the lap closed
+    lap_close_dist: 2.0       # m from the start pose that closes the lap
+    # raceline
+    sample_step: 0.25
+    margin: 0.40              # m kept from the cones beyond the car's half width (a cone hit stalls the car)
+    v_max: 4.0                # m/s cap of the speed profile
+    a_lat: 3.5                # m/s^2 lateral limit used for cornering speed
+    a_acc: 2.5
+    a_brake: 3.0
+    race_speed_scale: 0.6     # scale the whole profile (raise once the car proves it)
+    # mpc model (sysid-calibrated values go here)
+    long_a: 74.4
+    long_b: 2.54
+    idle_brake: 0.71
+    tyre_B: 8.0
+    tyre_C: 1.4
+    tyre_D: 18.0
+    inertia_z: 0.10
+    lf: 0.175                 # half of the 0.35 m effective wheelbase from the yaw-rate fit
+    lr: 0.175
+    # mpc weights
+    mpc_horizon: 12
+    mpc_dt: 0.1
+    w_pos: 8.0
+    w_head: 2.0
+    w_speed: 0.6
+    w_dsteer: 0.01
+    mpc_steer_tau: 0.15       # s, the steering servo's lag in the model
+    w_dtau: 3.0
+    dtau_max: 0.4             # throttle units per second, hard bound in the MPC
+    w_tau: 0.3
+    tau_max: 0.14             # throttle cap: wheel spin above this; about 4 m/s steady state
