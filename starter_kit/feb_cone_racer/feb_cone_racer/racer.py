@@ -52,7 +52,7 @@ DEFAULTS = dict(
     keyframe_dist=0.4, slam_range=5.0, dx_weight=2.0, z_weight=1.0, new_landmark_dist=0.6, icp_gate=1.5,
     solve_every=3, min_lap_length=15.0, lap_close_dist=2.0, min_seen=2, icp_min_matches=5, snap_radius=10.0, snap_gate=6.0,
     # raceline
-    sample_step=0.25, car_half_width=0.135, margin=0.40, curvature_reg=0.0002,
+    sample_step=0.25, car_half_width=0.135, margin=0.40, curvature_reg=0.01,
     v_max=4.0, a_lat=3.5, a_acc=2.5, a_brake=3.0,
     # mpc: model
     mass=3.9, inertia_z=0.10, lf=0.175, lr=0.175, tyre_B=8.0, tyre_C=1.4, tyre_D=18.0,   # L 0.35 m effective (yaw-rate fit)

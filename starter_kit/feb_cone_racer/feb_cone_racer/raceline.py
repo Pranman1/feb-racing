@@ -14,34 +14,42 @@ import numpy as np
 
 
 def min_curvature(centre, normal, half_width, car_half_width=0.135, margin=0.12, reg=0.02):
+    """Minimum-curvature offsets alpha along the normals, a box-constrained QP. The Hessian is
+    pentadiagonal (second differences), so it is built sparse: a 1300-point track solves in
+    well under a second instead of minutes. CasADi's qrqp first, scipy's L-BFGS-B as fallback."""
+    import scipy.sparse as sps
     N = len(centre)
     bound = np.maximum(half_width - car_half_width - margin, 0.03)
-    # p_i = c_i + a_i n_i ; second difference D p ; minimise |D p|^2 + reg |a|^2
     idx = np.arange(N)
-    D = np.zeros((N, N))
-    D[idx, idx] = -2.0
-    D[idx, (idx + 1) % N] = 1.0
-    D[idx, (idx - 1) % N] = 1.0
+    ds = float(np.median(np.linalg.norm(np.roll(centre, -1, axis=0) - centre, axis=1)))
+    # second difference divided by ds^2 approximates curvature, so the objective (and reg) mean
+    # the same thing whatever the sampling
+    D = sps.csr_matrix((np.concatenate([-2.0 * np.ones(N), np.ones(N), np.ones(N)]) / (ds * ds),
+                        (np.concatenate([idx, idx, idx]), np.concatenate([idx, (idx + 1) % N, (idx - 1) % N]))), shape=(N, N))
     Cx, Cy = D @ centre[:, 0], D @ centre[:, 1]
-    Nx, Ny = D * normal[:, 0][None, :], D * normal[:, 1][None, :]
-    H = 2.0 * (Nx.T @ Nx + Ny.T @ Ny) + 2.0 * reg * np.eye(N)
+    Nx, Ny = D @ sps.diags(normal[:, 0]), D @ sps.diags(normal[:, 1])
+    H = (2.0 * (Nx.T @ Nx + Ny.T @ Ny) + 2.0 * reg * sps.eye(N)).tocsc()
+    H.sum_duplicates()
+    H.sort_indices()                      # CasADi requires sorted compressed-column storage
     g = 2.0 * (Nx.T @ Cx + Ny.T @ Cy)
+    alpha = None
     try:
         import casadi as ca
         a = ca.MX.sym("a", N)
-        qp = {"x": a, "f": 0.5 * ca.dot(a, ca.mtimes(ca.DM(H), a)) + ca.dot(ca.DM(g), a)}
-        try:
-            solver = ca.qpsol("qp", "qrqp", qp, {"print_iter": False, "print_header": False, "error_on_fail": False})
-        except Exception:
-            solver = ca.nlpsol("qp", "ipopt", qp, {"ipopt.print_level": 0, "print_time": False})
+        Hc = ca.DM(H)
+        qp = {"x": a, "f": 0.5 * ca.dot(a, ca.mtimes(Hc, a)) + ca.dot(ca.DM(g), a)}
+        solver = ca.qpsol("qp", "qrqp", qp, {"print_iter": False, "print_header": False, "error_on_fail": False})
         sol = solver(lbx=-bound, ubx=bound, x0=np.zeros(N))
         alpha = np.asarray(sol["x"]).flatten()
+        if not np.all(np.isfinite(alpha)):
+            alpha = None
     except Exception:
-        # projected gradient fallback, no CasADi
-        alpha = np.zeros(N)
-        L = np.linalg.eigvalsh(H).max()
-        for _ in range(400):
-            alpha = np.clip(alpha - (H @ alpha + g) / L, -bound, bound)
+        alpha = None
+    if alpha is None:
+        from scipy.optimize import minimize
+        res = minimize(lambda x: 0.5 * x @ (H @ x) + g @ x, np.zeros(N), jac=lambda x: H @ x + g,
+                       method="L-BFGS-B", bounds=list(zip(-bound, bound)), options={"maxiter": 500})
+        alpha = res.x
     return centre + alpha[:, None] * normal, alpha
 
 
