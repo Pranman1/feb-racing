@@ -10,6 +10,7 @@ import cv2
 import numpy as np
 
 BLUE, YELLOW, ORANGE = 1, 2, 3          # orange: the big start-line cones
+UNKNOWN = 0                              # a lidar cone the camera has not coloured (beside or behind the car)
 
 
 class Perception:
@@ -120,7 +121,9 @@ class Perception:
         """Colour each lidar cone: camera first, then the colour it had last scan (moved into
         this scan's frame), then a side guess for near cones. Returns [(x, y, colour, weight)]: weight
         1.0 when the camera matched this cone this scan and no other cone shares its bearing,
-        0.3 when the colour was carried from an earlier scan, 0.0 for a side guess."""
+        0.3 when the colour was carried from an earlier scan, 0.0 for a side guess. Clusters
+        that get no colour are kept in self.unknown: the lidar sees all round, the camera does
+        not, and a cone is a cone for localisation."""
         dyaw = 0.0
         if yaw is not None and self.prev_yaw is not None:
             dyaw = math.atan2(math.sin(yaw - self.prev_yaw), math.cos(yaw - self.prev_yaw))
@@ -158,4 +161,5 @@ class Perception:
             if colour is not None:
                 result.append((x, y, colour, weight))
         self.prev = out
+        self.unknown = [(x, y) for x, y, colour, _ in out if colour is None]
         return result

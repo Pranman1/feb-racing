@@ -25,7 +25,7 @@ from sensor_msgs.msg import Image, Imu, JointState, LaserScan
 from std_msgs.msg import Float32
 
 from .graphslam import GraphSLAM
-from .perception import BLUE, ORANGE, YELLOW, Perception
+from .perception import BLUE, ORANGE, UNKNOWN, YELLOW, Perception
 from .raceline import heading_along, min_curvature, speed_profile
 from .track import build_track
 
@@ -49,7 +49,7 @@ DEFAULTS = dict(
     map_speed=1.2, map_min_speed=0.8, lookahead=1.0, chain_step=1.8, avoid_range=0.9,
     speed_per_throttle=23.0, throttle_kp=0.02, throttle_ki=0.03, throttle_slew=0.8, speed_window=0.25, steer_tau=0.15,
     # slam
-    keyframe_dist=0.4, slam_range=5.0, dx_weight=2.0, z_weight=1.0, new_landmark_dist=0.6, icp_gate=1.5,
+    keyframe_dist=0.4, slam_range=5.0, loc_range=6.0, dx_weight=2.0, z_weight=1.0, new_landmark_dist=0.6, icp_gate=1.5,
     solve_every=3, min_lap_length=15.0, lap_close_dist=2.0, min_seen=2, icp_min_matches=5, snap_radius=10.0, snap_gate=6.0,
     # raceline
     sample_step=0.25, car_half_width=0.135, margin=0.40, curvature_reg=0.01,
@@ -196,7 +196,10 @@ class Racer(Node):
 
         # cones for the map: every coloured cone within range gives a position edge; only a
         # colour the camera confirmed this scan carries a full vote for the landmark's colour
-        obs = [(x, y, c, w) for x, y, c, w in cones if math.hypot(x, y) < self.p["slam_range"]]
+        rng = self.p["slam_range"] if self.mode == "MAPPING" else self.p["loc_range"]
+        obs = [(x, y, c, w) for x, y, c, w in cones if math.hypot(x, y) < rng]
+        if self.mode != "MAPPING":                # for localisation every lidar cone counts, coloured or not
+            obs += [(x, y, UNKNOWN, 0.0) for x, y in self.perception.unknown if math.hypot(x, y) < rng]
         cy, sy = math.cos(self.yaw), math.sin(self.yaw)
         z_rel = np.array([[cy * x - sy * y, sy * x + cy * y] for x, y, c, w in obs]).reshape(-1, 2)
         colours = np.array([c for _, _, c, _ in obs], dtype=int)
@@ -234,6 +237,13 @@ class Racer(Node):
                     self.local_mode = True
                 steer, throttle = self.follow_local(clusters, cones, dt)
                 self.mpc_warm_reset()
+                if t - self.reloc_t > 1.0 and len(z_rel) >= 4:      # look for the car anywhere on the map
+                    self.reloc_t = t
+                    found = self.slam.relocalise(z_rel, colours)
+                    if found is not None:
+                        self.get_logger().info("relocalised: map position moved %.1f m" % np.linalg.norm(found - self.pose))
+                        self.pose = found
+                        self.good_loc_t = t
             else:
                 if self.local_mode:
                     self.get_logger().info("localisation back: MPC on the raceline")
@@ -325,7 +335,8 @@ class Racer(Node):
         self.slam.freeze(int(p["min_seen"]))
         lap = self.last_t - self.lap_start_t
         self.lap_times.append(lap)
-        track = build_track(self.slam.lhat, self.slam.colour, self.start[0], (math.cos(self.start[1]), math.sin(self.start[1])), p["sample_step"])
+        track = build_track(self.slam.lhat, self.slam.colour, self.start[0], (math.cos(self.start[1]), math.sin(self.start[1])), p["sample_step"],
+                            path=self.slam.xhat)
         if track is None:
             self.get_logger().error("map has too few cones of a colour; keep following the local line")
             self.slam.frozen = False
@@ -346,6 +357,7 @@ class Racer(Node):
             self.get_logger().warn("boundaries leave cones out: blue %d of %d, yellow %d of %d" % (len(track["left"]), n_b, len(track["right"]), n_y))
         self.lap_start_t = self.last_t
         self.good_loc_t = self.last_t
+        self.reloc_t = self.last_t
         self.get_logger().info("map closed after %.1f s: %d cones, raceline %.1f m, %d points, v %.1f..%.1f m/s (%.0f ms) -> RACING with %s"
                                % (lap, len(self.slam.lhat), self.race_s[-1], len(line), v.min(), v.max(), 1000 * (time.time() - t0), "MPC" if self.mpc else "pure pursuit"))
         self.publish_map()

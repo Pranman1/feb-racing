@@ -95,20 +95,41 @@ def nearest_on_polyline(poly_closed, q, max_seg=None):
     return proj[k]
 
 
-def build_track(lhat, colour, start_xy, start_heading, step=0.25, repair_colours=True):
+def side_of_path(path, q):
+    """Signed distance of q from the closed polyline `path`: positive on its left."""
+    P = np.vstack([path, path[:1]])
+    a, b = P[:-1], P[1:]
+    ab = b - a
+    t = np.clip(np.einsum("ij,ij->i", q - a, ab) / (np.einsum("ij,ij->i", ab, ab) + 1e-12), 0.0, 1.0)
+    proj = a + t[:, None] * ab
+    k = int(np.argmin(np.linalg.norm(proj - q, axis=1)))
+    cross = ab[k, 0] * (q[1] - proj[k, 1]) - ab[k, 1] * (q[0] - proj[k, 0])
+    return float(np.sign(cross) * np.linalg.norm(q - proj[k]))
+
+
+def build_track(lhat, colour, start_xy, start_heading, step=0.25, repair_colours=True, path=None):
     """Ordered boundaries and a sampled centreline from the map.
     Returns dict(centre (N,2), normal (N,2), half_width (N,), s (N,), left (M,2), right (K,2),
-    colour (repaired)) or None if a boundary is missing. With repair_colours the map's colours
-    are corrected once by which side of the first centreline each cone lies on (blue is left of
-    travel), which fixes the odd cone the camera mislabelled, and the track is rebuilt."""
+    colour (repaired)) or None if a boundary is missing. Colours are repaired before building:
+    `path` is the car's own mapping-lap track, which the local follower keeps near the middle,
+    so a cone clearly to its left is blue and one to its right is yellow, whatever the camera
+    said; then (repair_colours) a cone sitting on the other colour's boundary line is flipped
+    too, and the track rebuilt once."""
     colour = np.array(colour, dtype=int).copy()
+    if path is not None and len(path) >= 8:
+        path = np.asarray(path, float)
+        width = _usual_width(lhat, colour)
+        for i, q in enumerate(lhat):
+            d = side_of_path(path, q)
+            if 0.35 * width < abs(d) < 1.6 * width:
+                colour[i] = BLUE if d > 0 else YELLOW
     # the orange start cones belong to whichever boundary they stand on: give each the colour
     # of its nearest blue or yellow neighbour, then treat them like any other boundary cone
     for i in np.flatnonzero(colour == ORANGE):
         others = np.flatnonzero((colour == BLUE) | (colour == YELLOW))
         if len(others):
             colour[i] = colour[others[int(np.argmin(np.linalg.norm(lhat[others] - lhat[i], axis=1)))]]
-    track = _build(lhat, colour, start_xy, start_heading, step)
+    track = _build(lhat, colour, start_xy, start_heading, step, path)
     if track is None or not repair_colours:
         return track
     fixed = np.array(colour, dtype=int).copy()
@@ -129,7 +150,7 @@ def build_track(lhat, colour, start_xy, start_heading, step=0.25, repair_colours
     if np.array_equal(fixed, colour):
         track["colour"] = fixed
         return track
-    track2 = _build(lhat, fixed, start_xy, start_heading, step)
+    track2 = _build(lhat, fixed, start_xy, start_heading, step, path)
     if track2 is None:
         track["colour"] = np.array(colour, dtype=int)
         return track
@@ -137,7 +158,15 @@ def build_track(lhat, colour, start_xy, start_heading, step=0.25, repair_colours
     return track2
 
 
-def _build(lhat, colour, start_xy, start_heading, step):
+def _usual_width(lhat, colour):
+    """Median distance from a blue cone to the nearest yellow one: the track width."""
+    b, y = lhat[colour == BLUE], lhat[colour == YELLOW]
+    if len(b) < 3 or len(y) < 3:
+        return 3.0
+    return float(np.median(np.min(np.linalg.norm(b[:, None] - y[None], axis=2), axis=1)))
+
+
+def _build(lhat, colour, start_xy, start_heading, step, path=None):
     left = order_loop(lhat[colour == BLUE], start_xy, start_heading)
     right = order_loop(lhat[colour == YELLOW], start_xy, start_heading)
     if len(left) < 4 or len(right) < 4:
@@ -155,16 +184,24 @@ def _build(lhat, colour, start_xy, start_heading, step):
     h_med = float(np.median(half))
     bad = np.abs(half - h_med) > 0.4 * h_med
     if np.any(bad) and not np.all(bad):
-        side = np.sign(np.mean(np.einsum("ij,ij->i", rp[~bad] - lp[~bad], nrm[~bad])))
-        centre[bad] = lp[bad] + side * h_med * nrm[bad]
+        if path is not None and len(path) >= 8:          # the car's own lap ran near the middle
+            centre[bad] = np.array([nearest_on_polyline(np.asarray(path, float), q) for q in lp[bad]])
+        else:
+            side = np.sign(np.mean(np.einsum("ij,ij->i", rp[~bad] - lp[~bad], nrm[~bad])))
+            centre[bad] = lp[bad] + side * h_med * nrm[bad]
         half[bad] = h_med
-    # smooth the centreline lightly (closed) and resample evenly
-    k = 5
+    # smooth the centreline lightly (closed) and resample evenly. The window is short on
+    # purpose: a long one cuts into the inside of a hairpin. The half width is then measured
+    # again from the smoothed centre to the nearer boundary line, so it is true where the
+    # centre moved.
+    k = 2
     pad = np.vstack([centre[-k:], centre, centre[:k]])
     ker = np.ones(2 * k + 1) / (2 * k + 1)
     sm = np.column_stack([np.convolve(pad[:, 0], ker, mode="valid"), np.convolve(pad[:, 1], ker, mode="valid")])
     centre, s = resample_closed(sm, step)
-    half = np.interp(s, np.linspace(0, s[-1] + step, len(half), endpoint=False), half)
+    seg_l, seg_r = 2.0 * np.median(np.linalg.norm(np.roll(left, -1, axis=0) - left, axis=1)), 2.0 * np.median(np.linalg.norm(np.roll(right, -1, axis=0) - right, axis=1))
+    half = np.array([min(np.linalg.norm(nearest_on_polyline(left, q, seg_l) - q), np.linalg.norm(nearest_on_polyline(right, q, seg_r) - q)) for q in centre])
+    half = np.minimum(half, h_med)
     nxt = np.roll(centre, -1, axis=0)
     prv = np.roll(centre, 1, axis=0)
     tang = nxt - prv

@@ -18,6 +18,8 @@ import numpy as np
 import scipy.sparse as sps
 import scipy.sparse.linalg as spla
 
+from .perception import UNKNOWN
+
 BLUE, YELLOW, ORANGE = 1, 2, 3
 
 
@@ -77,7 +79,7 @@ class GraphSLAM:
             X, Y = [], []
             for c in np.unique(colour):
                 zi = np.flatnonzero(colour == c)
-                li = np.flatnonzero(lcol == c)
+                li = np.arange(len(lcol)) if c == UNKNOWN else np.flatnonzero(lcol == c)
                 if not len(zi) or not len(li):
                     continue
                 d = np.linalg.norm(zz[zi][:, None, :] - self.lhat[li][None, :, :], axis=2)
@@ -100,6 +102,35 @@ class GraphSLAM:
         if np.linalg.norm(t) > self.icp_max_shift or abs(np.arctan2(R[1, 0], R[0, 0])) > self.icp_max_turn or residual > self.icp_max_residual:
             return np.zeros(2), np.eye(2)
         return t, R
+
+    def relocalise(self, z_rel, colour, min_matches=4):
+        """Find the car anywhere on the frozen map from the cones in view, heading known (the
+        IMU heading is absolute, so only a translation is unknown). Every pairing of a seen cone
+        with a landmark of its colour is a candidate translation; the one that lays the most
+        seen cones onto landmarks wins, if it is clear and unique. Returns (x, y) or None."""
+        z_rel, colour = np.asarray(z_rel, float).reshape(-1, 2), np.asarray(colour, int)
+        n = len(z_rel)
+        if n < min_matches or len(self.lhat) < min_matches:
+            return None
+        lcol = self.colour
+        cands = []
+        for i in range(n):
+            li = np.arange(len(lcol)) if colour[i] == UNKNOWN else np.flatnonzero(lcol == colour[i])
+            if len(li):
+                cands.append(self.lhat[li] - z_rel[i])
+        if not cands:
+            return None
+        T = np.vstack(cands)                                                   # (C, 2)
+        d = np.linalg.norm((z_rel[None, :, None, :] + T[:, None, None, :]) - self.lhat[None, None, :, :], axis=3)   # (C, n, L)
+        hit = d.min(axis=2) < 0.4
+        score = hit.sum(axis=1)
+        best = int(np.argmax(score))
+        if score[best] < max(min_matches, 0.7 * n):
+            return None
+        others = np.linalg.norm(T - T[best], axis=1) > 1.0
+        if np.any(others) and score[others].max() >= score[best] - 1:
+            return None                                                        # another place fits about as well
+        return T[best].copy()
 
     def snap(self, z, colour, centre, radius, gate):
         """Loop closure with a wide net: align the world-frame cones z to the landmarks within
