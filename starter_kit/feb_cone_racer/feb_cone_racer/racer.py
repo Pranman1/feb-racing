@@ -52,17 +52,17 @@ DEFAULTS = dict(
     keyframe_dist=0.4, slam_range=5.0, loc_range=6.0, dx_weight=2.0, z_weight=1.0, new_landmark_dist=0.6, icp_gate=1.5,
     solve_every=3, min_lap_length=15.0, lap_close_dist=2.0, min_seen=2, icp_min_matches=5, snap_radius=10.0, snap_gate=6.0,
     # raceline
-    sample_step=0.25, car_half_width=0.135, margin=0.40, curvature_reg=0.01,
+    sample_step=0.25, car_half_width=0.135, margin=0.55, curvature_reg=0.01,
     v_max=4.0, a_lat=3.5, a_acc=2.5, a_brake=3.0,
     # mpc: model
     mass=3.9, inertia_z=0.10, lf=0.175, lr=0.175, tyre_B=8.0, tyre_C=1.4, tyre_D=18.0,   # L 0.35 m effective (yaw-rate fit)
     long_a=74.4, long_b=3.2, idle_brake=0.71,            # sysid fit on this car (feb_driver/tools/sysid_fit.py); b set so the steady state matches the 23 m/s per unit throttle seen when racing
-    max_steer=MAX_STEER, max_steer_rate=MAX_STEER_RATE, tau_max=0.18, v_cap=5.0,
+    max_steer=MAX_STEER, max_steer_rate=MAX_STEER_RATE, tau_max=0.14, v_cap=5.0,
     # mpc: problem
     mpc_horizon=12, mpc_dt=0.1, mpc_max_iter=60, mpc_steer_tau=0.15, mpc_substeps=3,
     w_pos=8.0, w_head=2.0, w_speed=0.6, w_vy=0.2, w_dsteer=0.01, w_dtau=3.0, w_tau=0.3, dtau_max=0.4,
     lost_after=1.5, loc_lost_after=3.0,
-    pursuit_lookahead=1.2, race_speed_scale=0.8,
+    pursuit_lookahead=1.2, race_speed_scale=0.6,
 )
 
 

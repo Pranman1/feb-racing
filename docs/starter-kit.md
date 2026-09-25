@@ -70,12 +70,15 @@ Per lidar scan: small clusters of returns are cone candidates; the camera's blue
 blobs give them a colour by image column (camera pose, focal length and the image's lag behind
 the scan are calibrated numbers in the yaml); a cone keeps its colour for a while after it leaves
 the camera's view, and a cone right beside the car takes its side's colour; the blue and yellow
-cones are chained along the track, each blue cone pairs with the yellow cone across the track
-to its right, the midpoints are the centreline, and pure pursuit follows it at 1 to 1.2 m/s with
-the starter kit's throttle law. If the lidar scene stops moving while the throttle is on, the
-car backs up for a second and tries again. It laps `loop_cones` indefinitely (7 laps in 240 s
-in testing) and every number is in `config/cone_driver.yaml`. Use `--look visual`: the camera
-thresholds are tuned for the dressed scene, and the bare one is too dark for them.
+cones are chained along the track (the chain step follows the spacing of the cones in view,
+so 1 m and 2.5 m layouts both work), each blue cone pairs with the yellow cone across the
+track to its right, the midpoints are the centreline, and pure pursuit follows it at 1 to
+1.2 m/s with the starter kit's throttle law. If the lidar scene stops moving while the
+throttle is on, or the car stops with nothing left to follow (nosed out of a hairpin), it
+backs up for a second and tries again. It laps `loop_cones` indefinitely (7 laps in 240 s in
+testing) and `spielberg_cones` (2 laps in 12 minutes, no cone touched) and every number is in
+`config/cone_driver.yaml`. Use `--look visual`: the camera thresholds are tuned for the dressed
+scene, and the bare one is too dark for them.
 
 ### `feb_cone_racer`: map, raceline, MPC
 
@@ -88,15 +91,24 @@ starter_kit/feb_cone_racer/install_deps.sh      # scipy + CasADi into stack/.pyd
 
 Lap 1 is driven by the baseline follower while **GraphSLAM** (the formulation of the team's FSAE
 `graphslam_global`, poses and cones as a sparse linear least-squares problem, ICP data
-association with colour votes) builds the map from wheel odometry, IMU heading and the coloured
-cones. Back at the start the map is frozen, the boundaries ordered, a centreline sampled, cone
-colours repaired from geometry, a **minimum-curvature raceline** solved as a QP (CasADi) and a
-**speed profile** laid over it from lateral, acceleration and braking limits. From then on the
-car localises against the map by ICP and a **nonlinear MPC** (dynamic bicycle model with
-Pacejka-style tyres and the sysid longitudinal model, direct multiple shooting, IPOPT, about 25
-ms a solve) tracks the raceline. Without CasADi the node still maps and plans, and pure pursuit
-drives the raceline. Debug topics: `/feb/cones`, `/feb/map`, `/feb/raceline`, `/feb/pose`,
-`/feb/mpc_prediction`. Parameters, including the vehicle model, are in `config/racer.yaml`.
+association with colour votes, a wide-net loop closure at the orange start gate) builds the
+map from wheel odometry, IMU heading and the coloured cones. Back at the start the map is
+frozen and the track is built: cone colours are repaired by which side of the car's own
+mapping-lap path they lie on (the follower keeps that path near the middle, so it beats a
+camera mislabel), the boundaries are ordered with a step that follows the cone spacing and
+survives a missing cone, a centreline is sampled and its width re-measured (a track's width
+is nearly constant, so where the boundaries collapse the mapping path fills in), then a
+**minimum-curvature raceline** is solved as a sparse QP (CasADi, 10 ms for 1300 points) and
+a **speed profile** laid over it from lateral, acceleration and braking limits. From then on
+the car localises against the map by ICP on every lidar cone (coloured or not), finds itself
+again anywhere on the map from the IMU heading if the match is lost, and a **nonlinear MPC**
+(dynamic bicycle model with Pacejka-style tyres and the sysid longitudinal model, direct
+multiple shooting, IPOPT, about 10 ms a solve) tracks the raceline. Without CasADi the node
+still maps and plans, and pure pursuit drives the raceline. Debug topics: `/feb/cones`,
+`/feb/map`, `/feb/raceline`, `/feb/pose`, `/feb/mpc_prediction`. Parameters, including the
+vehicle model, are in `config/racer.yaml`. In testing it maps `loop_cones` in 31 s and then
+laps it in about 23 s, and maps `spielberg_cones` (342 m, 292 cones) in 5 minutes and then
+laps it in about 213 s, without touching a cone; `race_speed_scale` is the knob to turn up.
 
 ## Stage 5: realism
 

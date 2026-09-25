@@ -24,12 +24,12 @@ racer:
     lap_close_dist: 2.0       # m from the start pose that closes the lap
     # raceline
     sample_step: 0.25
-    margin: 0.40              # m kept from the cones beyond the car's half width (a cone hit stalls the car)
+    margin: 0.55              # m kept from the cones beyond the car's half width: tracking error is about 0.45 m at speed (a cone hit stalls the car)
     v_max: 4.0                # m/s cap of the speed profile
     a_lat: 3.5                # m/s^2 lateral limit used for cornering speed
     a_acc: 2.5
     a_brake: 3.0
-    race_speed_scale: 0.8     # scale the whole profile (raise once the car proves it)
+    race_speed_scale: 0.6     # scale the whole profile; at 0.7 and above the map match slips at speed and cones get touched
     # mpc model (sysid-calibrated values go here)
     long_a: 74.4
     long_b: 3.2               # steady state 23 m/s per unit throttle, as measured when racing
@@ -51,4 +51,4 @@ racer:
     w_dtau: 3.0
     dtau_max: 0.4             # throttle units per second, hard bound in the MPC
     w_tau: 0.3
-    tau_max: 0.18             # throttle cap: about 4 m/s steady state
+    tau_max: 0.14             # throttle cap: the wheels spin above this; about 3.3 m/s steady state

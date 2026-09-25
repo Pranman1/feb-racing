@@ -125,11 +125,11 @@ class GraphSLAM:
         hit = d.min(axis=2) < 0.4
         score = hit.sum(axis=1)
         best = int(np.argmax(score))
-        if score[best] < max(min_matches, 0.7 * n):
+        if score[best] < max(min_matches, 0.8 * n):
             return None
-        others = np.linalg.norm(T - T[best], axis=1) > 1.0
-        if np.any(others) and score[others].max() >= score[best] - 1:
-            return None                                                        # another place fits about as well
+        others = np.linalg.norm(T - T[best], axis=1) > 0.6
+        if np.any(others) and score[others].max() >= score[best] - 2:
+            return None                # another place fits nearly as well (cones every metre look alike one cone along)
         return T[best].copy()
 
     def snap(self, z, colour, centre, radius, gate):
@@ -224,9 +224,9 @@ class GraphSLAM:
         self.lhat, self.votes, self.count = lhat[merged], votes[merged], count[merged]
         self.frozen = True
 
-    def localise(self, pose_guess, z_rel, colour):
+    def localise(self, pose_guess, z_rel, colour, wide=True):
         """Correct a dead-reckoned position against the frozen map. Returns the corrected (x, y)
-        and how many cones matched."""
+        and how many cones matched. With `wide`, a failed match is retried with a 3 m net."""
         pose_guess = np.asarray(pose_guess, float)
         z_rel, colour = np.asarray(z_rel, float).reshape(-1, 2), np.asarray(colour, int)
         if len(z_rel) < 3:
@@ -238,7 +238,7 @@ class GraphSLAM:
             t, R = self.icp(zw, colour)
         finally:
             self.icp_min_matches = saved_min
-        if not np.any(t):
+        if not np.any(t) and wide:
             # nothing within the usual gate: the car may have drifted more than that, so try
             # once with a wider net (translation only is what matters here)
             saved = (self.icp_gate, self.icp_max_shift, self.icp_min_matches)
@@ -247,8 +247,8 @@ class GraphSLAM:
                 t, R = self.icp(zw, colour)
             finally:
                 self.icp_gate, self.icp_max_shift, self.icp_min_matches = saved
-            if not np.any(t):
-                return pose_guess, 0
+        if not np.any(t):
+            return pose_guess, 0
         zz = zw @ R.T + t
         d = np.linalg.norm(zz[:, None, :] - self.lhat[None, :, :], axis=2)
         matched = int(np.sum(d.min(axis=1) < 0.5))
