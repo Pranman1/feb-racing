@@ -1,4 +1,4 @@
-name: FS Germany trackdrive
+name: FS Germany
 category: fsae
 direction: ccw
 checkpoints: 30
@@ -10,6 +10,6 @@ cones:
   from: cones.json
 resolution: 0.05
 origin:
-- 1.9582111718749995
-- 2.0168485156250004
+- 2.102215234375
+- 2.4431249999999998
 difficulty: 3

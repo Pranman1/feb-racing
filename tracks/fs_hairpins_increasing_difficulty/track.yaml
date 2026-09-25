@@ -1,4 +1,4 @@
-name: FS hairpins increasing difficulty (EUFS)
+name: FS hairpins (EUFS)
 category: fsae
 direction: ccw
 checkpoints: 30
@@ -10,5 +10,5 @@ cones:
   from: cones.json
 resolution: 0.05
 origin:
-- 1.9997399999999996
-- 1.9989586718750005
+- 2.0193325000000004
+- 2.035439999999999

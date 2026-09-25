@@ -59,6 +59,10 @@ def order(pts):
 blue_o, yellow_o = order(blue), order(yellow)
 # corridor midpoints: walk the blue boundary and take the midpoint to the nearest yellow cone
 mid = np.array([(b + yellow[np.argmin(np.linalg.norm(yellow - b, axis=1))]) / 2.0 for b in blue_o])
+# smooth the midpoints (closed) so the corridor does not zigzag between cone pairs
+k = 2
+pad = np.vstack([mid[-k:], mid, mid[:k]])
+mid = np.column_stack([np.convolve(pad[:, 0], np.ones(2 * k + 1) / (2 * k + 1), mode="valid"), np.convolve(pad[:, 1], np.ones(2 * k + 1) / (2 * k + 1), mode="valid")])
 # keep the design points at least a metre apart
 kept = [mid[0]]
 for p in mid[1:]:
