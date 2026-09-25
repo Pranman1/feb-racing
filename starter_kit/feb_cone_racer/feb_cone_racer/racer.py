@@ -56,13 +56,13 @@ DEFAULTS = dict(
     v_max=4.0, a_lat=3.5, a_acc=2.5, a_brake=3.0,
     # mpc: model
     mass=3.9, inertia_z=0.10, lf=0.175, lr=0.175, tyre_B=8.0, tyre_C=1.4, tyre_D=18.0,   # L 0.35 m effective (yaw-rate fit)
-    long_a=74.4, long_b=2.54, idle_brake=0.71,           # sysid fit on this car (feb_driver/tools/sysid_fit.py)
-    max_steer=MAX_STEER, max_steer_rate=MAX_STEER_RATE, tau_max=0.14, v_cap=5.0,
+    long_a=74.4, long_b=3.2, idle_brake=0.71,            # sysid fit on this car (feb_driver/tools/sysid_fit.py); b set so the steady state matches the 23 m/s per unit throttle seen when racing
+    max_steer=MAX_STEER, max_steer_rate=MAX_STEER_RATE, tau_max=0.18, v_cap=5.0,
     # mpc: problem
     mpc_horizon=12, mpc_dt=0.1, mpc_max_iter=60, mpc_steer_tau=0.15, mpc_substeps=3,
     w_pos=8.0, w_head=2.0, w_speed=0.6, w_vy=0.2, w_dsteer=0.01, w_dtau=3.0, w_tau=0.3, dtau_max=0.4,
     lost_after=1.5, loc_lost_after=3.0,
-    pursuit_lookahead=1.2, race_speed_scale=0.6,
+    pursuit_lookahead=1.2, race_speed_scale=0.8,
 )
 
 
@@ -125,6 +125,7 @@ class Racer(Node):
         self.odo_speed = 0.0
         self.loc_log_t = 0.0
         self.last_seen_t = 0.0
+        self.no_target = False
         self.good_loc_t = 0.0
         self.local_mode = False
         self.stalled_since = None
@@ -263,12 +264,14 @@ class Racer(Node):
             self.reverse_until, self.stalled_since = None, None
             self.throttle, self.integral = 0.0, 0.0
             self.mpc_warm_reset()
-        if moving:
+        if moving and not self.no_target:
             self.stalled_since = None
-        elif self.throttle > 0.02 or throttle > 0.02:
+        elif self.throttle > 0.02 or throttle > 0.02 or self.no_target:
+            # stuck on a cone, or the follower stopped with nothing to follow (nosed out of the
+            # corridor at a hairpin): back up and look again
             self.stalled_since = self.stalled_since or t      # sticky: a throttle dip does not reset it
             if t - self.stalled_since > 2.0:
-                self.get_logger().warn("stuck, backing up")
+                self.get_logger().warn("nothing to follow, backing up" if self.no_target else "stuck, backing up")
                 self.reverse_until = t + 1.2
         self.steer, self.throttle = steer, throttle
         self.pub_throttle.publish(Float32(data=float(throttle)))
@@ -461,6 +464,7 @@ class Racer(Node):
         p = self.p
         line = self.local_centreline([(x, y, c) for x, y, c, w in cones])
         target = next((q for q in line if math.hypot(*q) >= p["lookahead"]), line[-1] if line else None)
+        self.no_target = target is None
         if target is None:
             self.integral = 0.0
             return self.steer * 0.5, 0.0
@@ -542,6 +546,7 @@ class Racer(Node):
         return ref
 
     def race_step(self, dt):
+        self.no_target = False
         i = self.race_idx
         if self.mpc is not None:
             # delay compensation: where the car will be when this command bites
@@ -569,6 +574,7 @@ class Racer(Node):
     def pursuit_step(self, dt, speed=None):
         """Pure pursuit on the raceline: the fallback when the MPC is unavailable or fails, and
         the way back when the car has lost sight of the cones."""
+        self.no_target = False
         i = self.race_idx = self.nearest_index()
         n = len(self.raceline)
         j = i

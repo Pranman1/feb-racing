@@ -374,12 +374,14 @@ class ConeDriver(Node):
                 return
             self.reverse_until, self.stalled_since = None, None
             self.throttle, self.integral = 0.0, 0.0
-        if moving:
+        if moving and target is not None:
             self.stalled_since = None
         elif self.throttle > 0.02 or target is None:
+            # stuck on a cone, or stopped with nothing to follow (nosed out of the corridor at a
+            # hairpin): both end the same way, back up and look again
             self.stalled_since = self.stalled_since or t      # sticky: a throttle dip does not reset it
             if t - self.stalled_since > self.p["stall_time"]:
-                self.get_logger().warn("stuck, backing up")
+                self.get_logger().warn("stuck, backing up" if target is not None else "nothing to follow, backing up")
                 self.reverse_until = t + self.p["reverse_time"]
         step = (wanted - self.steer) * min(1.0, dt / self.p["steer_tau"])
         self.steer += float(np.clip(step, -MAX_STEER_RATE * dt, MAX_STEER_RATE * dt))
