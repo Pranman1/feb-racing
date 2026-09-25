@@ -80,6 +80,12 @@ testing) and `spielberg_cones` (2 laps in 12 minutes, no cone touched) and every
 `config/cone_driver.yaml`. Use `--look visual`: the camera thresholds are tuned for the dressed
 scene, and the bare one is too dark for them.
 
+### `feb_cone_racer` and `feb_cone_ordering`: not released to members yet
+
+The two packages below are the full pipeline (map, the team's cone ordering, raceline, MPC).
+They live in `starter_kit/` for the organiser and the core team and are not in the member
+manuals; how and when they reach members is still to be decided.
+
 ### `feb_cone_racer`: map, raceline, MPC
 
 ```bash

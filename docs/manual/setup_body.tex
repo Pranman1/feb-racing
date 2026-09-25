@@ -147,22 +147,16 @@ Port 4567 in use: \texttt{./feb-sim stop}. Docker pull denied, or ``cannot conne
 One command pulls the repo (tracks, launcher, docs, new starter packages), pulls a newer devkit
 image if there is one, and replaces the simulator app when a new build is released. Your
 \texttt{stack/} folder is never touched. When a new starter package appears in
-\texttt{starter\_kit/}, copy it the same way as the first one. The cone track has three: the
-baseline cone driver, the cone racer (mapping lap, raceline, MPC), which needs SciPy and
-CasADi installed once into \texttt{stack/.pydeps}, and the team's own cone ordering (C++,
-built by the devkit on start), which the racer uses when it is there:
+\texttt{starter\_kit/}, copy it the same way as the first one. The cone tracks
+(\texttt{loop\_cones}, \texttt{spielberg\_cones}) have their own baseline, the cone driver:
 
 \begin{lstlisting}
 cp -r starter_kit/feb_cone_driver stack/
 ./feb-sim run --track loop_cones --look visual --stack "ros2 launch feb_cone_driver drive.launch.py"
-
-cp -r starter_kit/feb_cone_racer starter_kit/feb_cone_ordering stack/
-starter_kit/feb_cone_racer/install_deps.sh     # once, with the devkit running
-./feb-sim run --track loop_cones --look visual --stack "ros2 launch feb_cone_racer race.launch.py"
 \end{lstlisting}
 
-The drivers need the Visual look: the camera's colour thresholds are tuned for the dressed
-scene. \texttt{docs/starter-kit.md} describes what each package does.
+It needs the Visual look: the camera's colour thresholds are tuned for the dressed scene.
+\texttt{docs/starter-kit.md} describes what it does.
 
 \section{What the car gives and takes}
 
