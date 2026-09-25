@@ -107,6 +107,42 @@ def side_of_path(path, q):
     return float(np.sign(cross) * np.linalg.norm(q - proj[k]))
 
 
+def repair_by_path(lhat, colour, path):
+    """Cone colours by which side of the car's own mapping-lap path they lie on: the local
+    follower keeps that path near the middle, so a cone clearly to its left is blue and one to
+    its right is yellow, whatever the camera said. The orange gate cones get their side too."""
+    colour = np.array(colour, dtype=int).copy()
+    if path is None or len(path) < 8:
+        return colour
+    path = np.asarray(path, float)
+    width = _usual_width(lhat, colour)
+    for i, q in enumerate(lhat):
+        d = side_of_path(path, q)
+        if 0.35 * width < abs(d) < 1.6 * width:
+            colour[i] = BLUE if d > 0 else YELLOW
+    return colour
+
+
+def track_from_rungs(blue, yellow, colour, step=0.25):
+    """The track from the team's cone ordering: blue[i] and yellow[i] are the two ends of one
+    rung across the track, in order along it. The centreline is the rung midpoints, the half
+    width half the rung length, both resampled evenly; the boundaries are the rung ends."""
+    blue, yellow = np.asarray(blue, float).reshape(-1, 2), np.asarray(yellow, float).reshape(-1, 2)
+    n = min(len(blue), len(yellow))
+    if n < 8:
+        return None
+    blue, yellow = blue[:n], yellow[:n]
+    centre = (blue + yellow) / 2.0
+    half = np.linalg.norm(blue - yellow, axis=1) / 2.0
+    seg = np.linalg.norm(np.vstack([np.diff(centre, axis=0), centre[:1] - centre[-1:]]), axis=1)
+    s_in = np.concatenate([[0.0], np.cumsum(seg)])
+    centre, s = resample_closed(centre, step)
+    half = np.interp(s, s_in[:-1], half)
+    track = _finish(centre, half, s, step)
+    track.update(left=blue, right=yellow, colour=np.array(colour, dtype=int))
+    return track
+
+
 def build_track(lhat, colour, start_xy, start_heading, step=0.25, repair_colours=True, path=None):
     """Ordered boundaries and a sampled centreline from the map.
     Returns dict(centre (N,2), normal (N,2), half_width (N,), s (N,), left (M,2), right (K,2),
@@ -115,14 +151,7 @@ def build_track(lhat, colour, start_xy, start_heading, step=0.25, repair_colours
     so a cone clearly to its left is blue and one to its right is yellow, whatever the camera
     said; then (repair_colours) a cone sitting on the other colour's boundary line is flipped
     too, and the track rebuilt once."""
-    colour = np.array(colour, dtype=int).copy()
-    if path is not None and len(path) >= 8:
-        path = np.asarray(path, float)
-        width = _usual_width(lhat, colour)
-        for i, q in enumerate(lhat):
-            d = side_of_path(path, q)
-            if 0.35 * width < abs(d) < 1.6 * width:
-                colour[i] = BLUE if d > 0 else YELLOW
+    colour = repair_by_path(lhat, colour, path)
     # the orange start cones belong to whichever boundary they stand on: give each the colour
     # of its nearest blue or yellow neighbour, then treat them like any other boundary cone
     for i in np.flatnonzero(colour == ORANGE):
@@ -202,15 +231,23 @@ def _build(lhat, colour, start_xy, start_heading, step, path=None):
     seg_l, seg_r = 2.0 * np.median(np.linalg.norm(np.roll(left, -1, axis=0) - left, axis=1)), 2.0 * np.median(np.linalg.norm(np.roll(right, -1, axis=0) - right, axis=1))
     half = np.array([min(np.linalg.norm(nearest_on_polyline(left, q, seg_l) - q), np.linalg.norm(nearest_on_polyline(right, q, seg_r) - q)) for q in centre])
     half = np.minimum(half, h_med)
+    track = _finish(centre, half, s, step, left)
+    track.update(left=left, right=right)
+    return track
+
+
+def _finish(centre, half, s, step, left=None):
+    """Tangents and left-of-travel normals for a sampled centreline. With `left` (the blue
+    boundary) the loop is flipped if blue is not on the +normal side."""
     nxt = np.roll(centre, -1, axis=0)
     prv = np.roll(centre, 1, axis=0)
     tang = nxt - prv
     tang /= np.linalg.norm(tang, axis=1)[:, None] + 1e-9
     normal = np.column_stack([-tang[:, 1], tang[:, 0]])          # left of travel
-    # make sure the blue (left) boundary really is on the +normal side; flip the loop otherwise
-    lq = np.array([nearest_on_polyline(left, c) for c in centre[:: max(len(centre) // 12, 1)]])
-    side = np.mean(np.einsum("ij,ij->i", lq - centre[:: max(len(centre) // 12, 1)], normal[:: max(len(centre) // 12, 1)]))
-    if side < 0:
-        centre, half, normal = centre[::-1], half[::-1], -normal[::-1]
-        s = np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(centre, axis=0), axis=1))])
-    return dict(centre=centre, normal=normal, half_width=half, s=s, left=left, right=right)
+    if left is not None:
+        lq = np.array([nearest_on_polyline(left, c) for c in centre[:: max(len(centre) // 12, 1)]])
+        side = np.mean(np.einsum("ij,ij->i", lq - centre[:: max(len(centre) // 12, 1)], normal[:: max(len(centre) // 12, 1)]))
+        if side < 0:
+            centre, half, normal = centre[::-1], half[::-1], -normal[::-1]
+            s = np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(centre, axis=0), axis=1))])
+    return dict(centre=centre, normal=normal, half_width=half, s=s)

@@ -27,7 +27,12 @@ from std_msgs.msg import Float32
 from .graphslam import GraphSLAM
 from .perception import BLUE, ORANGE, UNKNOWN, YELLOW, Perception
 from .raceline import heading_along, min_curvature, speed_profile
-from .track import build_track
+from .track import build_track, repair_by_path, track_from_rungs
+
+try:                                     # the team's cone ordering, if its package is in the stack
+    from feb_cone_ordering.srv import OrderCones
+except ImportError:
+    OrderCones = None
 
 NS = "/autodrive/roboracer_1/"
 QOS = QoSProfile(reliability=QoSReliabilityPolicy.RELIABLE, durability=QoSDurabilityPolicy.VOLATILE,
@@ -50,7 +55,7 @@ DEFAULTS = dict(
     speed_per_throttle=23.0, throttle_kp=0.02, throttle_ki=0.03, throttle_slew=0.8, speed_window=0.25, steer_tau=0.15,
     # slam
     keyframe_dist=0.4, slam_range=5.0, loc_range=6.0, dx_weight=2.0, z_weight=1.0, new_landmark_dist=0.6, icp_gate=1.5,
-    solve_every=3, min_lap_length=15.0, lap_close_dist=2.0, min_seen=2, icp_min_matches=5, snap_radius=10.0, snap_gate=6.0,
+    solve_every=3, min_lap_length=15.0, order_timeout=3.0, lap_close_dist=2.0, min_seen=2, icp_min_matches=5, snap_radius=10.0, snap_gate=6.0,
     # raceline
     sample_step=0.25, car_half_width=0.135, margin=0.55, curvature_reg=0.01,
     v_max=4.0, a_lat=3.5, a_acc=2.5, a_brake=3.0,
@@ -137,6 +142,8 @@ class Racer(Node):
         self.pub_steering = self.create_publisher(Float32, NS + "steering_command", QOS)
         self.pub_cones = self.create_publisher(PoseArray, "/feb/cones", 10)
         self.pub_map = self.create_publisher(PoseArray, "/feb/map", 10)
+        self.order_client = self.create_client(OrderCones, "/feb/order_cones") if OrderCones is not None else None
+        self.order_future = None
         self.pub_line = self.create_publisher(Path, "/feb/raceline", 10)
         self.pub_pose = self.create_publisher(PoseStamped, "/feb/pose", 10)
         self.pub_pred = self.create_publisher(Path, "/feb/mpc_prediction", 10)
@@ -211,7 +218,10 @@ class Racer(Node):
         moving = self.scene_moving(msg)
         if len(cones) >= 2:
             self.last_seen_t = t
-        if self.mode == "MAPPING":
+        if self.mode == "ORDERING":
+            steer, throttle = self.follow_local(clusters, cones, dt)
+            self.ordering_step()
+        elif self.mode == "MAPPING":
             self.mapping_step(z_rel, colours, weights)
             steer, throttle = self.follow_local(clusters, cones, dt)
             if t - self.last_seen_t > self.p["lost_after"] + 1.5 and self.reverse_until is None:
@@ -342,18 +352,62 @@ class Racer(Node):
             self.get_logger().info("mapping: %d keyframes, %d landmarks, travelled %.1f m" % (self.keyframes, len(self.slam.lhat), self.travelled))
 
     def finish_mapping(self):
+        """The map is complete: freeze it, repair the colours from the mapping-lap path, and
+        ask the team's cone ordering for the track. The answer comes back on a later scan
+        (the car keeps following the local line meanwhile); without the service, or after
+        `order_timeout`, the built-in boundary walk takes over."""
         p = self.p
-        t0 = time.time()
         self.slam.freeze(int(p["min_seen"]))
-        lap = self.last_t - self.lap_start_t
-        self.lap_times.append(lap)
-        track = build_track(self.slam.lhat, self.slam.colour, self.start[0], (math.cos(self.start[1]), math.sin(self.start[1])), p["sample_step"],
-                            path=self.slam.xhat)
+        self.lap_times.append(self.last_t - self.lap_start_t)
+        self.slam.colour_override = repair_by_path(self.slam.lhat, self.slam.colour, self.slam.xhat)
+        self.map_closed_t = time.time()
+        if self.order_client is not None and self.order_client.service_is_ready():
+            req = OrderCones.Request()
+            req.car.position.x, req.car.position.y = float(self.pose[0]), float(self.pose[1])
+            req.car.orientation.z, req.car.orientation.w = math.sin(self.yaw / 2.0), math.cos(self.yaw / 2.0)
+            req.map = self.map_message()
+            self.order_future = self.order_client.call_async(req)
+            self.order_deadline = self.last_t + p["order_timeout"]
+            self.mode = "ORDERING"
+            self.get_logger().info("map closed after %.1f s: %d cones; asking the team's cone ordering" % (self.lap_times[-1], len(self.slam.lhat)))
+        else:
+            self.get_logger().info("map closed after %.1f s: %d cones; no cone ordering service, using the boundary walk" % (self.lap_times[-1], len(self.slam.lhat)))
+            self.complete_track(None)
+
+    def ordering_step(self):
+        """Waiting for the cone ordering: take its answer when it lands, or give up on it."""
+        if self.order_future.done():
+            res = self.order_future.result()
+            rungs = None
+            if res is not None and len(res.blue.poses) >= 8:
+                rungs = (np.array([[q.position.x, q.position.y] for q in res.blue.poses]),
+                         np.array([[q.position.x, q.position.y] for q in res.yellow.poses]))
+                self.get_logger().info("cone ordering: %d rungs, %s track" % (len(res.blue.poses), "closed" if res.closed else "open"))
+            else:
+                self.get_logger().warn("cone ordering returned nothing usable; using the boundary walk")
+            self.complete_track(rungs)
+        elif self.last_t > self.order_deadline:
+            self.get_logger().warn("cone ordering did not answer in time; using the boundary walk")
+            self.complete_track(None)
+
+    def complete_track(self, rungs):
+        p = self.p
+        lap = self.lap_times[-1]
+        track = track_from_rungs(rungs[0], rungs[1], self.slam.colour_override, p["sample_step"]) if rungs is not None else None
         if track is None:
-            self.get_logger().error("map has too few cones of a colour; keep following the local line")
-            self.slam.frozen = False
-            return
-        self.slam.colour_override = track["colour"]
+            track = build_track(self.slam.lhat, self.slam.colour, self.start[0], (math.cos(self.start[1]), math.sin(self.start[1])), p["sample_step"],
+                                path=self.slam.xhat)
+            if track is None:
+                self.get_logger().error("map has too few cones of a colour; keep following the local line")
+                self.slam.frozen = False
+                self.slam.colour_override = None
+                self.mode = "MAPPING"
+                return
+            self.slam.colour_override = track["colour"]
+            n_b, n_y = int(np.sum(track["colour"] == BLUE)), int(np.sum(track["colour"] == YELLOW))
+            if len(track["left"]) < 0.9 * n_b or len(track["right"]) < 0.9 * n_y:
+                self.get_logger().warn("boundaries leave cones out: blue %d of %d, yellow %d of %d" % (len(track["left"]), n_b, len(track["right"]), n_y))
+        t0 = self.map_closed_t
         line, _ = min_curvature(track["centre"], track["normal"], track["half_width"], p["car_half_width"], p["margin"], p["curvature_reg"])
         v, kappa = speed_profile(line, p["v_max"], p["a_lat"], p["a_acc"], p["a_brake"])
         self.track, self.raceline, self.race_v = track, line, v * p["race_speed_scale"]
@@ -364,14 +418,12 @@ class Racer(Node):
         self.mode = "RACING"
         self.half_lap = False
         self.local_mode = np.linalg.norm(line[self.race_idx] - self.pose) > 1.0   # off the line: follower first
-        n_b, n_y = int(np.sum(track["colour"] == BLUE)), int(np.sum(track["colour"] == YELLOW))
-        if len(track["left"]) < 0.9 * n_b or len(track["right"]) < 0.9 * n_y:
-            self.get_logger().warn("boundaries leave cones out: blue %d of %d, yellow %d of %d" % (len(track["left"]), n_b, len(track["right"]), n_y))
         self.lap_start_t = self.last_t
         self.good_loc_t = self.last_t
         self.reloc_t = self.last_t
-        self.get_logger().info("map closed after %.1f s: %d cones, raceline %.1f m, %d points, v %.1f..%.1f m/s (%.0f ms) -> RACING with %s"
-                               % (lap, len(self.slam.lhat), self.race_s[-1], len(line), v.min(), v.max(), 1000 * (time.time() - t0), "MPC" if self.mpc else "pure pursuit"))
+        self.get_logger().info("track ready %.0f ms after the map closed (lap %.1f s): %s, raceline %.1f m, %d points, v %.1f..%.1f m/s -> RACING with %s"
+                               % (1000 * (time.time() - t0), lap, "team cone ordering" if rungs is not None else "boundary walk",
+                                  self.race_s[-1], len(line), v.min(), v.max(), "MPC" if self.mpc else "pure pursuit"))
         self.publish_map()
 
     # ------------------------------------------------------------ lap-1 follower (the simple driver)
@@ -614,14 +666,17 @@ class Racer(Node):
             arr.poses.append(q)
         self.pub_cones.publish(arr)
 
-    def publish_map(self):
+    def map_message(self):
         arr = PoseArray()
         arr.header.frame_id = "map"
         for (x, y), c in zip(self.slam.lhat, self.slam.colour):
             q = Pose()
             q.position.x, q.position.y, q.orientation.w = float(x), float(y), float(c)
             arr.poses.append(q)
-        self.pub_map.publish(arr)
+        return arr
+
+    def publish_map(self):
+        self.pub_map.publish(self.map_message())
         path = Path()
         path.header.frame_id = "map"
         for (x, y), v in zip(self.raceline, self.race_v):

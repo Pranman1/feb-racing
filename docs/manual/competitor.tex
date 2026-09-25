@@ -211,11 +211,13 @@ the app, so a pulled track appears in the Track button right away. \cmd{./feb-si
 one line when a newer app exists.
 
 New starter packages arrive the same way. The cone track (\texttt{loop\_cones},
-\texttt{spielberg\_cones}) has two: \file{feb\_cone\_driver}, the baseline cone driver, and
+\texttt{spielberg\_cones}) has three: \file{feb\_cone\_driver}, the baseline cone driver;
 \file{feb\_cone\_racer}, which maps the track on lap one, computes a raceline and races it with a
-nonlinear MPC (SciPy and CasADi installed once by \file{starter\_kit/feb\_cone\_racer/install\_deps.sh}).
-Copy either into \file{stack/} like the first, and run with \cmd{--look visual}: the camera's
-colour thresholds are tuned for the dressed scene. \file{docs/starter-kit.md} describes both.
+nonlinear MPC (SciPy and CasADi installed once by \file{starter\_kit/feb\_cone\_racer/install\_deps.sh});
+and \file{feb\_cone\_ordering}, the team's own cone ordering in C++, which the devkit builds on
+start and the racer uses when it is in the stack. Copy them into \file{stack/} like the first,
+and run with \cmd{--look visual}: the camera's colour thresholds are tuned for the dressed
+scene. \file{docs/starter-kit.md} describes all three.
 
 \section{Score yourself and post it}
 

@@ -83,7 +83,7 @@ scene, and the bare one is too dark for them.
 ### `feb_cone_racer`: map, raceline, MPC
 
 ```bash
-cp -r starter_kit/feb_cone_racer stack/
+cp -r starter_kit/feb_cone_racer starter_kit/feb_cone_ordering stack/
 ./feb-sim run --track loop_cones --look visual --stack "ros2 launch feb_cone_racer race.launch.py"
 # in another terminal, once, while the devkit is running:
 starter_kit/feb_cone_racer/install_deps.sh      # scipy + CasADi into stack/.pydeps
@@ -93,11 +93,13 @@ Lap 1 is driven by the baseline follower while **GraphSLAM** (the formulation of
 `graphslam_global`, poses and cones as a sparse linear least-squares problem, ICP data
 association with colour votes, a wide-net loop closure at the orange start gate) builds the
 map from wheel odometry, IMU heading and the coloured cones. Back at the start the map is
-frozen and the track is built: cone colours are repaired by which side of the car's own
-mapping-lap path they lie on (the follower keeps that path near the middle, so it beats a
-camera mislabel), the boundaries are ordered with a step that follows the cone spacing and
-survives a missing cone, a centreline is sampled and its width re-measured (a track's width
-is nearly constant, so where the boundaries collapse the mapping path fills in), then a
+frozen, cone colours are repaired by which side of the car's own mapping-lap path they lie
+on (the follower keeps that path near the middle, so it beats a camera mislabel), and the
+track is built. With `feb_cone_ordering` in the stack that is the **team's cone ordering**
+(below), asked once through its service: the rung midpoints are the centreline and the rung
+lengths the width. Without it, or if it does not answer within 3 s, a built-in boundary walk
+does the job (a step that follows the cone spacing and survives a missing cone, the width
+re-measured, the mapping path filling in where the boundaries collapse). Then a
 **minimum-curvature raceline** is solved as a sparse QP (CasADi, 10 ms for 1300 points) and
 a **speed profile** laid over it from lateral, acceleration and braking limits. From then on
 the car localises against the map by ICP on every lidar cone (coloured or not), finds itself
@@ -112,6 +114,27 @@ maps `spielberg_cones` (342 m, 292 cones) in 5 minutes and then laps it in about
 touching one. `race_speed_scale` (0.6) is the knob to
 turn up, and where the work is: at 0.7 the map match starts slipping at speed and cones get
 touched, so faster laps mean better localisation and tracking, not a bigger number.
+
+### `feb_cone_ordering`: the team's cone ordering, as a node
+
+`src/algorithms/` is a verbatim copy of the FSAE stack's `cone_ordering` (Akhil Agarwal,
+feb-system-integration commit e048173), without its raylib visualiser; the node around it
+speaks the simulator's messages. A Delaunay triangulation over all cones keeps the same-colour
+edges under 10 m; a wall-following walk from the edge nearest the car extracts each colour's
+boundary polygon; a parity test says whether the car sits inside a closed loop; every boundary
+edge contributes a "force" rotated by 5/8 pi (blue one way, yellow the other) falling off with
+the cube of the distance, and integrating that slope field from the car gives a path down the
+middle of the corridor; every second path point is projected sideways onto both boundaries
+(rotated when a rung would cross the previous one, snapped to the polygon), giving aligned
+blue and yellow lists, one rung per 0.2 m along the track. It never chains cones, so a
+missing or mislabelled cone only bends the field locally. On the recorded Spielberg map:
+1693 rungs, widths 2.1 to 2.8 m, midpoints never closer than 1.0 m to a cone, no crossing
+rungs, in well under a second.
+
+It runs live (`ros2 launch feb_cone_ordering order.launch.py`: rungs on `/feb/cone_order/blue`
+and `/feb/cone_order/yellow` for every `/feb/map`), as the `/feb/order_cones` service the
+racer calls, or on a text file with `cone_order_cli` (see its README). The devkit builds the
+C++ on start; the racer's launch starts the node when the package is present.
 
 ## Stage 5: realism
 
