@@ -126,6 +126,8 @@ class Racer(Node):
         self.loc_log_t = 0.0
         self.last_seen_t = 0.0
         self.no_target = False
+        self.snap_t = -1e9
+        self.target_t = -1e9
         self.good_loc_t = 0.0
         self.local_mode = False
         self.stalled_since = None
@@ -318,7 +320,9 @@ class Racer(Node):
             t_snap, R_snap = self.slam.snap(zw, colours, self.start[0], p["snap_radius"], p["snap_gate"])
             if np.any(t_snap):
                 self.since_key = self.since_key + t_snap
-                self.get_logger().info("loop closure at the start gate: pose corrected by %.2f m" % np.linalg.norm(t_snap))
+                self.snap_t = self.last_t
+                self.get_logger().info("loop closure at the start gate: pose corrected by %.2f m, %.1f m from the start"
+                                       % (np.linalg.norm(t_snap), np.linalg.norm(self.pose + self.since_key - self.start[0])))
         self.slam.add(self.since_key, z_rel, colours, weights)
         self.keyframes += 1
         self.since_key = np.zeros(2)
@@ -331,7 +335,8 @@ class Racer(Node):
         self.pose = self.slam.xhat[-1].copy()
         # back at the start?
         d0 = np.linalg.norm(self.pose - self.start[0])
-        if self.travelled > p["min_lap_length"] and d0 < p["lap_close_dist"] and math.cos(self.yaw - self.start[1]) > 0.5:
+        close = p["lap_close_dist"] * (2.5 if self.last_t - self.snap_t < 3.0 else 1.0)   # the gate match itself says we are here
+        if self.travelled > p["min_lap_length"] and d0 < close and math.cos(self.yaw - self.start[1]) > 0.5:
             self.finish_mapping()
         elif self.keyframes % 10 == 0:
             self.get_logger().info("mapping: %d keyframes, %d landmarks, travelled %.1f m" % (self.keyframes, len(self.slam.lhat), self.travelled))
@@ -464,10 +469,17 @@ class Racer(Node):
         p = self.p
         line = self.local_centreline([(x, y, c) for x, y, c, w in cones])
         target = next((q for q in line if math.hypot(*q) >= p["lookahead"]), line[-1] if line else None)
-        self.no_target = target is None
         if target is None:
+            # a scan with nothing ahead (the big start cones fill the view, a cone hidden for a
+            # moment): hold the wheel and crawl for a second before giving up
+            if self.last_t - self.target_t < 1.0:
+                self.no_target = False
+                return self.steer, self.throttle_law(p["map_min_speed"], dt)
+            self.no_target = True
             self.integral = 0.0
             return self.steer * 0.5, 0.0
+        self.no_target = False
+        self.target_t = self.last_t
         ld = max(math.hypot(*target), 0.3)
         alpha = math.atan2(target[1], target[0])
         wanted = math.atan(2.0 * WHEELBASE * math.sin(alpha) / ld)

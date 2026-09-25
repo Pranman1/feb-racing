@@ -73,6 +73,7 @@ class ConeDriver(Node):
         self.prev_clusters = None    # last scan's cone clusters, to tell whether the world moves past us
         self.stalled_since = None    # sim time the lidar scene stopped changing although we were driving
         self.reverse_until = None    # sim time until which we back away from whatever we are stuck on
+        self.target_t = -1e9         # sim time of the last scan that gave a target
 
         self.pub_throttle = self.create_publisher(Float32, NS + "throttle_command", QOS)
         self.pub_steering = self.create_publisher(Float32, NS + "steering_command", QOS)
@@ -350,9 +351,15 @@ class ConeDriver(Node):
         if target is None and line:
             target = line[-1]
         if target is not None:
+            self.target_t = t
             ld = max(math.hypot(*target), 0.3)
             alpha = math.atan2(target[1], target[0])
             wanted = math.atan(2.0 * WHEELBASE * math.sin(alpha) / ld)
+        elif t - self.target_t < 1.0:
+            # nothing ahead for a scan or two (the big start cones fill the view, a cone hidden
+            # for a moment): hold the wheel and crawl before giving up
+            target = (self.p["lookahead"] * math.cos(self.steer), self.p["lookahead"] * math.sin(self.steer))
+            wanted = self.steer
         else:
             wanted = 0.0
         # any cone (whatever its colour) closer than avoid_range ahead pushes the wheel away from it
