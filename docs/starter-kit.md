@@ -107,8 +107,11 @@ multiple shooting, IPOPT, about 10 ms a solve) tracks the raceline. Without CasA
 still maps and plans, and pure pursuit drives the raceline. Debug topics: `/feb/cones`,
 `/feb/map`, `/feb/raceline`, `/feb/pose`, `/feb/mpc_prediction`. Parameters, including the
 vehicle model, are in `config/racer.yaml`. In testing it maps `loop_cones` in 31 s and then
-laps it in about 23 s, and maps `spielberg_cones` (342 m, 292 cones) in 5 minutes and then
-laps it in about 213 s, without touching a cone; `race_speed_scale` is the knob to turn up.
+laps it in 22 to 23 s (it brushes a cone once or twice in a 6-minute run and backs off), and
+maps `spielberg_cones` (342 m, 292 cones) in 5 minutes and then laps it in about 200 s without
+touching one. `race_speed_scale` (0.6) is the knob to
+turn up, and where the work is: at 0.7 the map match starts slipping at speed and cones get
+touched, so faster laps mean better localisation and tracking, not a bigger number.
 
 ## Stage 5: realism
 
