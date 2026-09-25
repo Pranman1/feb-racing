@@ -210,6 +210,13 @@ build. New tracks need no app update: the launcher hands the repo's \file{tracks
 the app, so a pulled track appears in the Track button right away. \cmd{./feb-sim run} prints
 one line when a newer app exists.
 
+New starter packages arrive the same way. The cone track (\texttt{loop\_cones},
+\texttt{spielberg\_cones}) has two: \file{feb\_cone\_driver}, the baseline cone driver, and
+\file{feb\_cone\_racer}, which maps the track on lap one, computes a raceline and races it with a
+nonlinear MPC (SciPy and CasADi installed once by \file{starter\_kit/feb\_cone\_racer/install\_deps.sh}).
+Copy either into \file{stack/} like the first, and run with \cmd{--look visual}: the camera's
+colour thresholds are tuned for the dressed scene. \file{docs/starter-kit.md} describes both.
+
 \section{Score yourself and post it}
 
 \begin{lstlisting}
