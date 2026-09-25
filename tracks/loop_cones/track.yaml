@@ -1,7 +1,11 @@
 name: FEB Loop (cones)
 resolution: 0.05
-origin: [-4.1, -2.475]
+origin:
+- -4.1
+- -2.475
 direction: ccw
 checkpoints: 20
 cones:
   spacing: 1.0
+category: feb_cones
+difficulty: 1

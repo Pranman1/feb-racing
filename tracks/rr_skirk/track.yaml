@@ -1,0 +1,12 @@
+name: Skirk
+category: roboracer
+resolution: 0.05
+origin:
+- -7.801
+- -16.388
+direction: ccw
+checkpoints: 30
+qualifying: false
+walls:
+  diameter: 0.33
+difficulty: 2

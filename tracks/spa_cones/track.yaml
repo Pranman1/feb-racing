@@ -1,0 +1,12 @@
+name: Spa-Francorchamps (1:10, cones)
+category: f1_cones
+direction: ccw
+checkpoints: 40
+qualifying: false
+resolution: 0.05
+origin:
+- -33.78475000000001
+- -136.40608
+cones:
+  spacing: 2.5
+difficulty: 5

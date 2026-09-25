@@ -1,0 +1,14 @@
+name: FS small track (EUFS)
+category: fsae
+direction: ccw
+checkpoints: 30
+qualifying: false
+start:
+- 7.21
+- 15.83
+cones:
+  from: cones.json
+resolution: 0.05
+origin:
+- 2.074313828125
+- 1.90976

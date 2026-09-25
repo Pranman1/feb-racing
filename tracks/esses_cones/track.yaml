@@ -1,0 +1,10 @@
+name: FEB Esses (cones)
+category: feb_cones
+direction: ccw
+checkpoints: 24
+cones:
+  spacing: 1.2
+resolution: 0.05
+origin:
+- -6.1849609375
+- -2.556

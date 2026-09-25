@@ -1,10 +1,12 @@
-name: Spielberg (cones)
+name: Spielberg (1:10, cones)
 direction: ccw
 checkpoints: 40
 resolution: 0.05
 origin:
 - -77.96271656249999
 - -11.200546484374998
-qualifying: false     # a 342 m lap; showcase and endurance, not the 300 s attempt
+qualifying: false
 cones:
-  spacing: 2.5        # metres between cones along each boundary, FSAE-like on a big track
+  spacing: 2.5
+category: f1_cones
+difficulty: 3

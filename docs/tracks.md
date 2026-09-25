@@ -46,9 +46,30 @@ ROS `map.yaml`). Grey "unknown" pixels count as not drivable.
 | `checkpoints` | lap checkpoints; checkpoint 0 is the finish line |
 | `max_cars` | 1 for corridors too narrow to race side by side (Porto); default 4 |
 | `qualifying` | `false` for showcase tracks whose 10 laps do not fit the 300 s attempt (Spielberg, the circuit); they are excluded from qualification and nightly reruns |
+| `category` | the group the app's track picker files it under: `feb`, `feb_cones`, `fsae`, `roboracer`, `f1`, `f1_cones`; default `feb`, or `feb_cones` for a cones-only track |
+| `difficulty` | 1 to 5, the picker sorts a group by it; default computed from length, sharp corners and the tightest radius (`track_build.py`), set it when the number looks wrong |
 | `start` | optional `[x, y]` finish-line position; default: the straightest section |
 | `walls.diameter` | air-duct diameter (0.33 m like the league; omit the key for a cone-only track) |
 | `cones.spacing` | metres between cones on each edge, blue left, yellow right (omit for none) |
+| `cones.from` | a JSON file of cones (`[{x, y, color}]`) used as they are instead of generated ones: real layouts |
+
+## The picker
+
+The app's Track button opens a panel: the groups across the top (FEB, FEB cones, FSAE,
+RoboRacer, F1, F1 cones; a group shows only when it has tracks), the group's tracks under it
+easiest first with their length and a five-dot difficulty. A group of the same tracks in
+ducts and in cones is the same design built twice, `walls` in one folder and `cones` in the
+other (`loop` and `loop_cones`, `monza` and `monza_cones`).
+
+## Importing real layouts
+
+- **RoboRacer / F1 at 1:10** (`f1tenth_racetracks`, `f1tenth_gym`): a centreline CSV goes
+  through `tools/track_from_centerline.py` (a design with our corridor width), an occupancy
+  map goes in as `map.png` with its resolution and origin.
+- **Formula Student cone layouts** (AMZ FSSIM yaml, EUFS csv): `tools/track_from_cones.py`
+  scales the layout so the corridor is 2.2 m wide, keeps the cones exactly where they stand
+  (`cones.from`) and writes the corridor design for the centreline and checkpoints. Layouts
+  whose corridor touches itself (EUFS `garden_light`, `its_a_mess`) cannot be built.
 
 ## Practice versus secret tracks
 

@@ -1,0 +1,15 @@
+name: FS Italy trackdrive
+category: fsae
+direction: ccw
+checkpoints: 30
+qualifying: false
+start:
+- 34.95
+- 18.48
+cones:
+  from: cones.json
+resolution: 0.05
+origin:
+- 2.075625
+- 1.96759875
+difficulty: 3

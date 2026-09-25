@@ -1,0 +1,12 @@
+name: Berlin
+category: roboracer
+resolution: 0.05
+origin:
+- -11.60654
+- -26.520793
+direction: ccw
+checkpoints: 30
+qualifying: false
+walls:
+  diameter: 0.33
+difficulty: 3

@@ -64,6 +64,7 @@ function races(e) {
       `<tr><td>${esc(id)}</td><td>${esc(r.team)}${statusBadge(r)}</td><td class="num">${r.position}</td><td class="num">${r.laps_completed}</td><td class="num">${secs(r.finish_s)}</td><td class="num">${r.collisions}</td></tr>`).join('')).join('') + '</tbody></table></div>';
 }
 
+const groups = [['feb', 'FEB tracks'], ['feb_cones', 'FEB tracks (cones)'], ['fsae', 'FSAE tracks'], ['roboracer', 'RoboRacer tracks'], ['f1', 'F1 tracks'], ['f1_cones', 'F1 tracks (cones)']];
 const pages = {
   '/': (d) => `
     <h2>Competitions</h2>
@@ -71,8 +72,9 @@ const pages = {
       <span class="badge ${e.status === 'done' ? 'ok' : e.status === 'live' ? 'bad' : 'info'}">${esc(e.status)}</span></a>`).join('') || '<p class="muted">No events scheduled.</p>'}</div>
     <h2>Practice tracks</h2>
     <p class="muted">Qualify for the first competition with ${d.qualify.laps} laps and at most ${d.qualify.max_collisions} collision on every track below. Progress per team: <a href="#/teams">Teams</a>.</p>
-    <div class="cards">${d.tracks.map(t => `<a class="card" href="#/practice/${esc(t.id)}">${t.preview ? `<img src="tracks/${esc(t.id)}.png" alt="">` : ''}<b>${esc(t.name)}</b>${t.qualifying ? '' : '<span class="badge info">showcase</span>'}
-      <div class="meta">${t.length} m · ${t.direction} · ${t.attempts} attempts${t.standings[0] ? ` · best ${secs(t.standings[0].best_lap_s)} s by ${esc(t.standings[0].team)}` : ''}</div></a>`).join('')}</div>`,
+    ${groups.map(([g, name]) => { const ts = d.tracks.filter(t => (t.category || 'feb') === g).sort((a, b) => (a.difficulty - b.difficulty) || (a.length - b.length)); return ts.length ? `<h3>${name}</h3>
+    <div class="cards">${ts.map(t => `<a class="card" href="#/practice/${esc(t.id)}">${t.preview ? `<img src="tracks/${esc(t.id)}.png" alt="">` : ''}<b>${esc(t.name)}</b>${t.qualifying ? '' : '<span class="badge info">showcase</span>'}
+      <div class="meta">${t.length} m · ${t.direction} · ${'●'.repeat(t.difficulty || 0)}${'○'.repeat(5 - (t.difficulty || 0))} · ${t.attempts} attempts${t.standings[0] ? ` · best ${secs(t.standings[0].best_lap_s)} s by ${esc(t.standings[0].team)}` : ''}</div></a>`).join('')}</div>` : ''; }).join('')}`,
   '/practice': (d) => pages['/'](d),
   '/practice/:id': (d, id) => { const t = d.tracks.find(t => t.id === id); if (!t) return 'Unknown track';
     return `<h2>${esc(t.name)} <span class="muted">practice</span></h2>${t.preview ? `<img src="tracks/${esc(t.id)}.png" style="max-width:420px;border-radius:8px">` : ''}

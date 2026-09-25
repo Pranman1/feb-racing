@@ -1,0 +1,14 @@
+name: FS rectangle (EUFS)
+category: fsae
+direction: ccw
+checkpoints: 30
+qualifying: false
+start:
+- 11.81
+- 4.44
+cones:
+  from: cones.json
+resolution: 0.05
+origin:
+- 1.8144688281249999
+- 2.097680078125

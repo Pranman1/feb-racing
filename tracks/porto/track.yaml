@@ -1,8 +1,11 @@
 name: Porto (legacy RoboRacer)
 resolution: 0.05
-origin: [-12.825, -12.825]
+origin:
+- -12.825
+- -12.825
 direction: ccw
 checkpoints: 20
-max_cars: 1               # the corridor narrows to 1.3 m: practice only
+max_cars: 1
 walls:
   diameter: 0.33
+category: roboracer

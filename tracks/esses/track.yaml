@@ -1,0 +1,10 @@
+name: FEB Esses
+category: feb
+direction: ccw
+checkpoints: 24
+walls:
+  diameter: 0.33
+resolution: 0.05
+origin:
+- -6.1849609375
+- -2.556

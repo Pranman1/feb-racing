@@ -1,0 +1,14 @@
+name: FS peanut (EUFS)
+category: fsae
+direction: ccw
+checkpoints: 30
+qualifying: false
+start:
+- 15.5
+- 7.0
+cones:
+  from: cones.json
+resolution: 0.05
+origin:
+- 2.0204546875000005
+- 1.9082399999999997

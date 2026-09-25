@@ -1,0 +1,12 @@
+name: Monza (1:10)
+category: f1
+direction: ccw
+checkpoints: 40
+qualifying: false
+walls:
+  diameter: 0.33
+resolution: 0.05
+origin:
+- -2.531960234375
+- -39.246011875
+difficulty: 3

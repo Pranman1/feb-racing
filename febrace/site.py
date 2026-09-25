@@ -51,6 +51,7 @@ def build():
         tracks.append({"id": name, "name": t["name"], "length": t["length"], "direction": t["direction"],
                        "walls": bool(t["walls"]), "cones": bool(t["cones"]), "preview": preview.exists(),
                        "qualifying": t.get("qualifying", True),
+                       "category": t.get("category", "feb"), "difficulty": int(t.get("difficulty", 0)),
                        "standings": standings(rows), "attempts": len(rows)})
 
     for e in events:

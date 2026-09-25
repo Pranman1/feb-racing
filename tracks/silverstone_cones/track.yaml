@@ -1,0 +1,12 @@
+name: Silverstone (1:10, cones)
+category: f1_cones
+direction: ccw
+checkpoints: 40
+qualifying: false
+resolution: 0.05
+origin:
+- -6.930917265625
+- -43.435016484375
+cones:
+  spacing: 2.5
+difficulty: 4

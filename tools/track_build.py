@@ -18,6 +18,8 @@ track.yaml::
     checkpoints: 20           # number of lap checkpoints (checkpoint 0 = finish line)
     max_cars: 4               # optional; 1 for tracks too narrow to race side by side
     qualifying: true          # optional; false for showcase tracks too long for the 300 s attempt
+    category: feb             # optional; feb, feb_cones, fsae, roboracer, f1, f1_cones (the app's track picker)
+    difficulty: 3             # optional 1..5; default: computed from length, twistiness and hairpins
     start: [3.0, 1.0]         # optional finish-line position (m); default: longest straight
     walls:
       diameter: 0.33          # air-duct diameter (m); omit the key for no walls
@@ -25,6 +27,7 @@ track.yaml::
     cones:                    # optional; omit the key for no cones
       spacing: 1.0            # metres between cones along each boundary
       start_cones: true       # four big orange cones at the finish line (default)
+      from: cones.json        # or: use these cone positions as they are ([{x, y, color}], real layouts)
 
 Coordinates in track.json are in the map frame: x right, y up, metres.
 The simulator converts to its own axes when loading.
@@ -165,6 +168,34 @@ def contour_normals(contour, mask, spacing, into_corridor):
     return pts, normals
 
 
+def difficulty_of(xy):
+    """1 (short and simple) to 5 (long, many sharp corners, tight radii), from the centreline:
+    length (up to 400 m counts), the number of sharp corners (more than 60 degrees of turn at
+    under 3.3 m radius, up to 8 count) and the tightest radius (under 1.5 m, under 1 m).
+    A rating to sort the picker by; set `difficulty` in track.yaml to overrule it."""
+    xy = np.asarray(xy, float)
+    nxt, prv = np.roll(xy, -1, axis=0), np.roll(xy, 1, axis=0)
+    d1, d2 = (nxt - prv) / 2.0, nxt - 2.0 * xy + prv
+    kappa = (d1[:, 0] * d2[:, 1] - d1[:, 1] * d2[:, 0]) / (np.hypot(d1[:, 0], d1[:, 1]) ** 3 + 1e-9)
+    kappa = np.convolve(np.pad(kappa, 2, mode="wrap"), np.ones(5) / 5, mode="valid")
+    length = len(xy) * CENTRELINE_SPACING
+    sharp, i = 0, 0
+    while i < len(kappa):                          # runs of same-signed bend
+        if abs(kappa[i]) > 0.15:
+            sign, turn, tight, j = np.sign(kappa[i]), 0.0, 0.0, i
+            while j < len(kappa) and abs(kappa[j]) > 0.15 and np.sign(kappa[j]) == sign:
+                turn += abs(kappa[j]) * CENTRELINE_SPACING
+                tight = max(tight, abs(kappa[j]))
+                j += 1
+            sharp += turn > math.radians(60) and tight > 0.3
+            i = j
+        else:
+            i += 1
+    r_min = 1.0 / max(float(np.abs(kappa).max()), 1e-3)
+    score = 1.0 + 1.5 * min(length, 400.0) / 400.0 + 2.0 * min(sharp, 8) / 8.0 + (1.0 if r_min < 1.0 else 0.5 if r_min < 1.5 else 0.0)
+    return int(round(min(max(score, 1.0), 5.0)))
+
+
 def signed_area(xy):
     x, y = xy[:, 0], xy[:, 1]
     return 0.5 * np.sum(x * np.roll(y, -1) - np.roll(x, -1) * y)
@@ -274,6 +305,8 @@ def build_track(folder):
         "direction": "ccw" if ccw else "cw",
         "max_cars": int(cfg.get("max_cars", 4)),
         "qualifying": bool(cfg.get("qualifying", True)),
+        "category": str(cfg.get("category", "feb_cones" if "cones" in cfg and "walls" not in cfg else "feb")),
+        "difficulty": int(cfg["difficulty"]) if "difficulty" in cfg else difficulty_of(xy),
         "length": round(float(len(xy) * CENTRELINE_SPACING), 2),
         "centreline": xy.round(3).flatten().tolist(),
         "checkpoints": checkpoints,
@@ -288,8 +321,12 @@ def build_track(folder):
         track["walls"] = [{"points": w.round(3).flatten().tolist()}
                           for w in build_walls(mask, diameter / 2 / frame.res, frame)]
     if "cones" in cfg:
-        track["cones"] = build_cones(outer, hole, ccw, float(cfg["cones"].get("spacing", 1.0)), frame,
-                                     finish=checkpoints[0], start_cones=bool(cfg["cones"].get("start_cones", True)))
+        if "from" in cfg["cones"]:          # a real layout: the cones exactly where they stand
+            given = json.loads((folder / cfg["cones"]["from"]).read_text())
+            track["cones"] = [{"x": round(float(c["x"]), 3), "y": round(float(c["y"]), 3), "color": str(c["color"])} for c in given]
+        else:
+            track["cones"] = build_cones(outer, hole, ccw, float(cfg["cones"].get("spacing", 1.0)), frame,
+                                         finish=checkpoints[0], start_cones=bool(cfg["cones"].get("start_cones", True)))
     return track, mask, frame
 
 
@@ -322,7 +359,7 @@ def main():
         track, mask, frame = build_track(folder)
         (folder / "track.json").write_text(json.dumps(track, separators=(",", ":")))
         draw_preview(track, mask, frame, folder / "preview.png")
-        print(f"{track['name']}: {track['length']} m, {len(track['checkpoints'])} checkpoints, "
+        print(f"{track['name']}: {track['length']} m, difficulty {track['difficulty']}, {track['category']}, {len(track['checkpoints'])} checkpoints, "
               f"{len(track['walls'])} wall loops, {len(track['cones'])} cones -> {folder / 'track.json'}")
 
 
