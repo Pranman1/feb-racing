@@ -339,7 +339,11 @@ class Racer(Node):
         self.race_s = np.concatenate([[0.0], np.cumsum(seg)])
         self.race_idx = int(np.argmin(np.linalg.norm(line - self.pose, axis=1)))
         self.mode = "RACING"
+        self.half_lap = False
         self.local_mode = np.linalg.norm(line[self.race_idx] - self.pose) > 1.0   # off the line: follower first
+        n_b, n_y = int(np.sum(track["colour"] == BLUE)), int(np.sum(track["colour"] == YELLOW))
+        if len(track["left"]) < 0.9 * n_b or len(track["right"]) < 0.9 * n_y:
+            self.get_logger().warn("boundaries leave cones out: blue %d of %d, yellow %d of %d" % (len(track["left"]), n_b, len(track["right"]), n_y))
         self.lap_start_t = self.last_t
         self.good_loc_t = self.last_t
         self.get_logger().info("map closed after %.1f s: %d cones, raceline %.1f m, %d points, v %.1f..%.1f m/s (%.0f ms) -> RACING with %s"
@@ -468,12 +472,15 @@ class Racer(Node):
         if self.last_t - self.loc_log_t > 2.0:
             self.loc_log_t = self.last_t
             self.get_logger().info("localise: %d cones in view, %d matched, correction %.2f m, speed %.1f, mpc %.0f ms" % (len(z_rel), matched, shift, self.speed, self.solve_ms))
-        # lap timing on the raceline index wrap
+        # lap timing on the raceline index wrap, once the far side of the loop has been passed
         n = len(self.raceline)
         i = self.nearest_index()
-        if self.race_idx > 0.8 * n and i < 0.2 * n:
+        if 0.4 * n < i < 0.6 * n:
+            self.half_lap = True
+        if self.race_idx > 0.8 * n and i < 0.2 * n and self.half_lap:
             lap = self.last_t - self.lap_start_t
             self.lap_start_t = self.last_t
+            self.half_lap = False
             self.lap_times.append(lap)
             self.get_logger().info("lap %d: %.2f s (mpc %.0f ms/solve)" % (len(self.lap_times) - 1, lap, self.solve_ms))
         self.race_idx = i

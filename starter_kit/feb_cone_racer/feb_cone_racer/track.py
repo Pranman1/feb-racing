@@ -36,21 +36,33 @@ def _walk(pts, i0, h, max_step):
     return order
 
 
-def order_loop(points, start, heading, max_step=3.5):
+def order_loop(points, start, heading, max_step=None):
     """Greedy walk through the points starting nearest `start`, heading roughly `heading`,
     preferring to continue straight. If the walk dies early it is retried the other way round
-    and the longer result kept. Outliers farther than max_step from everything are left out."""
+    and the longer result kept. The longest step allowed follows the cone spacing (2.4 times
+    the median nearest-neighbour distance, at least 3.5 m) so one cone missing from the map
+    does not cut the loop, and 4 times the spacing if the loop still stays open. Cones farther
+    than that from everything are left out."""
     pts = np.asarray(points, float)
     if len(pts) < 3:
         return pts
+    spacing = float(np.median(np.sort(np.linalg.norm(pts[:, None] - pts[None], axis=2), axis=1)[:, 1]))
+    steps = [max_step] if max_step else [max(3.5, 2.4 * spacing), max(3.5, 4.0 * spacing)]
     i0 = int(np.argmin(np.linalg.norm(pts - start, axis=1)))
     h = np.asarray(heading, float) / (np.linalg.norm(heading) + 1e-9)
-    fwd = _walk(pts, i0, h, max_step)
-    if len(fwd) < len(pts) - 1:
-        back = _walk(pts, i0, -h, max_step)
-        if len(back) > len(fwd):
-            fwd = back[::-1]
-    return pts[fwd]
+    best = []
+    for step in steps:                      # a wider step only if the loop stays open otherwise
+        fwd = _walk(pts, i0, h, step)
+        if len(fwd) < len(pts) - 1:
+            back = _walk(pts, i0, -h, step)
+            if len(back) > len(fwd):
+                fwd = back[::-1]
+        if len(fwd) > len(best):
+            best = fwd
+        closed = np.linalg.norm(pts[best[-1]] - pts[best[0]]) <= step
+        if closed and len(best) >= 0.95 * len(pts):
+            break
+    return pts[best]
 
 
 def resample_closed(poly, step):
@@ -67,14 +79,19 @@ def resample_closed(poly, step):
     return np.column_stack([xs, ys]), ss
 
 
-def nearest_on_polyline(poly_closed, q):
-    """Nearest point on a closed polyline to q."""
+def nearest_on_polyline(poly_closed, q, max_seg=None):
+    """Nearest point on a closed polyline to q. With max_seg, segments longer than that (a
+    bridge across missing cones, or the closing segment of a loop that did not close) do not
+    count."""
     P = np.vstack([poly_closed, poly_closed[:1]])
     a, b = P[:-1], P[1:]
     ab = b - a
     t = np.clip(np.einsum("ij,ij->i", q - a, ab) / (np.einsum("ij,ij->i", ab, ab) + 1e-12), 0.0, 1.0)
     proj = a + t[:, None] * ab
-    k = int(np.argmin(np.linalg.norm(proj - q, axis=1)))
+    dist = np.linalg.norm(proj - q, axis=1)
+    if max_seg is not None:
+        dist[np.linalg.norm(ab, axis=1) > max_seg] = np.inf
+    k = int(np.argmin(dist))
     return proj[k]
 
 
@@ -100,10 +117,11 @@ def build_track(lhat, colour, start_xy, start_heading, step=0.25, repair_colours
     # yellow neighbours, while a real blue cone is a track width away from that line
     for _ in range(2):
         left, right = order_loop(lhat[fixed == BLUE], start_xy, start_heading), order_loop(lhat[fixed == YELLOW], start_xy, start_heading)
+        seg = lambda P: 2.0 * np.median(np.linalg.norm(np.roll(P, -1, axis=0) - P, axis=1))   # only real cone-to-cone segments count
         changed = False
         for i, q in enumerate(lhat):
             other = right if fixed[i] == BLUE else left
-            if len(other) >= 3 and np.linalg.norm(nearest_on_polyline(other, q) - q) < 0.35:
+            if len(other) >= 3 and np.linalg.norm(nearest_on_polyline(other, q, seg(other)) - q) < 0.35:
                 fixed[i] = YELLOW if fixed[i] == BLUE else BLUE
                 changed = True
         if not changed:
@@ -125,12 +143,21 @@ def _build(lhat, colour, start_xy, start_heading, step):
     if len(left) < 4 or len(right) < 4:
         return None
     lp, _ = resample_closed(left, step)
-    centre, half = [], []
-    for q in lp:
-        r = nearest_on_polyline(right, q)
-        centre.append((q + r) / 2.0)
-        half.append(np.linalg.norm(q - r) / 2.0)
-    centre, half = np.array(centre), np.array(half)
+    rp = np.array([nearest_on_polyline(right, q) for q in lp])
+    centre, half = (lp + rp) / 2.0, np.linalg.norm(lp - rp, axis=1) / 2.0
+    # A cone track has a nearly constant width. Where the two boundaries come much closer or
+    # farther than usual, one of them is wrong there (a cone missing at a hairpin makes its
+    # boundary cut across the other one), so those samples take the usual width, measured
+    # sideways from the blue boundary instead.
+    tang = np.roll(lp, -1, axis=0) - np.roll(lp, 1, axis=0)
+    tang /= np.linalg.norm(tang, axis=1)[:, None] + 1e-9
+    nrm = np.column_stack([-tang[:, 1], tang[:, 0]])
+    h_med = float(np.median(half))
+    bad = np.abs(half - h_med) > 0.4 * h_med
+    if np.any(bad) and not np.all(bad):
+        side = np.sign(np.mean(np.einsum("ij,ij->i", rp[~bad] - lp[~bad], nrm[~bad])))
+        centre[bad] = lp[bad] + side * h_med * nrm[bad]
+        half[bad] = h_med
     # smooth the centreline lightly (closed) and resample evenly
     k = 5
     pad = np.vstack([centre[-k:], centre, centre[:k]])
