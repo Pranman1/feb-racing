@@ -53,6 +53,51 @@ estimate during development, never at race time.
 Optimise a minimum-curvature line on your map with a speed profile from your sysid numbers,
 and track it (pure pursuit, then MAP or MPC). This is where lap times halve.
 
+## The cone track: two more packages
+
+`loop_cones` has no walls, only blue cones on the left and yellow on the right, so the
+follow-the-gap driver has nothing to follow. Two packages in `starter_kit/` are the answer, and
+between them they are the FSAE car's pipeline at small scale.
+
+### `feb_cone_driver`: the baseline (one file)
+
+```bash
+cp -r starter_kit/feb_cone_driver stack/
+./feb-sim run --track loop_cones --look visual --stack "ros2 launch feb_cone_driver drive.launch.py"
+```
+
+Per lidar scan: small clusters of returns are cone candidates; the camera's blue and yellow
+blobs give them a colour by image column (camera pose, focal length and the image's lag behind
+the scan are calibrated numbers in the yaml); a cone keeps its colour for a while after it leaves
+the camera's view, and a cone right beside the car takes its side's colour; the blue and yellow
+cones are chained along the track, each blue cone pairs with the yellow cone across the track
+to its right, the midpoints are the centreline, and pure pursuit follows it at 1 to 1.2 m/s with
+the starter kit's throttle law. If the lidar scene stops moving while the throttle is on, the
+car backs up for a second and tries again. It laps `loop_cones` indefinitely (7 laps in 240 s
+in testing) and every number is in `config/cone_driver.yaml`. Use `--look visual`: the camera
+thresholds are tuned for the dressed scene, and the bare one is too dark for them.
+
+### `feb_cone_racer`: map, raceline, MPC
+
+```bash
+cp -r starter_kit/feb_cone_racer stack/
+./feb-sim run --track loop_cones --look visual --stack "ros2 launch feb_cone_racer race.launch.py"
+# in another terminal, once, while the devkit is running:
+starter_kit/feb_cone_racer/install_deps.sh      # scipy + CasADi into stack/.pydeps
+```
+
+Lap 1 is driven by the baseline follower while **GraphSLAM** (the formulation of the team's FSAE
+`graphslam_global`, poses and cones as a sparse linear least-squares problem, ICP data
+association with colour votes) builds the map from wheel odometry, IMU heading and the coloured
+cones. Back at the start the map is frozen, the boundaries ordered, a centreline sampled, cone
+colours repaired from geometry, a **minimum-curvature raceline** solved as a QP (CasADi) and a
+**speed profile** laid over it from lateral, acceleration and braking limits. From then on the
+car localises against the map by ICP and a **nonlinear MPC** (dynamic bicycle model with
+Pacejka-style tyres and the sysid longitudinal model, direct multiple shooting, IPOPT, about 25
+ms a solve) tracks the raceline. Without CasADi the node still maps and plans, and pure pursuit
+drives the raceline. Debug topics: `/feb/cones`, `/feb/map`, `/feb/raceline`, `/feb/pose`,
+`/feb/mpc_prediction`. Parameters, including the vehicle model, are in `config/racer.yaml`.
+
 ## Stage 5: realism
 
 `./feb-sim run --noise 1` adds lidar range noise and dropouts; `--noise "range_sigma:=0.05 latency:=0.05"`

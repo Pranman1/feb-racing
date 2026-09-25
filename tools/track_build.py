@@ -24,6 +24,7 @@ track.yaml::
       color: "#9a9a9a"        # optional duct colour (hex), default mid grey
     cones:                    # optional; omit the key for no cones
       spacing: 1.0            # metres between cones along each boundary
+      start_cones: true       # four big orange cones at the finish line (default)
 
 Coordinates in track.json are in the map frame: x right, y up, metres.
 The simulator converts to its own axes when loading.
@@ -197,14 +198,32 @@ def build_walls(mask, radius_px, frame):
     return [w for w in loops if cv2.arcLength(w.astype(np.float32), True) >= MIN_WALL_LENGTH]
 
 
-def build_cones(outer, hole, ccw, spacing_m, frame):
-    """Cones along both corridor edges: blue on the driver's left, yellow on the right."""
+def build_cones(outer, hole, ccw, spacing_m, frame, finish=None, start_cones=True):
+    """Cones along both corridor edges: blue on the driver's left, yellow on the right, and,
+    as in FSAE, two big orange cones on each side of the finish line (a metre apart along the
+    track) so the start is unmistakable to a driver and its map."""
     spacing_px = spacing_m / frame.res
     left, right = (hole, outer) if ccw else (outer, hole)
     cones = []
     for contour, colour in ((left, "blue"), (right, "yellow")):
         for x, y in frame.to_map(resample_closed(contour, spacing_px)):
             cones.append({"x": round(float(x), 3), "y": round(float(y), 3), "color": colour})
+    if start_cones and finish is not None:
+        cx, cy, yaw, width = finish["x"], finish["y"], finish["yaw"], finish["width"]
+        t = np.array([np.cos(yaw), np.sin(yaw)])
+        n = np.array([-t[1], t[0]])
+        # drop the boundary cones that would sit on the start cones, then add the four
+        keep = []
+        for c in cones:
+            d = np.array([c["x"] - cx, c["y"] - cy])
+            if abs(d @ t) < 0.9 and abs(abs(d @ n) - width / 2) < 0.4:
+                continue
+            keep.append(c)
+        cones = keep
+        for side in (+1, -1):
+            for along in (-0.5, +0.5):
+                q = np.array([cx, cy]) + along * t + side * (width / 2) * n
+                cones.append({"x": round(float(q[0]), 3), "y": round(float(q[1]), 3), "color": "orange"})
     return cones
 
 
@@ -269,7 +288,8 @@ def build_track(folder):
         track["walls"] = [{"points": w.round(3).flatten().tolist()}
                           for w in build_walls(mask, diameter / 2 / frame.res, frame)]
     if "cones" in cfg:
-        track["cones"] = build_cones(outer, hole, ccw, float(cfg["cones"].get("spacing", 1.0)), frame)
+        track["cones"] = build_cones(outer, hole, ccw, float(cfg["cones"].get("spacing", 1.0)), frame,
+                                     finish=checkpoints[0], start_cones=bool(cfg["cones"].get("start_cones", True)))
     return track, mask, frame
 
 
@@ -287,7 +307,7 @@ def draw_preview(track, mask, frame, path):
         a, b = px([cp["x"] - n[0], cp["y"] - n[1]]), px([cp["x"] + n[0], cp["y"] + n[1]])
         cv2.line(img, tuple(a[0]), tuple(b[0]), white, 2 if cp is track["checkpoints"][0] else 1)
     for c in track["cones"]:
-        cv2.circle(img, tuple(px([c["x"], c["y"]])[0]), 2, blue if c["color"] == "blue" else gold, -1)
+        cv2.circle(img, tuple(px([c["x"], c["y"]])[0]), 4 if c["color"] == "orange" else 2, blue if c["color"] == "blue" else (0, 90, 255) if c["color"] == "orange" else gold, -1)
     s = track["spawn"]
     tip = px([s["x"] + 0.3 * math.cos(s["yaw"]), s["y"] + 0.3 * math.sin(s["yaw"])])[0]
     cv2.arrowedLine(img, tuple(px([s["x"], s["y"]])[0]), tuple(tip), (0, 200, 0), 2, tipLength=0.5)
