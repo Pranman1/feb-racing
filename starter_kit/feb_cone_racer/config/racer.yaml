@@ -56,3 +56,5 @@ racer:
     dtau_max: 0.4             # throttle units per second, hard bound in the MPC
     w_tau: 0.3
     tau_max: 0.14             # throttle cap: the wheels spin above this; about 3.3 m/s steady state
+    reverse_throttle: 0.07    # backing off a cone: 0.12 reversed at 3 m/s, far too much
+    reverse_cooldown: 4.0     # s of trying forward before another reverse may start

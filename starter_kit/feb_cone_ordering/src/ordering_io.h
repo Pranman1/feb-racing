@@ -17,16 +17,24 @@ inline double yaw_of(const geometry_msgs::msg::Quaternion &q) {
     return std::atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y * q.y + q.z * q.z));
 }
 
-/// Fill the ordering state from the car pose and the coloured map, run the ordering.
+/// Fill the ordering state from the car pose and the coloured map, run the ordering. Right on
+/// the start gate (four big cones half a metre apart) the slope field can be degenerate and the
+/// closed-track integration ends after a couple of steps; then the ordering is run again from a
+/// pose a little behind or ahead of the car along its heading, which is the same lap.
 inline void run(ConeOrderingState &state, const geometry_msgs::msg::Pose &car, const geometry_msgs::msg::PoseArray &map) {
-    state = ConeOrderingState{};
-    state.car = {{car.position.x, car.position.y}, yaw_of(car.orientation)};
-    for (const auto &p : map.poses) {
-        const int colour = static_cast<int>(std::lround(p.orientation.w));
-        if (colour == BLUE) state.bluePoints.push_back({p.position.x, p.position.y});
-        else if (colour == YELLOW) state.redPoints.push_back({p.position.x, p.position.y});   // the team calls the right side red
+    const double yaw = yaw_of(car.orientation);
+    const double offsets[] = {0.0, -2.0, 2.0, -4.0, 4.0, -6.0};
+    for (double along : offsets) {
+        state = ConeOrderingState{};
+        state.car = {{car.position.x + along * std::cos(yaw), car.position.y + along * std::sin(yaw)}, yaw};
+        for (const auto &p : map.poses) {
+            const int colour = static_cast<int>(std::lround(p.orientation.w));
+            if (colour == BLUE) state.bluePoints.push_back({p.position.x, p.position.y});
+            else if (colour == YELLOW) state.redPoints.push_back({p.position.x, p.position.y});   // the team calls the right side red
+        }
+        cone_ordering::update(state);
+        if (!state.is_closed || state.redConeOrder.size() >= 8) return;
     }
-    cone_ordering::update(state);
 }
 
 inline geometry_msgs::msg::PoseArray to_array(const std::vector<Point> &pts, const std::string &frame) {

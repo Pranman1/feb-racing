@@ -66,7 +66,7 @@ DEFAULTS = dict(
     # mpc: problem
     mpc_horizon=12, mpc_dt=0.1, mpc_max_iter=60, mpc_steer_tau=0.15, mpc_substeps=3,
     w_pos=8.0, w_head=2.0, w_speed=0.6, w_vy=0.2, w_dsteer=0.01, w_dtau=3.0, w_tau=0.3, dtau_max=0.4,
-    lost_after=1.5, loc_lost_after=3.0,
+    lost_after=1.5, loc_lost_after=3.0, reverse_throttle=0.07, reverse_cooldown=4.0,
     pursuit_lookahead=1.2, race_speed_scale=0.6,
 )
 
@@ -137,6 +137,7 @@ class Racer(Node):
         self.local_mode = False
         self.stalled_since = None
         self.reverse_until = None
+        self.reverse_done_t = -1e9              # reverses may not chain: a few seconds of trying forward in between
 
         self.pub_throttle = self.create_publisher(Float32, NS + "throttle_command", QOS)
         self.pub_steering = self.create_publisher(Float32, NS + "steering_command", QOS)
@@ -223,7 +224,9 @@ class Racer(Node):
         weights = np.array([w for _, _, _, w in obs], dtype=float)
 
         moving = self.scene_moving(msg)
-        if len(cones) >= 2:
+        # "cones in view" counts what the lidar sees, coloured or not: at a hairpin the camera can
+        # look at nothing for seconds while the lidar has the whole corner
+        if len(cones) >= 2 or sum(1 for x, y in clusters if x > -0.5 and math.hypot(x, y) < 6.0) >= 2:
             self.last_seen_t = t
         if self.mode == "ORDERING":
             steer, throttle = self.follow_local(clusters, cones, dt)
@@ -235,9 +238,9 @@ class Racer(Node):
             local = self.follow_rungs(clusters, dt)
             self.lap_one_scans[0 if local is not None else 1] += 1
             steer, throttle = local if local is not None else self.follow_local(clusters, cones, dt)
-            if t - self.last_seen_t > self.p["lost_after"] + 1.5 and self.reverse_until is None:
+            if t - self.last_seen_t > self.p["lost_after"] + 1.5 and self.can_reverse(t):
                 self.get_logger().warn("no cones in view: backing up")     # nosed out of the corridor
-                self.reverse_until = t + 1.5
+                self.reverse_until = t + 1.2
                 self.stalled_since = t
         else:
             matched = self.localise(z_rel, colours)
@@ -254,9 +257,9 @@ class Racer(Node):
                 if t - self.last_seen_t > 20.0:
                     steer, throttle = 0.0, 0.0             # lost for good: stop, do not wander
                 else:
-                    if t - self.last_seen_t > 8.0 and self.reverse_until is None and self.stalled_since is None:
+                    if t - self.last_seen_t > 8.0 and self.can_reverse(t) and self.stalled_since is None:
                         self.get_logger().warn("no cones in view for long: backing up")
-                        self.reverse_until = t + 1.5
+                        self.reverse_until = t + 1.2
                         self.stalled_since = t
                     steer, throttle = self.pursuit_step(dt, speed=0.7)
             elif t - self.good_loc_t > self.p["loc_lost_after"]:
@@ -281,10 +284,11 @@ class Racer(Node):
         # stuck on a cone (wheels may spin, so watch the lidar scene): back away, then carry on
         if self.reverse_until is not None:
             if t < self.reverse_until:
-                self.pub_throttle.publish(Float32(data=-0.12))
+                self.pub_throttle.publish(Float32(data=-self.p["reverse_throttle"]))
                 self.pub_steering.publish(Float32(data=-self.steer / MAX_STEER))
                 return
             self.reverse_until, self.stalled_since = None, None
+            self.reverse_done_t = t
             self.throttle, self.integral = 0.0, 0.0
             self.mpc_warm_reset()
         if moving and not self.no_target:
@@ -293,7 +297,7 @@ class Racer(Node):
             # stuck on a cone, or the follower stopped with nothing to follow (nosed out of the
             # corridor at a hairpin): back up and look again
             self.stalled_since = self.stalled_since or t      # sticky: a throttle dip does not reset it
-            if t - self.stalled_since > 2.0:
+            if t - self.stalled_since > 2.0 and self.can_reverse(t):
                 self.get_logger().warn("nothing to follow, backing up" if self.no_target else "stuck, backing up")
                 self.reverse_until = t + 1.2
         self.steer, self.throttle = steer, throttle
@@ -736,6 +740,9 @@ class Racer(Node):
             q.orientation.w = float(c)
             arr.poses.append(q)
         self.pub_cones.publish(arr)
+
+    def can_reverse(self, t):
+        return self.reverse_until is None and t - self.reverse_done_t > self.p["reverse_cooldown"]
 
     def status_line(self, t, moving):
         """One line for /feb/status: phase, what is steering, and every fallback that is active."""
