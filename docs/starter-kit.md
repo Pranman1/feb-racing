@@ -116,7 +116,10 @@ again anywhere on the map from the IMU heading if the match is lost, and a **non
 (dynamic bicycle model with Pacejka-style tyres and the sysid longitudinal model, direct
 multiple shooting, IPOPT, about 10 ms a solve) tracks the raceline. Without CasADi the node
 still maps and plans, and pure pursuit drives the raceline. Debug topics: `/feb/cones`,
-`/feb/map`, `/feb/raceline`, `/feb/pose`, `/feb/mpc_prediction`. Parameters, including the
+`/feb/map`, `/feb/raceline`, `/feb/pose`, `/feb/mpc_prediction`, and `/feb/status`, one line twice
+a second with the phase (mapping lap, waiting for the ordering, racing), what is steering (local
+path, reactive follower, MPC, pure pursuit) and any active fallback (map match lost, no cones in
+view, backing up); `./feb-sim logs -f` shows the same story as the racer's log. Parameters, including the
 vehicle model, are in `config/racer.yaml`. In testing it maps `loop_cones` in 31 s and then
 laps it in 22 to 23 s (it brushes a cone once or twice in a 6-minute run and backs off), and
 maps `spielberg_cones` (342 m, 292 cones) in 5 minutes and then laps it in about 200 s without

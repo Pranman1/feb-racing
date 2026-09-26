@@ -255,6 +255,13 @@ def cmd_stop(_):
     print("devkit stopped")
 
 
+def cmd_logs(args):
+    """The devkit's log: the package build, the bridge and every line the stack prints."""
+    if not container_running():
+        fail("devkit is not running; start it with `feb-sim run`")
+    os.execvp("docker", ["docker", "logs", "--tail", str(args.tail)] + (["-f"] if args.follow else []) + [CONTAINER])
+
+
 def cmd_shell(_):
     if not container_running():
         fail("devkit is not running; start it with `feb-sim run`")
@@ -399,6 +406,10 @@ def main():
     setup.set_defaults(func=cmd_setup)
     for name, func in (("shell", cmd_shell), ("stop", cmd_stop)):
         sub.add_parser(name).set_defaults(func=func)
+    logs = sub.add_parser("logs", help="the devkit's log (build, bridge, your stack); -f follows")
+    logs.add_argument("-f", "--follow", action="store_true")
+    logs.add_argument("-n", "--tail", default="200", help="lines to show (default 200, 'all')")
+    logs.set_defaults(func=cmd_logs)
     args = ap.parse_args()
     args.func(args)
 
