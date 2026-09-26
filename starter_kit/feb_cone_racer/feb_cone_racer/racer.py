@@ -22,7 +22,7 @@ from nav_msgs.msg import Path
 from rclpy.node import Node
 from rclpy.qos import QoSDurabilityPolicy, QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy
 from sensor_msgs.msg import Image, Imu, JointState, LaserScan
-from std_msgs.msg import Float32
+from std_msgs.msg import Float32, String
 
 from .graphslam import GraphSLAM
 from .perception import BLUE, ORANGE, UNKNOWN, YELLOW, Perception
@@ -54,7 +54,7 @@ DEFAULTS = dict(
     map_speed=1.2, map_min_speed=0.8, lookahead=1.0, chain_step=1.8, avoid_range=0.9, local_path_lookahead=1.4, rung_max_age=1.0,
     speed_per_throttle=23.0, throttle_kp=0.02, throttle_ki=0.03, throttle_slew=0.8, speed_window=0.25, steer_tau=0.15,
     # slam
-    keyframe_dist=0.4, slam_range=6.0, loc_range=6.0, dx_weight=2.0, z_weight=1.0, new_landmark_dist=0.6, icp_gate=1.5,
+    keyframe_dist=0.4, slam_range=6.0, loc_range=6.0, loc_corridor=2.5, dx_weight=2.0, z_weight=1.0, new_landmark_dist=0.6, icp_gate=1.5,
     solve_every=3, min_lap_length=15.0, order_timeout=3.0, lap_close_dist=2.0, min_seen=2, icp_min_matches=5, snap_radius=10.0, snap_gate=6.0,
     # raceline
     sample_step=0.25, car_half_width=0.135, margin=0.55, curvature_reg=0.01,
@@ -151,6 +151,8 @@ class Racer(Node):
         self.order_future = None
         self.pub_line = self.create_publisher(Path, "/feb/raceline", 10)
         self.pub_pose = self.create_publisher(PoseStamped, "/feb/pose", 10)
+        self.pub_status = self.create_publisher(String, "/feb/status", 10)      # phase, what steers, active fallbacks
+        self.status_t = -1e9
         self.pub_pred = self.create_publisher(Path, "/feb/mpc_prediction", 10)
         self.create_subscription(LaserScan, NS + "lidar", self.on_scan, QOS)
         self.create_subscription(Image, NS + "front_camera", self.perception.on_image, QOS)
@@ -174,7 +176,7 @@ class Racer(Node):
         t = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
         angle = float(msg.position[0])
         hist = self.encoders.setdefault(msg.header.frame_id, [])
-        if hist and angle < hist[-1][1]:
+        if hist and angle < hist[-1][1] - 50.0:      # the counter was reset (a small decrease is the car reversing)
             hist.clear()
         hist.append((t, angle))
         while len(hist) > 2 and t - hist[0][0] > self.p["speed_window"]:
@@ -182,7 +184,7 @@ class Racer(Node):
         if len(hist) < 2 or t - hist[0][0] < 1e-3:
             return
         v = (angle - hist[0][1]) / (t - hist[0][0]) * WHEEL_RADIUS
-        if 0.0 <= v < 25.0:
+        if -5.0 < v < 25.0:                          # signed: backing up must move the dead reckoning backwards too
             self.speed = 0.5 * self.speed + 0.5 * v
 
     # ------------------------------------------------------------ main loop, per scan
@@ -295,6 +297,9 @@ class Racer(Node):
                 self.get_logger().warn("nothing to follow, backing up" if self.no_target else "stuck, backing up")
                 self.reverse_until = t + 1.2
         self.steer, self.throttle = steer, throttle
+        if t - self.status_t > 0.5:
+            self.status_t = t
+            self.pub_status.publish(String(data=self.status_line(t, moving)))
         self.pub_throttle.publish(Float32(data=float(throttle)))
         self.pub_steering.publish(Float32(data=float(steer / MAX_STEER)))
         self.publish_pose(msg.header)
@@ -420,7 +425,8 @@ class Racer(Node):
             if len(track["left"]) < 0.9 * n_b or len(track["right"]) < 0.9 * n_y:
                 self.get_logger().warn("boundaries leave cones out: blue %d of %d, yellow %d of %d" % (len(track["left"]), n_b, len(track["right"]), n_y))
         t0 = self.map_closed_t
-        line, _ = min_curvature(track["centre"], track["normal"], track["half_width"], p["car_half_width"], p["margin"], p["curvature_reg"])
+        line, _ = min_curvature(track["centre"], track["normal"], track["half_width"], p["car_half_width"], p["margin"], p["curvature_reg"],
+                                cones=self.slam.lhat)
         v, kappa = speed_profile(line, p["v_max"], p["a_lat"], p["a_acc"], p["a_brake"])
         self.track, self.raceline, self.race_v = track, line, v * p["race_speed_scale"]
         self.race_psi = heading_along(line)
@@ -599,7 +605,7 @@ class Racer(Node):
     def throttle_law(self, v_t, dt):
         p = self.p
         ff = v_t / p["speed_per_throttle"]
-        err = v_t - self.speed
+        err = v_t - max(self.speed, 0.0)
         self.integral = float(np.clip(self.integral + err * dt, -0.8, 0.8))
         bound = ff if self.speed < 0.3 else 0.5 * ff
         trim = float(np.clip(p["throttle_kp"] * err + p["throttle_ki"] * self.integral, -bound, bound))
@@ -615,7 +621,7 @@ class Racer(Node):
         self.uprev = np.array([self.delta, 0.0])
 
     def localise(self, z_rel, colours):
-        corrected, matched = self.slam.localise(self.pose, z_rel, colours)
+        corrected, matched = self.slam.localise(self.pose, z_rel, colours, subset=self.landmarks_near())
         shift = float(np.linalg.norm(corrected - self.pose))
         if matched >= 3:
             self.pose = 0.5 * self.pose + 0.5 * corrected      # trust the map, but no jumps
@@ -635,6 +641,19 @@ class Racer(Node):
             self.get_logger().info("lap %d: %.2f s (mpc %.0f ms/solve)" % (len(self.lap_times) - 1, lap, self.solve_ms))
         self.race_idx = i
         return matched
+
+    def landmarks_near(self):
+        """The landmarks within reach of the stretch of raceline around the car: on a layout
+        whose sections run side by side, the cones of the neighbouring section must not be
+        candidates, or the match slides across to them. Everything when the map match is lost."""
+        if self.local_mode or self.last_t - self.good_loc_t > self.p["loc_lost_after"]:
+            return None
+        n = len(self.raceline)
+        idx = np.arange(self.race_idx - int(8.0 / self.p["sample_step"]), self.race_idx + int(15.0 / self.p["sample_step"])) % n
+        stretch = self.raceline[idx]
+        d = np.min(np.linalg.norm(self.slam.lhat[:, None, :] - stretch[None, :, :], axis=2), axis=1)
+        near = np.flatnonzero(d < self.p["loc_corridor"])
+        return near if len(near) >= 4 else None
 
     def nearest_index(self):
         n = len(self.raceline)
@@ -667,7 +686,7 @@ class Racer(Node):
         if self.mpc is not None:
             # delay compensation: where the car will be when this command bites
             x, y = self.pose
-            psi, v, d = self.yaw, self.odo_speed, self.delta
+            psi, v, d = self.yaw, max(self.odo_speed, 0.0), self.delta
             for _ in range(3):
                 h = STEER_DELAY / 3.0
                 x += v * math.cos(psi) * h
@@ -717,6 +736,28 @@ class Racer(Node):
             q.orientation.w = float(c)
             arr.poses.append(q)
         self.pub_cones.publish(arr)
+
+    def status_line(self, t, moving):
+        """One line for /feb/status: phase, what is steering, and every fallback that is active."""
+        if self.mode == "MAPPING":
+            a, b = self.lap_one_scans
+            what = "mapping lap on %s" % ("the team's local path" if a >= b else "the reactive follower")
+            detail = "%d cones, %.0f m" % (len(self.slam.lhat), self.travelled)
+        elif self.mode == "ORDERING":
+            what, detail = "map closed, waiting for the cone ordering", "%d cones" % len(self.slam.lhat)
+        else:
+            what = "racing on " + ("the reactive follower (localisation lost)" if self.local_mode else ("MPC" if self.mpc else "pure pursuit"))
+            detail = "lap %d" % max(len(self.lap_times) - 1, 0)
+        flags = []
+        if self.reverse_until is not None:
+            flags.append("backing up")
+        if t - self.last_seen_t > self.p["lost_after"]:
+            flags.append("no cones in view")
+        if self.mode == "RACING" and t - self.good_loc_t > self.p["loc_lost_after"]:
+            flags.append("map match lost")
+        if not moving and self.throttle > 0.02:
+            flags.append("not moving")
+        return "%s | %s%s" % (what, detail, (" | " + ", ".join(flags)) if flags else "")
 
     def map_message(self):
         arr = PoseArray()

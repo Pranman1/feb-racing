@@ -13,13 +13,46 @@ the loop so the closure is consistent.
 import numpy as np
 
 
-def min_curvature(centre, normal, half_width, car_half_width=0.135, margin=0.12, reg=0.02):
+def lateral_bounds(centre, normal, half_width, cones, clearance):
+    """How far the raceline may move left (upper) and right (lower) of the centreline at each
+    sample: the boundary less the clearance, and never within `clearance` of any cone. A cone
+    sitting near the centreline (a stray landmark, a mislabelled cone the boundary missed)
+    would otherwise end up under the car."""
+    N = len(centre)
+    lo, hi = -np.maximum(half_width - clearance, 0.03), np.maximum(half_width - clearance, 0.03)
+    if cones is None or len(cones) == 0:
+        return lo, hi
+    cones = np.asarray(cones, float).reshape(-1, 2)
+    tang = np.column_stack([normal[:, 1], -normal[:, 0]])          # normal is left of travel
+    for c in cones:
+        d = c - centre
+        along = np.abs(d[:, 0] * tang[:, 0] + d[:, 1] * tang[:, 1])
+        near = along < clearance
+        if not np.any(near):
+            continue
+        side = d[near, 0] * normal[near, 0] + d[near, 1] * normal[near, 1]      # signed lateral offset of the cone
+        idx = np.flatnonzero(near)
+        left = side > 0
+        hi[idx[left]] = np.minimum(hi[idx[left]], side[left] - clearance)
+        lo[idx[~left]] = np.maximum(lo[idx[~left]], side[~left] + clearance)
+    bad = hi < lo                                                   # a cone on the centreline: keep the roomier side
+    room_left = np.maximum(half_width - clearance, 0.03) - np.abs(lo)
+    for i in np.flatnonzero(bad):
+        if hi[i] + lo[i] > 0:
+            lo[i] = hi[i] - 0.06
+        else:
+            hi[i] = lo[i] + 0.06
+    return lo, hi
+
+
+def min_curvature(centre, normal, half_width, car_half_width=0.135, margin=0.12, reg=0.02, cones=None):
     """Minimum-curvature offsets alpha along the normals, a box-constrained QP. The Hessian is
     pentadiagonal (second differences), so it is built sparse: a 1300-point track solves in
-    well under a second instead of minutes. CasADi's qrqp first, scipy's L-BFGS-B as fallback."""
+    well under a second instead of minutes. CasADi's qrqp first, scipy's L-BFGS-B as fallback.
+    With `cones`, every cone is kept at least car half width + margin away."""
     import scipy.sparse as sps
     N = len(centre)
-    bound = np.maximum(half_width - car_half_width - margin, 0.03)
+    lo, hi = lateral_bounds(centre, normal, half_width, cones, car_half_width + margin)
     idx = np.arange(N)
     ds = float(np.median(np.linalg.norm(np.roll(centre, -1, axis=0) - centre, axis=1)))
     # second difference divided by ds^2 approximates curvature, so the objective (and reg) mean
@@ -39,7 +72,7 @@ def min_curvature(centre, normal, half_width, car_half_width=0.135, margin=0.12,
         Hc = ca.DM(H)
         qp = {"x": a, "f": 0.5 * ca.dot(a, ca.mtimes(Hc, a)) + ca.dot(ca.DM(g), a)}
         solver = ca.qpsol("qp", "qrqp", qp, {"print_iter": False, "print_header": False, "error_on_fail": False})
-        sol = solver(lbx=-bound, ubx=bound, x0=np.zeros(N))
+        sol = solver(lbx=lo, ubx=hi, x0=np.clip(np.zeros(N), lo, hi))
         alpha = np.asarray(sol["x"]).flatten()
         if not np.all(np.isfinite(alpha)):
             alpha = None
@@ -48,7 +81,7 @@ def min_curvature(centre, normal, half_width, car_half_width=0.135, margin=0.12,
     if alpha is None:
         from scipy.optimize import minimize
         res = minimize(lambda x: 0.5 * x @ (H @ x) + g @ x, np.zeros(N), jac=lambda x: H @ x + g,
-                       method="L-BFGS-B", bounds=list(zip(-bound, bound)), options={"maxiter": 500})
+                       method="L-BFGS-B", bounds=list(zip(lo, hi)), options={"maxiter": 500})
         alpha = res.x
     return centre + alpha[:, None] * normal, alpha
 

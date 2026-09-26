@@ -29,6 +29,7 @@ class GraphSLAM:
         self.dx_weight, self.z_weight = dx_weight, z_weight
         self.icp_min_matches, self.icp_max_shift, self.icp_max_turn = icp_min_matches, icp_max_shift, icp_max_turn
         self.icp_max_residual = 0.5
+        self.icp_gate_frac = 0.45               # gate never more than this fraction of the local landmark spacing
         self.new_landmark_dist, self.icp_gate, self.icp_iterations = new_landmark_dist, icp_gate, icp_iterations
         self.rows = []               # (row, col, value) triplets of A
         self.b = []
@@ -74,6 +75,14 @@ class GraphSLAM:
         if len(z) < 2 or len(self.lhat) < 2:
             return t, R
         lcol = self.colour
+        # where landmarks stand close together (two track sections side by side, a hairpin's
+        # inner cones) the gate shrinks to a fraction of the local spacing, so a cone is never
+        # associated across to its neighbour's section
+        gate = np.full(len(self.lhat), self.icp_gate)
+        if self.icp_gate_frac > 0 and len(self.lhat) >= 2:
+            dd = np.linalg.norm(self.lhat[:, None, :] - self.lhat[None, :, :], axis=2)
+            np.fill_diagonal(dd, np.inf)
+            gate = np.minimum(gate, self.icp_gate_frac * dd.min(axis=1))
         for _ in range(self.icp_iterations):
             zz = z @ R.T + t
             X, Y = [], []
@@ -85,7 +94,7 @@ class GraphSLAM:
                 d = np.linalg.norm(zz[zi][:, None, :] - self.lhat[li][None, :, :], axis=2)
                 fwd, bwd = np.argmin(d, axis=1), np.argmin(d, axis=0)
                 for i, j in enumerate(fwd):
-                    if bwd[j] == i and d[i, j] < self.icp_gate:
+                    if bwd[j] == i and d[i, j] < gate[li[j]]:
                         X.append(z[zi[i]])
                         Y.append(self.lhat[li[j]])
             if len(X) < self.icp_min_matches:
@@ -103,7 +112,7 @@ class GraphSLAM:
             return np.zeros(2), np.eye(2)
         return t, R
 
-    def relocalise(self, z_rel, colour, min_matches=4):
+    def relocalise(self, z_rel, colour, min_matches=4, near=None, radius=3.0):
         """Find the car anywhere on the frozen map from the cones in view, heading known (the
         IMU heading is absolute, so only a translation is unknown). Every pairing of a seen cone
         with a landmark of its colour is a candidate translation; the one that lays the most
@@ -121,6 +130,10 @@ class GraphSLAM:
         if not cands:
             return None
         T = np.vstack(cands)                                                   # (C, 2)
+        if near is not None:                                                   # only positions close to the guess
+            T = T[np.linalg.norm(T - np.asarray(near, float), axis=1) < radius]
+            if len(T) == 0:
+                return None
         d = np.linalg.norm((z_rel[None, :, None, :] + T[:, None, None, :]) - self.lhat[None, None, :, :], axis=3)   # (C, n, L)
         hit = d.min(axis=2) < 0.4
         score = hit.sum(axis=1)
@@ -224,13 +237,22 @@ class GraphSLAM:
         self.lhat, self.votes, self.count = lhat[merged], votes[merged], count[merged]
         self.frozen = True
 
-    def localise(self, pose_guess, z_rel, colour, wide=True):
+    def localise(self, pose_guess, z_rel, colour, wide=True, subset=None):
         """Correct a dead-reckoned position against the frozen map. Returns the corrected (x, y)
-        and how many cones matched. With `wide`, a failed match is retried with a 3 m net."""
+        and how many cones matched. With `wide`, a failed match is retried as a unique translation
+        search within 3 m."""
         pose_guess = np.asarray(pose_guess, float)
         z_rel, colour = np.asarray(z_rel, float).reshape(-1, 2), np.asarray(colour, int)
         if len(z_rel) < 3:
             return pose_guess, 0
+        if subset is not None:                  # only the landmarks along the stretch the car is on
+            saved = (self.lhat, self.votes, self.count, self.colour_override)
+            try:
+                self.lhat, self.votes, self.count = self.lhat[subset], self.votes[subset], self.count[subset]
+                self.colour_override = None if saved[3] is None else saved[3][subset]
+                return self.localise(pose_guess, z_rel, colour, wide=wide)
+            finally:
+                self.lhat, self.votes, self.count, self.colour_override = saved
         zw = z_rel + pose_guess
         saved_min = self.icp_min_matches
         self.icp_min_matches = 3                 # a hairpin shows only a few cones; three are enough to hold position
@@ -239,14 +261,13 @@ class GraphSLAM:
         finally:
             self.icp_min_matches = saved_min
         if not np.any(t) and wide:
-            # nothing within the usual gate: the car may have drifted more than that, so try
-            # once with a wider net (translation only is what matters here)
-            saved = (self.icp_gate, self.icp_max_shift, self.icp_min_matches)
-            self.icp_gate, self.icp_max_shift, self.icp_min_matches = 3.0, 3.0, 4
-            try:
-                t, R = self.icp(zw, colour)
-            finally:
-                self.icp_gate, self.icp_max_shift, self.icp_min_matches = saved
+            # nothing within the usual gate: the car may have drifted more than that. A wider
+            # ICP net would happily lock one cone along on a regular layout, so instead search
+            # the translations within 3 m and accept only a clear, unique fit.
+            found = self.relocalise(z_rel, colour, near=pose_guess, radius=3.0)
+            if found is None:
+                return pose_guess, 0
+            t, R = found - pose_guess, np.eye(2)
         if not np.any(t):
             return pose_guess, 0
         zz = zw @ R.T + t
