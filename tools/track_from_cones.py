@@ -84,8 +84,18 @@ cones += [{"x": round(float(x), 3), "y": round(float(y), 3), "color": "orange"} 
     f"# corridor midpoints from {src.name}, scaled by {scale:.3f} so the track is {args.width} m wide\n"
     f"width: {args.width}\nresolution: 0.05\npoints:\n" + "".join(f"  - [{p[0]:.2f}, {p[1]:.2f}]\n" for p in kept))
 gate = orange.mean(axis=0) if len(orange) else kept[0]
+# driving direction: blue cones stand on the left of travel, so if the blue boundary is the inner
+# one the lap runs counter-clockwise, otherwise clockwise
+K = np.array(kept)
+area = 0.5 * np.sum(K[:, 0] * np.roll(K[:, 1], -1) - np.roll(K[:, 0], -1) * K[:, 1])      # positive = ccw polygon
+ccw_poly = area > 0
+inner_blue = np.mean([np.min(np.linalg.norm(K - b, axis=1)) for b in blue]) < np.mean([np.min(np.linalg.norm(K - y, axis=1)) for y in yellow])
+# with a ccw walk the inside is on the left; if blue is nearer the centroid it is the inner boundary
+centroid = K.mean(axis=0)
+inner_blue = np.mean(np.linalg.norm(blue - centroid, axis=1)) < np.mean(np.linalg.norm(yellow - centroid, axis=1))
+direction = args.direction or ("ccw" if inner_blue else "cw")
 (folder / "track.yaml").write_text(
-    f"name: {args.name}\ncategory: {args.category}\ndirection: {args.direction or 'ccw'}\ncheckpoints: 30\n"
+    f"name: {args.name}\ncategory: {args.category}\ndirection: {direction}\ncheckpoints: 30\n"
     f"qualifying: false\nstart: [{gate[0]:.2f}, {gate[1]:.2f}]\ncones:\n  from: cones.json\n")
 seg = np.linalg.norm(np.diff(np.vstack([kept, kept[:1]]), axis=0), axis=1).sum()
 print(f"{args.name}: {len(blue)} blue, {len(yellow)} yellow, {len(orange)} orange, scale {scale:.3f}, about {seg:.0f} m -> {folder}")

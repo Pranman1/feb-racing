@@ -1,6 +1,6 @@
 name: FS hairpins (EUFS)
 category: fsae
-direction: ccw
+direction: cw
 checkpoints: 30
 qualifying: false
 start:
