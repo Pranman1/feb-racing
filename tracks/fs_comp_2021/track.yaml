@@ -1,14 +1,10 @@
 name: FS comp 2021 (EUFS)
 category: fsae
+resolution: 0.05
+origin: [0.0, 0.0]
 direction: cw
 checkpoints: 30
 qualifying: false
-start:
-- 27.77
-- 4.11
+start: [27.77, 4.11]
 cones:
   from: cones.json
-resolution: 0.05
-origin:
-- 2.069843671875
-- 2.00736

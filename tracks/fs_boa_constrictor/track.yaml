@@ -1,14 +1,10 @@
 name: FS boa constrictor (EUFS)
 category: fsae
+resolution: 0.05
+origin: [0.0, 0.0]
 direction: ccw
 checkpoints: 30
 qualifying: false
-start:
-- 14.46
-- 4.48
+start: [14.46, 4.48]
 cones:
   from: cones.json
-resolution: 0.05
-origin:
-- 2.499965625
-- 2.1473299999999997

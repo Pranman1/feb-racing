@@ -1,14 +1,10 @@
 name: FS hairpins (EUFS)
 category: fsae
+resolution: 0.05
+origin: [0.0, 0.0]
 direction: cw
 checkpoints: 30
 qualifying: false
-start:
-- 20.99
-- 101.04
+start: [20.99, 101.04]
 cones:
   from: cones.json
-resolution: 0.05
-origin:
-- 2.0193325000000004
-- 2.035439999999999

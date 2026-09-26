@@ -1,5 +1,9 @@
 name: FS Germany
 category: fsae
+resolution: 0.05
+origin:
+- 0.0
+- 0.0
 direction: cw
 checkpoints: 30
 qualifying: false
@@ -8,8 +12,4 @@ start:
 - 44.49
 cones:
   from: cones.json
-resolution: 0.05
-origin:
-- 2.102215234375
-- 2.4431249999999998
 difficulty: 3

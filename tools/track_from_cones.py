@@ -3,13 +3,14 @@
 
 Reads the cone lists of a FSSIM track (AMZ, `cones_left`/`cones_right`/`cones_orange_big` in
 a yaml) or an EUFS track (`tag,x,y,...` csv with blue/yellow/big_orange rows), scales them so
-the corridor is our standard width, writes the cones to cones.json and a design.yaml of the
-corridor's midpoints for track_design.py, and a track.yaml that uses those cones.
+the corridor is our standard width, writes the cones to cones.json, rasterises the corridor between the two boundaries into
+map.png (so centreline, checkpoints and the asphalt follow the real layout), and a track.yaml
+that uses those cones.
 
     tools/track_from_cones.py FSG.yaml tracks/fsg --name "FSG trackdrive" --width 2.2
     tools/track_from_cones.py small_track.csv tracks/eufs_small --name "EUFS small"
 
-Then, as for any track:  tools/track_design.py tracks/fsg/design.yaml && tools/track_build.py tracks/fsg
+Then, as for any track:  tools/track_build.py tracks/fsg
 """
 import argparse
 import csv
@@ -57,22 +58,24 @@ def order(pts):
 
 
 blue_o, yellow_o = order(blue), order(yellow)
-# corridor midpoints: walk the blue boundary and take the midpoint to the nearest yellow cone
-mid = np.array([(b + yellow[np.argmin(np.linalg.norm(yellow - b, axis=1))]) / 2.0 for b in blue_o])
-# smooth the midpoints (closed) so the corridor does not zigzag between cone pairs
-k = 2
-pad = np.vstack([mid[-k:], mid, mid[:k]])
-mid = np.column_stack([np.convolve(pad[:, 0], np.ones(2 * k + 1) / (2 * k + 1), mode="valid"), np.convolve(pad[:, 1], np.ones(2 * k + 1) / (2 * k + 1), mode="valid")])
-# keep the design points at least a metre apart
-kept = [mid[0]]
-for p in mid[1:]:
-    if np.linalg.norm(p - kept[-1]) >= 1.0:
-        kept.append(p)
-if np.linalg.norm(kept[-1] - kept[0]) < 0.5:
-    kept.pop()
 # shift everything so the drawing starts near the origin
 shift = np.min(np.vstack([blue, yellow]), axis=0) - 3.0
-blue, yellow, orange, kept = blue - shift, yellow - shift, orange - shift, [p - shift for p in kept]
+blue, yellow, orange, blue_o, yellow_o = blue - shift, yellow - shift, orange - shift, blue_o - shift, yellow_o - shift
+# the corridor is the ring between the two ordered boundaries, rasterised straight from the cones
+# (no fixed width): the centreline, checkpoints and the asphalt then follow the real layout
+res = 0.05
+hi = np.max(np.vstack([blue, yellow]), axis=0) + 3.0
+W, H = int(hi[0] / res) + 1, int(hi[1] / res) + 1
+import cv2
+canvas = np.zeros((H, W), np.uint8)
+px = lambda pts: np.round(np.column_stack([pts[:, 0] / res, (H - 1) - pts[:, 1] / res])).astype(np.int32)
+cv2.fillPoly(canvas, [px(blue_o)], 255)
+cv2.fillPoly(canvas, [px(yellow_o)], 0) if cv2.contourArea(px(blue_o).astype(np.float32)) > cv2.contourArea(px(yellow_o).astype(np.float32)) else None
+if cv2.contourArea(px(blue_o).astype(np.float32)) <= cv2.contourArea(px(yellow_o).astype(np.float32)):
+    canvas[:] = 0
+    cv2.fillPoly(canvas, [px(yellow_o)], 255)
+    cv2.fillPoly(canvas, [px(blue_o)], 0)
+kept = np.array([(b + yellow[np.argmin(np.linalg.norm(yellow - b, axis=1))]) / 2.0 for b in blue_o])   # only for the length estimate
 
 folder = pathlib.Path(args.folder)
 folder.mkdir(parents=True, exist_ok=True)
@@ -80,9 +83,9 @@ cones = [{"x": round(float(x), 3), "y": round(float(y), 3), "color": "blue"} for
 cones += [{"x": round(float(x), 3), "y": round(float(y), 3), "color": "yellow"} for x, y in yellow]
 cones += [{"x": round(float(x), 3), "y": round(float(y), 3), "color": "orange"} for x, y in orange]
 (folder / "cones.json").write_text(json.dumps(cones))
-(folder / "design.yaml").write_text(
-    f"# corridor midpoints from {src.name}, scaled by {scale:.3f} so the track is {args.width} m wide\n"
-    f"width: {args.width}\nresolution: 0.05\npoints:\n" + "".join(f"  - [{p[0]:.2f}, {p[1]:.2f}]\n" for p in kept))
+cv2.imwrite(str(folder / "map.png"), canvas)
+for f in ("design.yaml",):
+    (folder / f).unlink(missing_ok=True)
 gate = orange.mean(axis=0) if len(orange) else kept[0]
 # driving direction: blue cones stand on the left of travel, so if the blue boundary is the inner
 # one the lap runs counter-clockwise, otherwise clockwise
@@ -95,7 +98,7 @@ centroid = K.mean(axis=0)
 inner_blue = np.mean(np.linalg.norm(blue - centroid, axis=1)) < np.mean(np.linalg.norm(yellow - centroid, axis=1))
 direction = args.direction or ("ccw" if inner_blue else "cw")
 (folder / "track.yaml").write_text(
-    f"name: {args.name}\ncategory: {args.category}\ndirection: {direction}\ncheckpoints: 30\n"
+    f"name: {args.name}\ncategory: {args.category}\nresolution: {res}\norigin: [0.0, 0.0]\ndirection: {direction}\ncheckpoints: 30\n"
     f"qualifying: false\nstart: [{gate[0]:.2f}, {gate[1]:.2f}]\ncones:\n  from: cones.json\n")
 seg = np.linalg.norm(np.diff(np.vstack([kept, kept[:1]]), axis=0), axis=1).sum()
 print(f"{args.name}: {len(blue)} blue, {len(yellow)} yellow, {len(orange)} orange, scale {scale:.3f}, about {seg:.0f} m -> {folder}")

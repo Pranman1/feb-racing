@@ -1,14 +1,10 @@
 name: FS bone (EUFS)
 category: fsae
+resolution: 0.05
+origin: [0.0, 0.0]
 direction: ccw
 checkpoints: 30
 qualifying: false
-start:
-- 11.68
-- 10.39
+start: [11.68, 10.39]
 cones:
   from: cones.json
-resolution: 0.05
-origin:
-- 2.1194740625000006
-- 2.4793662499999995
