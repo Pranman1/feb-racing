@@ -66,7 +66,7 @@ DEFAULTS = dict(
     # mpc: problem
     mpc_horizon=12, mpc_dt=0.1, mpc_max_iter=60, mpc_steer_tau=0.15, mpc_substeps=3,
     w_pos=8.0, w_head=2.0, w_speed=0.6, w_vy=0.2, w_dsteer=0.01, w_dtau=3.0, w_tau=0.3, dtau_max=0.4,
-    lost_after=1.5, loc_lost_after=3.0, reverse_throttle=0.07, reverse_cooldown=4.0,
+    lost_after=1.5, loc_lost_after=3.0, recovery="stop", reverse_throttle=0.07, reverse_cooldown=4.0,
     pursuit_lookahead=1.2, race_speed_scale=0.6,
 )
 
@@ -138,6 +138,7 @@ class Racer(Node):
         self.stalled_since = None
         self.reverse_until = None
         self.reverse_done_t = -1e9              # reverses may not chain: a few seconds of trying forward in between
+        self.halted = False
 
         self.pub_throttle = self.create_publisher(Float32, NS + "throttle_command", QOS)
         self.pub_steering = self.create_publisher(Float32, NS + "steering_command", QOS)
@@ -304,6 +305,8 @@ class Racer(Node):
             if t - self.stalled_since > 2.0 and self.can_reverse(t):
                 self.get_logger().warn("nothing to follow, backing up" if self.no_target else "stuck, backing up")
                 self.reverse_until = t + 1.2
+        if self.halted:
+            steer, throttle = 0.0, 0.0
         self.steer, self.throttle = steer, throttle
         if t - self.status_t > 0.5:
             self.status_t = t
@@ -347,11 +350,12 @@ class Racer(Node):
             return
         # back near the start with the orange gate in view: close the loop with a wide net, so
         # odometry drift over a long lap cannot leave the start cones unmatched
-        snap_radius = max(p["snap_radius"], 0.06 * self.travelled)       # drift grows with the lap; orange only stands at the gate
-        if self.travelled > p["min_lap_length"] and np.any(colours == ORANGE) and np.linalg.norm(self.pose - self.start[0]) < snap_radius:
-            # the gate is in view, so the car is within a few metres of the start whatever the
-            # pose says: a unique translation search against the landmarks around the start
-            # (an ICP with a wide net settles on a wrong local fit when the drift is metres)
+        snap_radius = max(p["snap_radius"], 0.06 * self.travelled)       # the drift grows with the lap
+        if self.travelled > p["min_lap_length"] + 20.0 and np.linalg.norm(self.pose - self.start[0]) < snap_radius and len(z_rel) >= 4:
+            # near the start again after a lap: a unique translation search of the cones in view
+            # against the landmarks mapped around the start closes the loop whatever the drift
+            # (an ICP with a wide net settles on a wrong local fit when the drift is metres; the
+            # search only answers when one placement fits clearly better than every other)
             guess = self.pose + self.since_key
             found = self.slam.relocalise(z_rel, colours, near=self.start[0], radius=snap_radius)
             if found is not None and np.linalg.norm(found - guess) > 0.05:
@@ -420,11 +424,12 @@ class Racer(Node):
                 n = min(len(b), len(y))
                 mid = (b[:n] + y[:n]) / 2.0
                 covered = float(np.sum(np.linalg.norm(np.diff(mid, axis=0), axis=1)))
-                if covered >= 0.7 * self.travelled:            # the rungs must go round the whole lap
+                if res.closed and covered >= 0.7 * self.travelled:   # a closed loop of rungs round the whole lap
                     rungs = (b, y)
-                    self.get_logger().info("cone ordering: %d rungs over %.0f m, %s track" % (n, covered, "closed" if res.closed else "open"))
+                    self.get_logger().info("cone ordering: %d rungs over %.0f m, closed track" % (n, covered))
                 else:
-                    self.get_logger().warn("cone ordering covered only %.0f m of a %.0f m lap; using the boundary walk" % (covered, self.travelled))
+                    self.get_logger().warn("cone ordering gave %s covering %.0f m of a %.0f m lap; using the boundary walk"
+                                           % ("a closed loop" if res.closed else "an open path", covered, self.travelled))
             else:
                 self.get_logger().warn("cone ordering returned nothing usable; using the boundary walk")
             self.complete_track(rungs)
@@ -795,6 +800,13 @@ class Racer(Node):
         self.pub_cones.publish(arr)
 
     def can_reverse(self, t):
+        """A stuck car may back up only with recovery=reverse (a simulator convenience). The
+        default, recovery=stop, is what the real car does: it stops, and the log says why."""
+        if self.p["recovery"] != "reverse":
+            if not self.halted:
+                self.halted = True
+                self.get_logger().error("stopped: the car is stuck and recovery is 'stop' (set recovery: reverse in racer.yaml to let it back up)")
+            return False
         return self.reverse_until is None and t - self.reverse_done_t > self.p["reverse_cooldown"]
 
     def status_line(self, t, moving):
@@ -809,6 +821,8 @@ class Racer(Node):
             what = "racing on " + ("the reactive follower (localisation lost)" if self.local_mode else ("MPC" if self.mpc else "pure pursuit"))
             detail = "lap %d" % max(len(self.lap_times) - 1, 0)
         flags = []
+        if self.halted:
+            flags.append("stopped (stuck)")
         if self.reverse_until is not None:
             flags.append("backing up")
         if t - self.last_seen_t > self.p["lost_after"]:
