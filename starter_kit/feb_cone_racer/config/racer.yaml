@@ -60,6 +60,6 @@ racer:
     tau_max: 0.14             # throttle cap: the wheels spin above this; about 3.3 m/s steady state
     push_throttle: 0.16       # not moving with the throttle on: push this hard for 1.5 s before giving up (a cone under the bumper)
     throttle_start: 0.07      # the least throttle that gets the car rolling from rest
-    recovery: stop            # stuck: 'stop' like the real car (cones fall over when hit, so this is rare), or 'reverse' to back up
+    recovery: stop            # stuck while racing: 'stop' like the real car, or 'reverse' to back up; the mapping lap may always back up gently out of a dead end
     reverse_throttle: 0.07    # with recovery: reverse; 0.12 reversed at 3 m/s, far too much
     reverse_cooldown: 4.0     # s of trying forward before another reverse may start

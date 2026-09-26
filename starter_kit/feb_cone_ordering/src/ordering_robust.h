@@ -55,11 +55,11 @@ inline std::vector<std::pair<bool, int>> suspects(const std::vector<Point> &blue
 /// Run the ordering; if a closed track came out with almost no rungs, retry with suspicious
 /// cones flipped (at most `tries` of them, one at a time). Returns how many flips were needed,
 /// or -1 if nothing helped (the caller falls back).
-inline int update(ConeOrderingState &state, int tries = 12) {
+inline int update(ConeOrderingState &state, int tries = 12, bool expect_closed = false) {
     const std::vector<Point> blue = state.bluePoints, red = state.redPoints;
     const Car car = state.car;
     cone_ordering::update(state);
-    if (healthy(state)) return 0;
+    if (healthy(state) && (state.is_closed || !expect_closed)) return 0;
     const auto order = suspects(blue, red);
     for (int k = 0; k < std::min(tries, static_cast<int>(order.size())); k++) {
         ConeOrderingState trial;
@@ -69,7 +69,7 @@ inline int update(ConeOrderingState &state, int tries = 12) {
         if (order[k].first) { trial.redPoints.push_back(blue[order[k].second]); trial.bluePoints.erase(trial.bluePoints.begin() + order[k].second); }
         else { trial.bluePoints.push_back(red[order[k].second]); trial.redPoints.erase(trial.redPoints.begin() + order[k].second); }
         cone_ordering::update(trial);
-        if (healthy(trial)) { state = trial; return k + 1; }
+        if (healthy(trial) && (trial.is_closed || !expect_closed)) { state = trial; return k + 1; }
     }
     return -1;
 }

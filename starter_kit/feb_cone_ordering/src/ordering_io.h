@@ -22,7 +22,7 @@ inline double yaw_of(const geometry_msgs::msg::Quaternion &q) {
 /// the start gate (four big cones half a metre apart) the slope field can be degenerate and the
 /// closed-track integration ends after a couple of steps; then the ordering is run again from a
 /// pose a little behind or ahead of the car along its heading, which is the same lap.
-inline void run(ConeOrderingState &state, const geometry_msgs::msg::Pose &car, const geometry_msgs::msg::PoseArray &map) {
+inline void run(ConeOrderingState &state, const geometry_msgs::msg::Pose &car, const geometry_msgs::msg::PoseArray &map, bool expect_closed = false) {
     const double yaw = yaw_of(car.orientation);
     const double offsets[] = {0.0, -2.0, 2.0, -4.0, 4.0, -6.0};
     for (double along : offsets) {
@@ -33,8 +33,8 @@ inline void run(ConeOrderingState &state, const geometry_msgs::msg::Pose &car, c
             if (colour == BLUE) state.bluePoints.push_back({p.position.x, p.position.y});
             else if (colour == YELLOW) state.redPoints.push_back({p.position.x, p.position.y});   // the team calls the right side red
         }
-        ordering_robust::update(state);
-        if (ordering_robust::healthy(state)) return;
+        ordering_robust::update(state, 12, expect_closed);
+        if (ordering_robust::healthy(state) && (state.is_closed || !expect_closed)) return;
     }
 }
 

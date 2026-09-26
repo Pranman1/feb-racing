@@ -46,7 +46,7 @@ private:
     void on_request(const std::shared_ptr<feb_cone_ordering::srv::OrderCones::Request> req,
                     std::shared_ptr<feb_cone_ordering::srv::OrderCones::Response> res) {
         ConeOrderingState state;
-        ordering_io::run(state, req->car, req->map);
+        ordering_io::run(state, req->car, req->map, true);     // the racer asks once its map is a closed loop
         res->closed = state.is_closed;
         res->blue = ordering_io::to_array(state.blueConeOrder, req->map.header.frame_id);
         res->yellow = ordering_io::to_array(state.redConeOrder, req->map.header.frame_id);

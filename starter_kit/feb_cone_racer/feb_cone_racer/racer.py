@@ -804,9 +804,11 @@ class Racer(Node):
         return None
 
     def can_reverse(self, t):
-        """A stuck car may back up only with recovery=reverse (a simulator convenience). The
-        default, recovery=stop, is what the real car does: it stops, and the log says why."""
-        if self.p["recovery"] != "reverse":
+        """Racing, a stuck car backs up only with recovery=reverse (a simulator convenience);
+        the default, recovery=stop, is what the real car does: it stops, and the log says why.
+        The mapping lap is the exception: it is exploratory, drives on a few metres of known
+        path at a time, and a short gentle back-up out of a dead end costs nothing there."""
+        if self.p["recovery"] != "reverse" and self.mode != "MAPPING":
             if not self.halted:
                 self.halted = True
                 self.get_logger().error("stopped: the car is stuck and recovery is 'stop' (set recovery: reverse in racer.yaml to let it back up)")
