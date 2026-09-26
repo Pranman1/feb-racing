@@ -95,7 +95,10 @@ cp -r starter_kit/feb_cone_racer starter_kit/feb_cone_ordering stack/
 starter_kit/feb_cone_racer/install_deps.sh      # scipy + CasADi into stack/.pydeps
 ```
 
-Lap 1 is driven by the baseline follower while **GraphSLAM** (the formulation of the team's FSAE
+Lap 1 is driven the way the car does it: the map grows with every keyframe, the team's cone
+ordering runs live on it and the car follows the local path its rungs describe (the
+baseline follower takes over if the rungs are stale, and drives when the ordering package is
+not in the stack), while **GraphSLAM** (the formulation of the team's FSAE
 `graphslam_global`, poses and cones as a sparse linear least-squares problem, ICP data
 association with colour votes, a wide-net loop closure at the orange start gate) builds the
 map from wheel odometry, IMU heading and the coloured cones. Back at the start the map is

@@ -51,10 +51,10 @@ DEFAULTS = dict(
     hsv_blue=[105, 220, 8, 135, 255, 255], hsv_yellow=[18, 150, 8, 40, 255, 255], hsv_orange=[0, 150, 15, 15, 255, 255],
     band_top=0.20, band_bottom=0.36, band_floor=0.21, orange_min_px=35,
     # lap-1 follower
-    map_speed=1.2, map_min_speed=0.8, lookahead=1.0, chain_step=1.8, avoid_range=0.9,
+    map_speed=1.2, map_min_speed=0.8, lookahead=1.0, chain_step=1.8, avoid_range=0.9, local_path_lookahead=1.4, rung_max_age=1.0,
     speed_per_throttle=23.0, throttle_kp=0.02, throttle_ki=0.03, throttle_slew=0.8, speed_window=0.25, steer_tau=0.15,
     # slam
-    keyframe_dist=0.4, slam_range=5.0, loc_range=6.0, dx_weight=2.0, z_weight=1.0, new_landmark_dist=0.6, icp_gate=1.5,
+    keyframe_dist=0.4, slam_range=6.0, loc_range=6.0, dx_weight=2.0, z_weight=1.0, new_landmark_dist=0.6, icp_gate=1.5,
     solve_every=3, min_lap_length=15.0, order_timeout=3.0, lap_close_dist=2.0, min_seen=2, icp_min_matches=5, snap_radius=10.0, snap_gate=6.0,
     # raceline
     sample_step=0.25, car_half_width=0.135, margin=0.55, curvature_reg=0.01,
@@ -142,6 +142,11 @@ class Racer(Node):
         self.pub_steering = self.create_publisher(Float32, NS + "steering_command", QOS)
         self.pub_cones = self.create_publisher(PoseArray, "/feb/cones", 10)
         self.pub_map = self.create_publisher(PoseArray, "/feb/map", 10)
+        # the team's cone ordering, live on the growing map: lap one follows its local path
+        self.rungs = {"blue": None, "yellow": None, "t": -1e9}
+        self.create_subscription(PoseArray, "/feb/cone_order/blue", lambda m: self.on_rungs("blue", m), 10)
+        self.create_subscription(PoseArray, "/feb/cone_order/yellow", lambda m: self.on_rungs("yellow", m), 10)
+        self.lap_one_scans = [0, 0]              # scans of lap one on the team's local path, on the reactive follower
         self.order_client = self.create_client(OrderCones, "/feb/order_cones") if OrderCones is not None else None
         self.order_future = None
         self.pub_line = self.create_publisher(Path, "/feb/raceline", 10)
@@ -223,7 +228,11 @@ class Racer(Node):
             self.ordering_step()
         elif self.mode == "MAPPING":
             self.mapping_step(z_rel, colours, weights)
-            steer, throttle = self.follow_local(clusters, cones, dt)
+            if len(self.slam.lhat) >= 4:
+                self.pub_map.publish(self.map_message())      # the growing map, every scan: the live ordering starts at the car
+            local = self.follow_rungs(clusters, dt)
+            self.lap_one_scans[0 if local is not None else 1] += 1
+            steer, throttle = local if local is not None else self.follow_local(clusters, cones, dt)
             if t - self.last_seen_t > self.p["lost_after"] + 1.5 and self.reverse_until is None:
                 self.get_logger().warn("no cones in view: backing up")     # nosed out of the corridor
                 self.reverse_until = t + 1.5
@@ -337,6 +346,7 @@ class Racer(Node):
         self.keyframes += 1
         self.since_key = np.zeros(2)
         self.since_key_dist = 0.0
+
         if self.keyframes % int(p["solve_every"]) == 0:
             try:
                 self.slam.solve()
@@ -369,7 +379,9 @@ class Racer(Node):
             self.order_future = self.order_client.call_async(req)
             self.order_deadline = self.last_t + p["order_timeout"]
             self.mode = "ORDERING"
-            self.get_logger().info("map closed after %.1f s: %d cones; asking the team's cone ordering" % (self.lap_times[-1], len(self.slam.lhat)))
+            a, b = self.lap_one_scans
+            self.get_logger().info("map closed after %.1f s: %d cones, lap one %.0f%% on the team's local path; asking the team's cone ordering"
+                                   % (self.lap_times[-1], len(self.slam.lhat), 100.0 * a / max(a + b, 1)))
         else:
             self.get_logger().info("map closed after %.1f s: %d cones; no cone ordering service, using the boundary walk" % (self.lap_times[-1], len(self.slam.lhat)))
             self.complete_track(None)
@@ -516,6 +528,46 @@ class Racer(Node):
                 nx, ny = -rt[j][1], rt[j][0]                     # left-hand normal of the yellow chain
                 points.append((r[0] + half * nx, r[1] + half * ny))
         return sorted([q for q in points if q[0] > 0.0], key=lambda q: math.hypot(*q))
+
+    def on_rungs(self, side, msg):
+        self.rungs[side] = np.array([[q.position.x, q.position.y] for q in msg.poses]).reshape(-1, 2)
+        self.rungs["t"] = self.last_t if self.last_t is not None else -1e9
+
+    def follow_rungs(self, clusters, dt):
+        """Lap one the way the car does it: the cone ordering runs live on the growing map and
+        its rungs give a local path (the rung midpoints, map frame). Pure pursuit on the first
+        midpoint ahead of the car beyond the lookahead. None when the rungs are stale or empty,
+        and the reactive follower takes over."""
+        p = self.p
+        b, y = self.rungs["blue"], self.rungs["yellow"]
+        if b is None or y is None or self.last_t - self.rungs["t"] > p["rung_max_age"]:
+            return None
+        n = min(len(b), len(y))
+        if n < 2:
+            return None
+        mid = (b[:n] + y[:n]) / 2.0 - self.pose
+        c, s_ = math.cos(-self.yaw), math.sin(-self.yaw)
+        local = np.column_stack([c * mid[:, 0] - s_ * mid[:, 1], s_ * mid[:, 0] + c * mid[:, 1]])   # car frame
+        ahead = [q for q in local if q[0] > 0.2]
+        if not ahead:
+            return None
+        far = [q for q in ahead if math.hypot(*q) >= p["local_path_lookahead"]]
+        target = far[0] if far else max(ahead, key=lambda q: q[0])     # the path may end just ahead on a young map
+        if target[0] < 0.8:
+            return None                                                # too close to steer by
+        self.no_target = False
+        self.target_t = self.last_t
+        ld = max(math.hypot(*target), 0.3)
+        alpha = math.atan2(target[1], target[0])
+        wanted = math.atan(2.0 * WHEELBASE * math.sin(alpha) / ld)
+        for x, y_ in clusters:                                       # a cone right ahead still pushes the wheel away
+            if 0.0 < x < p["avoid_range"] and abs(y_) < 0.5:
+                wanted -= math.copysign(0.6, y_) * (1.0 - x / p["avoid_range"])
+        wanted = float(np.clip(wanted, -MAX_STEER, MAX_STEER))
+        step = (wanted - self.steer) * min(1.0, dt / p["steer_tau"])
+        steer = self.steer + float(np.clip(step, -MAX_STEER_RATE * dt, MAX_STEER_RATE * dt))
+        v_goal = max(p["map_min_speed"], p["map_speed"] * (1.0 - 0.7 * abs(steer) / MAX_STEER))
+        return steer, self.throttle_law(v_goal, dt)
 
     def follow_local(self, clusters, cones, dt):
         p = self.p
