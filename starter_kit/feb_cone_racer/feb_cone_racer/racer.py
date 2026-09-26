@@ -51,7 +51,7 @@ DEFAULTS = dict(
     hsv_blue=[105, 220, 8, 135, 255, 255], hsv_yellow=[18, 150, 8, 40, 255, 255], hsv_orange=[0, 150, 15, 15, 255, 255],
     band_top=0.20, band_bottom=0.36, band_floor=0.21, orange_min_px=35,
     # lap-1 follower
-    map_speed=1.2, map_min_speed=0.8, lookahead=1.0, chain_step=1.8, avoid_range=0.9, local_path_lookahead=1.4, rung_max_age=1.0,
+    map_speed=1.2, map_min_speed=0.6, lookahead=1.0, chain_step=1.8, avoid_range=0.9, local_path_lookahead=1.4, rung_max_age=1.0,
     speed_per_throttle=23.0, throttle_kp=0.02, throttle_ki=0.03, throttle_slew=0.8, speed_window=0.25, steer_tau=0.15,
     # slam
     keyframe_dist=0.4, slam_range=6.0, loc_range=6.0, loc_corridor=2.5, dx_weight=2.0, z_weight=1.0, new_landmark_dist=0.6, icp_gate=1.5,
@@ -591,6 +591,7 @@ class Racer(Node):
         target = far[0] if far else max(ahead, key=lambda q: q[0])     # the path may end just ahead on a young map
         if target[0] < 0.8:
             return None                                                # too close to steer by
+        reach = max(q[0] for q in ahead)                               # how far the known path goes: slow down when it is short
         self.no_target = False
         self.target_t = self.last_t
         ld = max(math.hypot(*target), 0.3)
@@ -602,7 +603,7 @@ class Racer(Node):
         wanted = float(np.clip(wanted, -MAX_STEER, MAX_STEER))
         step = (wanted - self.steer) * min(1.0, dt / p["steer_tau"])
         steer = self.steer + float(np.clip(step, -MAX_STEER_RATE * dt, MAX_STEER_RATE * dt))
-        v_goal = max(p["map_min_speed"], p["map_speed"] * (1.0 - 0.7 * abs(steer) / MAX_STEER))
+        v_goal = max(p["map_min_speed"], p["map_speed"] * (1.0 - 0.7 * abs(steer) / MAX_STEER) * min(1.0, reach / 4.0))
         return steer, self.throttle_law(v_goal, dt)
 
     def follow_gap(self, msg, dt):

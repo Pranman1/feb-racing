@@ -313,6 +313,8 @@ def build_track(folder):
         "spawn": spawn,
         "walls": [],
         "cones": [],
+        # the corridor's two edges, resampled: the app paints the asphalt between them
+        "edges": [frame.to_map(resample_closed(simplify(c), 0.25 / frame.res)).round(3).flatten().tolist() for c in (outer, hole)],
     }
     if "walls" in cfg:
         diameter = float(cfg["walls"].get("diameter", 0.33))

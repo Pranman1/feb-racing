@@ -14,7 +14,7 @@ racer:
     match_px_frac: 0.04       # a lidar cone takes a blob's colour only within this fraction of the width
     # lap 1: the mapping lap, driven by the simple follower
     map_speed: 1.2
-    map_min_speed: 0.8
+    map_min_speed: 0.6
     lookahead: 1.0
     local_path_lookahead: 1.4   # m, pure-pursuit target along the live cone ordering's local path on lap one
     rung_max_age: 1.0         # s; older rungs hand lap one back to the reactive follower
