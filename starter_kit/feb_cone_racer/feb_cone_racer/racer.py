@@ -51,7 +51,7 @@ DEFAULTS = dict(
     hsv_blue=[105, 220, 8, 135, 255, 255], hsv_yellow=[18, 150, 8, 40, 255, 255], hsv_orange=[0, 150, 15, 15, 255, 255],
     band_top=0.20, band_bottom=0.36, band_floor=0.21, orange_min_px=35,
     # lap-1 follower
-    map_speed=1.2, map_min_speed=0.8, lookahead=1.0, throttle_start=0.07, chain_step=1.8, avoid_range=0.9, local_path_lookahead=1.4, rung_max_age=1.0,
+    map_speed=1.2, map_min_speed=0.8, lookahead=1.0, throttle_start=0.07, chain_step=1.8, avoid_range=0.9, local_path_lookahead=1.4, local_path_min_reach=3.0, rung_max_age=1.0,
     speed_per_throttle=23.0, throttle_kp=0.02, throttle_ki=0.03, throttle_slew=0.8, speed_window=0.25, steer_tau=0.15,
     # slam
     keyframe_dist=0.4, slam_range=6.0, loc_range=6.0, loc_corridor=2.5, dx_weight=2.0, z_weight=1.0, new_landmark_dist=0.6, icp_gate=1.5,
@@ -450,7 +450,7 @@ class Racer(Node):
         p = self.p
         lap = self.lap_times[-1]
         track = track_from_rungs(rungs[0], rungs[1], self.slam.colour_override, p["sample_step"], cones=self.slam.lhat) if rungs is not None else None
-        if track is not None and float(np.min(track["half_width"])) < 0.5:
+        if track is not None and float(np.min(track["half_width"])) < 0.25:      # only an absurd track goes back to the walk
             self.get_logger().warn("the ordering's track pinches to %.2f m somewhere; using the boundary walk" % float(np.min(track["half_width"])))
             track, rungs = None, None
         if track is None:
@@ -601,10 +601,10 @@ class Racer(Node):
             return None
         far = [q for q in ahead if math.hypot(*q) >= p["local_path_lookahead"]]
         target = far[0] if far else max(ahead, key=lambda q: q[0])     # the path may end just ahead on a young map
-        if target[0] < 0.8:
-            return None                                                # too close to steer by
-        reach = max(q[0] for q in ahead)                               # how far the known path goes: slow down when it is short
+        reach = max(q[0] for q in ahead)                               # how far the known path goes
         self.path_reach = reach
+        if target[0] < 0.8 or reach < p["local_path_min_reach"]:
+            return None                                                # too short to steer by: the reactive follower knows better here
         self.no_target = False
         self.target_t = self.last_t
         ld = max(math.hypot(*target), 0.3)
