@@ -9,6 +9,7 @@
 
 #include "algorithms/util.h"
 #include "algorithms/cone_ordering.h"
+#include "ordering_robust.h"
 
 namespace ordering_io {
 constexpr int BLUE = 1, YELLOW = 2;
@@ -32,8 +33,8 @@ inline void run(ConeOrderingState &state, const geometry_msgs::msg::Pose &car, c
             if (colour == BLUE) state.bluePoints.push_back({p.position.x, p.position.y});
             else if (colour == YELLOW) state.redPoints.push_back({p.position.x, p.position.y});   // the team calls the right side red
         }
-        cone_ordering::update(state);
-        if (!state.is_closed || state.redConeOrder.size() >= 8) return;
+        ordering_robust::update(state);
+        if (ordering_robust::healthy(state)) return;
     }
 }
 

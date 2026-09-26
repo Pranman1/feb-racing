@@ -139,7 +139,9 @@ the cube of the distance, and integrating that slope field from the car gives a 
 middle of the corridor; every second path point is projected sideways onto both boundaries
 (rotated when a rung would cross the previous one, snapped to the polygon), giving aligned
 blue and yellow lists, one rung per 0.2 m along the track. It never chains cones, so a
-missing or mislabelled cone only bends the field locally. On the recorded Spielberg map:
+missing cone only bends the field locally; a mislabelled one can still collapse a closed map's
+ordering, so the node's wrapper flips the most suspicious cones and retries (no change to the
+algorithm itself). On the recorded Spielberg map:
 1693 rungs, widths 2.1 to 2.8 m, midpoints never closer than 1.0 m to a cone, no crossing
 rungs, in well under a second.
 

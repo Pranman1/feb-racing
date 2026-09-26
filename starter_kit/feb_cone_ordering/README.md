@@ -21,4 +21,11 @@ and `/feb/cone_order/yellow` from `/feb/map` and `/feb/pose`), on demand through
 printf 'car 0 0 0\nb 0 1\nb 2 1\ny 0 -1\ny 2 -1\n' | ros2 run feb_cone_ordering cone_order_cli
 ```
 
+`src/ordering_robust.h` is the one addition around the algorithm: on a closed map a single cone
+of the wrong colour can collapse the ordering to a couple of rungs (13 of the 183 cones on the
+FS Germany map do that when flipped), so when that happens the most suspicious cones, those
+nearer to the other colour than to their own, are flipped one at a time and the ordering run
+again; 12 of those 13 cases recover with one to three flips, in about 10 ms each. The node also
+retries from a pose a little behind or ahead of the car. Nothing in `src/algorithms` changed.
+
 The constants (edge limit, step, rotation, falloff) are in `src/algorithms/util.h`.

@@ -7,6 +7,7 @@
 
 #include "algorithms/util.h"
 #include "algorithms/cone_ordering.h"
+#include "ordering_robust.h"
 
 int main() {
     ConeOrderingState state;
@@ -23,7 +24,8 @@ int main() {
             (kind == "b" ? state.bluePoints : state.redPoints).push_back(p);
         }
     }
-    cone_ordering::update(state);
+    const int flips = ordering_robust::update(state);
+    std::cout << "flips " << flips << "\n";
     std::cout << "closed " << (state.is_closed ? 1 : 0) << "\n";
     for (size_t i = 0; i < state.redConeOrder.size() && i < state.blueConeOrder.size(); i++) {
         std::cout << "rung " << state.blueConeOrder[i].x << " " << state.blueConeOrder[i].y << " "

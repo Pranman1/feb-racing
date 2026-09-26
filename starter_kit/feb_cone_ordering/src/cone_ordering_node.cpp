@@ -52,6 +52,7 @@ private:
         res->yellow = ordering_io::to_array(state.redConeOrder, req->map.header.frame_id);
         RCLCPP_INFO(get_logger(), "ordered %zu blue + %zu yellow cones into %zu rungs (%s track)",
                     state.bluePoints.size(), state.redPoints.size(), state.redConeOrder.size(), state.is_closed ? "closed" : "open");
+        if (state.is_closed && state.redConeOrder.size() < 8) RCLCPP_WARN(get_logger(), "ordering collapsed even after flipping suspicious cones; the racer falls back to its own walk");
     }
 
     geometry_msgs::msg::Pose car_;
