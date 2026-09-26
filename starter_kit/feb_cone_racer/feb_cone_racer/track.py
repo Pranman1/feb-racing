@@ -123,7 +123,7 @@ def repair_by_path(lhat, colour, path):
     return colour
 
 
-def track_from_rungs(blue, yellow, colour, step=0.25):
+def track_from_rungs(blue, yellow, colour, step=0.25, cones=None):
     """The track from the team's cone ordering: blue[i] and yellow[i] are the two ends of one
     rung across the track, in order along it. The centreline is the rung midpoints, the half
     width half the rung length, both resampled evenly; the boundaries are the rung ends."""
@@ -134,10 +134,31 @@ def track_from_rungs(blue, yellow, colour, step=0.25):
     blue, yellow = blue[:n], yellow[:n]
     centre = (blue + yellow) / 2.0
     half = np.linalg.norm(blue - yellow, axis=1) / 2.0
+    # the rungs come every 0.2 m and the odd one is rotated or out of step at a hairpin: drop
+    # midpoints that double back on their neighbours, then smooth over about a metre
+    for _ in range(4):
+        m = len(centre)
+        keep = np.ones(m, dtype=bool)
+        for i in range(m):
+            a, b = centre[i] - centre[i - 1], centre[(i + 1) % m] - centre[i]
+            if np.dot(a, b) < 0 and np.linalg.norm(a) > 1e-6 and np.linalg.norm(b) > 1e-6:
+                keep[i] = False
+        if np.all(keep):
+            break
+        centre, half = centre[keep], half[keep]
+    k = 4
+    pad = np.vstack([centre[-k:], centre, centre[:k]])
+    ker = np.ones(2 * k + 1) / (2 * k + 1)
+    centre = np.column_stack([np.convolve(pad[:, 0], ker, mode="valid"), np.convolve(pad[:, 1], ker, mode="valid")])
     seg = np.linalg.norm(np.vstack([np.diff(centre, axis=0), centre[:1] - centre[-1:]]), axis=1)
     s_in = np.concatenate([[0.0], np.cumsum(seg)])
     centre, s = resample_closed(centre, step)
     half = np.interp(s, s_in[:-1], half)
+    # never wider than the nearest mapped cone allows (the rung ends are projections and bunch
+    # up at a hairpin, so they are not used as a boundary line)
+    if cones is not None and len(cones):
+        cones = np.asarray(cones, float).reshape(-1, 2)
+        half = np.minimum(half, np.min(np.linalg.norm(centre[:, None, :] - cones[None, :, :], axis=2), axis=1))
     track = _finish(centre, half, s, step)
     track.update(left=blue, right=yellow, colour=np.array(colour, dtype=int))
     return track

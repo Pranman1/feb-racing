@@ -35,13 +35,13 @@ def lateral_bounds(centre, normal, half_width, cones, clearance):
         left = side > 0
         hi[idx[left]] = np.minimum(hi[idx[left]], side[left] - clearance)
         lo[idx[~left]] = np.maximum(lo[idx[~left]], side[~left] + clearance)
-    bad = hi < lo                                                   # a cone on the centreline: keep the roomier side
-    room_left = np.maximum(half_width - clearance, 0.03) - np.abs(lo)
-    for i in np.flatnonzero(bad):
+    # a cone near the centreline leaves no room between the bounds: pass it on the roomier side
+    # with a real interval to move in, so the solution bends rather than jumps
+    for i in np.flatnonzero(hi - lo < 0.15):
         if hi[i] + lo[i] > 0:
-            lo[i] = hi[i] - 0.06
+            lo[i] = hi[i] - 0.15
         else:
-            hi[i] = lo[i] + 0.06
+            hi[i] = lo[i] + 0.15
     return lo, hi
 
 

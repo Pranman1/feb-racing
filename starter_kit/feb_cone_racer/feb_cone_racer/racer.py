@@ -139,6 +139,7 @@ class Racer(Node):
         self.reverse_until = None
         self.reverse_done_t = -1e9              # reverses may not chain: a few seconds of trying forward in between
         self.halted = False
+        self.path_reach = 0.0
 
         self.pub_throttle = self.create_publisher(Float32, NS + "throttle_command", QOS)
         self.pub_steering = self.create_publisher(Float32, NS + "steering_command", QOS)
@@ -239,8 +240,12 @@ class Racer(Node):
             local = self.follow_rungs(clusters, dt)
             self.lap_one_scans[0 if local is not None else 1] += 1
             steer, throttle = local if local is not None else self.follow_local(clusters, cones, dt)
-            if self.no_target:
-                steer, throttle = self.follow_gap(msg, dt)
+            if self.no_target or (local is not None and self.path_reach < 2.5):
+                # nothing to follow, or the known path ends at an unseen corner: the lidar's
+                # widest opening is the safest heading until the corner's cones are coloured
+                gap = self.follow_gap(msg, dt)
+                if gap[1] > 0.0 or self.no_target:
+                    steer, throttle = gap
             if t - self.last_seen_t > self.p["lost_after"] + 1.5 and self.can_reverse(t):
                 self.get_logger().warn("no cones in view: backing up")     # nosed out of the corridor
                 self.reverse_until = t + 1.2
@@ -440,7 +445,10 @@ class Racer(Node):
     def complete_track(self, rungs):
         p = self.p
         lap = self.lap_times[-1]
-        track = track_from_rungs(rungs[0], rungs[1], self.slam.colour_override, p["sample_step"]) if rungs is not None else None
+        track = track_from_rungs(rungs[0], rungs[1], self.slam.colour_override, p["sample_step"], cones=self.slam.lhat) if rungs is not None else None
+        if track is not None and float(np.min(track["half_width"])) < 0.5:
+            self.get_logger().warn("the ordering's track pinches to %.2f m somewhere; using the boundary walk" % float(np.min(track["half_width"])))
+            track, rungs = None, None
         if track is None:
             track = build_track(self.slam.lhat, self.slam.colour, self.start[0], (math.cos(self.start[1]), math.sin(self.start[1])), p["sample_step"],
                                 path=self.slam.xhat)
@@ -592,6 +600,7 @@ class Racer(Node):
         if target[0] < 0.8:
             return None                                                # too close to steer by
         reach = max(q[0] for q in ahead)                               # how far the known path goes: slow down when it is short
+        self.path_reach = reach
         self.no_target = False
         self.target_t = self.last_t
         ld = max(math.hypot(*target), 0.3)
