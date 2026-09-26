@@ -16,9 +16,9 @@ UNKNOWN = 0                              # a lidar cone the camera has not colou
 class Perception:
     def __init__(self, p):
         self.p = p
-        self.blobs = []                 # [(colour, u_centre_px, top_row_px, area)] from the latest image
+        self.blobs = []                 # [(colour, u_centre_px, top_row_px, bottom_row_px, area)] from the latest image
         self.image_width = None
-        self.prev = []                  # last scan's cones: (x, y, colour, age)
+        self.prev = []                  # last scan's cones: (x, y, colour, age, colour votes)
         self.prev_yaw = None
 
     # ------------------------------------------------------------ camera
@@ -50,9 +50,15 @@ class Perception:
                 x, y, bw, bh = cv2.boundingRect(c)
                 if y + bh < floor * h:                   # entirely above the horizon: sky
                     continue
+                # a cone is brighter than the ground: a handful of dark pixels with the right hue
+                # (a speck on the ground, a streak at the horizon) is not one, and matched to a
+                # lidar cone it hands that cone the wrong colour
+                inside = mask[y:y + bh, x:x + bw] > 0
+                if float(np.mean(hsv[y:y + bh, x:x + bw, 2][inside])) < self.p["blob_min_value"]:
+                    continue
                 # the start cones are big: a small orange-hued blob is a shaded yellow cone
                 label = YELLOW if colour == ORANGE and area < self.p["orange_min_px"] else colour
-                blobs.append((label, x + bw / 2.0, float(y), area))   # colour, column, top row, area
+                blobs.append((label, x + bw / 2.0, float(y), float(y + bh), area))   # colour, column, top row, bottom row, area
         self.blobs = blobs
 
     # ------------------------------------------------------------ lidar
@@ -131,23 +137,34 @@ class Perception:
         ds = speed * dt
         c, s = math.cos(dyaw), math.sin(dyaw)
         moved = []
-        for x, y, colour, age in self.prev:
+        for x, y, colour, age, votes in self.prev:
             x0, y0 = x - ds, y
-            moved.append((c * x0 + s * y0, -s * x0 + c * y0, colour, age + 1))
+            moved.append((c * x0 + s * y0, -s * x0 + c * y0, colour, age + 1, votes))
         cam_colour, ambiguous = self.assign(clusters, yaw_rate)
         out, result = [], []
         for i, (x, y) in enumerate(clusters):
+            # the camera's word counts for less the farther the cone: a far cone is a few pixels
+            # wide and the blob of the cone behind it on the same bearing is easily taken for it
+            # (on this camera one reading in five is wrong beyond 4 m, one in thirty within 2 m)
+            reach = float(np.clip(1.3 - 0.15 * math.hypot(x, y), 0.35, 1.0))
             colour, age = cam_colour[i], 0
-            weight = 0.0 if colour is None else (0.3 if ambiguous[i] else 1.0)
-            if colour is None:
-                best, best_d = None, self.p["track_gate"]
-                for px, py, pc, page in moved:
-                    d = math.hypot(px - x, py - y)
-                    if d < best_d and page < self.p["track_memory"]:
-                        best, best_d = (pc, page), d
-                if best is not None:
-                    colour, age = best
-                    weight = 0.3
+            weight = 0.0 if colour is None else (0.3 if ambiguous[i] else 1.0) * reach
+            # the same cone last scan: its colour votes carry over, so one wrong reading of a
+            # cone the camera has seen right several times does not change it
+            votes = {}
+            best, best_d = None, self.p["track_gate"]
+            for px, py, pc, page, pv in moved:
+                d = math.hypot(px - x, py - y)
+                if d < best_d and page < self.p["track_memory"]:
+                    best, best_d = (pc, page, pv), d
+            if best is not None:
+                votes = {c: 0.9 * v for c, v in best[2].items()}
+            if colour is not None:
+                votes[colour] = votes.get(colour, 0.0) + weight
+                colour = max(votes, key=votes.get)
+            elif best is not None:
+                colour, age = best[0], best[1]
+                weight = 0.3
             if colour is None and 0.0 < x < self.p["side_guess_range"] and abs(y) < self.p["track_width"]:
                 colour, age, weight = (BLUE if y > 0.0 else YELLOW), self.p["track_memory"] - 1, 0.0
             # a cone right beside the car is that side's boundary as long as the car is between
@@ -157,9 +174,9 @@ class Perception:
                 side = BLUE if y > 0.0 else YELLOW
                 if colour != side and colour != ORANGE:
                     colour, weight = side, 0.0
-            out.append((x, y, colour, age))
+            out.append((x, y, colour, age, votes))
             if colour is not None:
                 result.append((x, y, colour, weight))
         self.prev = out
-        self.unknown = [(x, y) for x, y, colour, _ in out if colour is None]
+        self.unknown = [(x, y) for x, y, colour, _, _ in out if colour is None]
         return result

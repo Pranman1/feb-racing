@@ -165,7 +165,9 @@ def track_from_rungs(blue, yellow, colour, step=0.25, cones=None):
     # up at a hairpin, so they are not used as a boundary line)
     if cones is not None and len(cones):
         cones = np.asarray(cones, float).reshape(-1, 2)
-        half = np.minimum(half, np.min(np.linalg.norm(centre[:, None, :] - cones[None, :, :], axis=2), axis=1))
+        d = np.linalg.norm(centre[:, None, :] - cones[None, :, :], axis=2)
+        d[d < 0.3] = np.inf                  # a landmark on the centreline is a stray, not the boundary (the raceline steers round it)
+        half = np.minimum(half, np.min(d, axis=1))
     track = _finish(centre, half, s, step)
     track.update(left=blue, right=yellow, colour=np.array(colour, dtype=int))
     return track

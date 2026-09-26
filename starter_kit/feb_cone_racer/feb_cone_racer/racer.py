@@ -49,9 +49,9 @@ DEFAULTS = dict(
     min_blob_px=3, camera_hfov_deg=57.1, track_gate=0.4, track_memory=40, side_guess_range=2.5, track_width=2.2, side_override_x=1.5, side_override_y=0.6,
     camera_ahead=-0.66, camera_lateral=-0.033, camera_col_bias=-1.0, camera_lag_s=0.073,   # camera vs lidar, fitted on this car
     hsv_blue=[105, 220, 8, 135, 255, 255], hsv_yellow=[18, 150, 8, 40, 255, 255], hsv_orange=[0, 150, 15, 15, 255, 255],
-    band_top=0.20, band_bottom=0.36, band_floor=0.21, orange_min_px=35,
+    band_top=0.20, band_bottom=0.36, band_floor=0.21, orange_min_px=35, blob_min_value=25,
     # lap-1 follower
-    map_speed=1.2, map_min_speed=0.8, lookahead=1.0, throttle_start=0.07, chain_step=1.8, avoid_range=0.9, local_path_lookahead=1.4, local_path_min_reach=3.0, rung_max_age=1.0,
+    map_speed=1.2, map_min_speed=0.8, lookahead=1.0, throttle_start=0.07, chain_step=1.8, avoid_range=0.9, local_path_lookahead=1.4, local_path_min_reach=2.0, rung_max_age=1.0,
     speed_per_throttle=23.0, throttle_kp=0.02, throttle_ki=0.03, throttle_slew=0.8, speed_window=0.25, steer_tau=0.15,
     # slam
     keyframe_dist=0.4, slam_range=6.0, loc_range=6.0, loc_corridor=2.5, dx_weight=2.0, z_weight=1.0, new_landmark_dist=0.6, icp_gate=1.5,
@@ -66,7 +66,7 @@ DEFAULTS = dict(
     # mpc: problem
     mpc_horizon=12, mpc_dt=0.1, mpc_max_iter=60, mpc_steer_tau=0.15, mpc_substeps=3,
     w_pos=8.0, w_head=2.0, w_speed=0.6, w_vy=0.2, w_dsteer=0.01, w_dtau=3.0, w_tau=0.3, dtau_max=0.4,
-    lost_after=1.5, loc_lost_after=3.0, recovery="stop", push_throttle=0.16, reverse_throttle=0.07, reverse_cooldown=4.0,
+    lost_after=1.5, loc_lost_after=3.0, recovery="stop", push_throttle=0.16, reverse_throttle=0.07, reverse_cooldown=4.0, debug=False,
     pursuit_lookahead=1.2, race_speed_scale=0.6,
 )
 
@@ -140,6 +140,11 @@ class Racer(Node):
         self.reverse_done_t = -1e9              # reverses may not chain: a few seconds of trying forward in between
         self.halted = False
         self.push_until = None
+        self.on_local_path = False
+        self.seen_pose = np.zeros(2)             # where the car was when cones were last in view
+        self.returning = False
+        self.lap1_target = (float("nan"), float("nan"))
+        self.path_reach = 0.0
         self.pushed = False
         self.path_reach = 0.0
 
@@ -195,6 +200,7 @@ class Racer(Node):
     # ------------------------------------------------------------ main loop, per scan
 
     def on_scan(self, msg):
+        p = self.p
         t = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
         dt = min(max(t - self.last_t, 0.01), 0.5) if self.last_t else 0.1
         self.last_t = t
@@ -241,11 +247,34 @@ class Racer(Node):
                 self.pub_map.publish(self.map_message())      # the growing map, every scan: the live ordering starts at the car
             local = self.follow_rungs(clusters, dt)
             self.lap_one_scans[0 if local is not None else 1] += 1
+            self.on_local_path = local is not None
             steer, throttle = local if local is not None else self.follow_local(clusters, cones, dt)
-            if t - self.last_seen_t > self.p["lost_after"] + 1.5 and self.can_reverse(t):
-                self.get_logger().warn("no cones in view: backing up")     # nosed out of the corridor
-                self.reverse_until = t + 1.2
-                self.stalled_since = t
+            if self.p["debug"]:
+                self.get_logger().info("lap one: %s, target (%.1f, %.1f) in the car frame, reach %.1f m, steer %.2f, throttle %.2f"
+                                       % ("local path" if local is not None else "reactive", *self.lap1_target, self.path_reach, steer, throttle))
+            if t - self.last_seen_t > p["lost_after"]:
+                # nosed out of the corridor: the dead reckoning still knows where the cones were
+                # last in view, so drive back there (a turn on open ground costs nothing); back
+                # up only when that spot is right here and still shows nothing
+                back = self.seen_pose - self.pose
+                c, s_ = math.cos(-self.yaw), math.sin(-self.yaw)
+                lx, ly = c * back[0] - s_ * back[1], s_ * back[0] + c * back[1]
+                if math.hypot(lx, ly) > 1.0:
+                    if not self.returning:
+                        self.get_logger().warn("no cones in view: heading back %.1f m to where they were last seen" % math.hypot(lx, ly))
+                        self.returning = True
+                    ld = math.hypot(lx, ly)
+                    wanted = float(np.clip(math.atan(2.0 * WHEELBASE * ly / (ld * ld)) if lx > 0 else math.copysign(MAX_STEER, ly if ly != 0 else 1.0), -MAX_STEER, MAX_STEER))
+                    step = (wanted - self.steer) * min(1.0, dt / p["steer_tau"])
+                    steer = self.steer + float(np.clip(step, -MAX_STEER_RATE * dt, MAX_STEER_RATE * dt))
+                    throttle = self.throttle_law(p["map_min_speed"], dt)
+                elif t - self.last_seen_t > p["lost_after"] + 1.5 and self.can_reverse(t):
+                    self.get_logger().warn("no cones in view: backing up")
+                    self.reverse_until = t + 1.2
+                    self.stalled_since = t
+            else:
+                self.seen_pose = self.pose.copy()
+                self.returning = False
         else:
             matched = self.localise(z_rel, colours)
             # localisation health: after a few seconds without matches the map position is not
@@ -592,7 +621,7 @@ class Racer(Node):
         b, y = self.rungs["blue"], self.rungs["yellow"]
         if b is None or y is None or self.last_t - self.rungs["t"] > p["rung_max_age"]:
             return None
-        n = min(len(b), len(y))
+        n = self.corridor_prefix(b, y)
         if n < 2:
             return None
         mid = (b[:n] + y[:n]) / 2.0 - self.pose
@@ -609,6 +638,7 @@ class Racer(Node):
             return None                                                # too short to steer by: the reactive follower knows better here
         self.no_target = False
         self.target_t = self.last_t
+        self.lap1_target = (float(target[0]), float(target[1]))
         ld = max(math.hypot(*target), 0.3)
         alpha = math.atan2(target[1], target[0])
         wanted = math.atan(2.0 * WHEELBASE * math.sin(alpha) / ld)
@@ -621,6 +651,30 @@ class Racer(Node):
         v_goal = max(p["map_min_speed"], p["map_speed"] * (1.0 - 0.7 * abs(steer) / MAX_STEER) * min(1.0, reach / 4.0))
         return steer, self.throttle_law(v_goal, dt)
 
+    def corridor_prefix(self, b, y):
+        """How many rungs, from the car on, still look like the track: the ordering is built
+        for a complete map, and on the growing map its path past the last well-mapped cones
+        fans out (rungs several track widths long, reaching across to another section) or
+        zigzags (the slope field has too few cones to point one way). Rungs are trusted up to
+        the first one that is much longer or shorter than the track, or whose midpoint turns
+        more than the car could between two rungs."""
+        w = self.p["track_width"]
+        n = min(len(b), len(y))
+        mid = (b[:n] + y[:n]) / 2.0
+        heading = None
+        for i in range(n):
+            if not 0.5 * w <= np.linalg.norm(b[i] - y[i]) <= 1.6 * w:
+                return i
+            if i > 0:
+                d = mid[i] - mid[i - 1]
+                if np.linalg.norm(d) < 0.02:
+                    continue
+                h = math.atan2(d[1], d[0])
+                if heading is not None and abs(math.atan2(math.sin(h - heading), math.cos(h - heading))) > math.radians(35):
+                    return i
+                heading = h
+        return n
+
     def follow_local(self, clusters, cones, dt):
         p = self.p
         line = self.local_centreline([(x, y, c) for x, y, c, w in cones])
@@ -632,10 +686,12 @@ class Racer(Node):
                 self.no_target = False
                 return self.steer, self.throttle_law(p["map_min_speed"], dt)
             self.no_target = True
+            self.lap1_target = (float("nan"), float("nan"))
             self.integral = 0.0
             return self.steer * 0.5, 0.0
         self.no_target = False
         self.target_t = self.last_t
+        self.lap1_target = (float(target[0]), float(target[1]))
         ld = max(math.hypot(*target), 0.3)
         alpha = math.atan2(target[1], target[0])
         wanted = math.atan(2.0 * WHEELBASE * math.sin(alpha) / ld)
@@ -818,8 +874,7 @@ class Racer(Node):
     def status_line(self, t, moving):
         """One line for /feb/status: phase, what is steering, and every fallback that is active."""
         if self.mode == "MAPPING":
-            a, b = self.lap_one_scans
-            what = "mapping lap on %s" % ("the team's local path" if a >= b else "the reactive follower")
+            what = "mapping lap on %s" % ("the team's local path" if self.on_local_path else "the reactive follower")
             detail = "%d cones, %.0f m" % (len(self.slam.lhat), self.travelled)
         elif self.mode == "ORDERING":
             what, detail = "map closed, waiting for the cone ordering", "%d cones" % len(self.slam.lhat)

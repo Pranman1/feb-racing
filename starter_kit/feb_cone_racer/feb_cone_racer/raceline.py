@@ -59,6 +59,11 @@ def lateral_bounds(centre, normal, half_width, cones, clearance):
             v[0] = min(v[0], v[-1] + step)
             v[-1] = min(v[-1], v[0] + step)
         arr[:] = sign * v
+    # the limiter can push the two bounds past each other where a cone sits in a narrowing:
+    # open a real interval around their midpoint (the midpoint of two slope-limited curves is
+    # slope-limited, and so are these), which is the least-bad line past that cone
+    mid = 0.5 * (hi + lo)
+    hi, lo = np.maximum(hi, mid + 0.075), np.minimum(lo, mid - 0.075)
     return lo, hi
 
 
