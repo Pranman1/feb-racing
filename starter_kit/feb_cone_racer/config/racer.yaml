@@ -14,7 +14,7 @@ racer:
     match_px_frac: 0.04       # a lidar cone takes a blob's colour only within this fraction of the width
     # lap 1: the mapping lap, driven by the simple follower
     map_speed: 1.2
-    map_min_speed: 0.6
+    map_min_speed: 0.8
     lookahead: 1.0
     local_path_lookahead: 1.4   # m, pure-pursuit target along the live cone ordering's local path on lap one
     rung_max_age: 1.0         # s; older rungs hand lap one back to the reactive follower
@@ -57,6 +57,8 @@ racer:
     dtau_max: 0.4             # throttle units per second, hard bound in the MPC
     w_tau: 0.3
     tau_max: 0.14             # throttle cap: the wheels spin above this; about 3.3 m/s steady state
+    push_throttle: 0.16       # not moving with the throttle on: push this hard for 1.5 s before giving up (a cone under the bumper)
+    throttle_start: 0.07      # the least throttle that gets the car rolling from rest
     recovery: stop            # stuck: 'stop' like the real car (cones fall over when hit, so this is rare), or 'reverse' to back up
     reverse_throttle: 0.07    # with recovery: reverse; 0.12 reversed at 3 m/s, far too much
     reverse_cooldown: 4.0     # s of trying forward before another reverse may start

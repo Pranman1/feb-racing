@@ -51,7 +51,7 @@ DEFAULTS = dict(
     hsv_blue=[105, 220, 8, 135, 255, 255], hsv_yellow=[18, 150, 8, 40, 255, 255], hsv_orange=[0, 150, 15, 15, 255, 255],
     band_top=0.20, band_bottom=0.36, band_floor=0.21, orange_min_px=35,
     # lap-1 follower
-    map_speed=1.2, map_min_speed=0.6, lookahead=1.0, chain_step=1.8, avoid_range=0.9, local_path_lookahead=1.4, rung_max_age=1.0,
+    map_speed=1.2, map_min_speed=0.8, lookahead=1.0, throttle_start=0.07, chain_step=1.8, avoid_range=0.9, local_path_lookahead=1.4, rung_max_age=1.0,
     speed_per_throttle=23.0, throttle_kp=0.02, throttle_ki=0.03, throttle_slew=0.8, speed_window=0.25, steer_tau=0.15,
     # slam
     keyframe_dist=0.4, slam_range=6.0, loc_range=6.0, loc_corridor=2.5, dx_weight=2.0, z_weight=1.0, new_landmark_dist=0.6, icp_gate=1.5,
@@ -66,7 +66,7 @@ DEFAULTS = dict(
     # mpc: problem
     mpc_horizon=12, mpc_dt=0.1, mpc_max_iter=60, mpc_steer_tau=0.15, mpc_substeps=3,
     w_pos=8.0, w_head=2.0, w_speed=0.6, w_vy=0.2, w_dsteer=0.01, w_dtau=3.0, w_tau=0.3, dtau_max=0.4,
-    lost_after=1.5, loc_lost_after=3.0, recovery="stop", reverse_throttle=0.07, reverse_cooldown=4.0,
+    lost_after=1.5, loc_lost_after=3.0, recovery="stop", push_throttle=0.16, reverse_throttle=0.07, reverse_cooldown=4.0,
     pursuit_lookahead=1.2, race_speed_scale=0.6,
 )
 
@@ -139,6 +139,8 @@ class Racer(Node):
         self.reverse_until = None
         self.reverse_done_t = -1e9              # reverses may not chain: a few seconds of trying forward in between
         self.halted = False
+        self.push_until = None
+        self.pushed = False
         self.path_reach = 0.0
 
         self.pub_throttle = self.create_publisher(Float32, NS + "throttle_command", QOS)
@@ -240,12 +242,6 @@ class Racer(Node):
             local = self.follow_rungs(clusters, dt)
             self.lap_one_scans[0 if local is not None else 1] += 1
             steer, throttle = local if local is not None else self.follow_local(clusters, cones, dt)
-            if self.no_target or (local is not None and self.path_reach < 2.5):
-                # nothing to follow, or the known path ends at an unseen corner: the lidar's
-                # widest opening is the safest heading until the corner's cones are coloured
-                gap = self.follow_gap(msg, dt)
-                if gap[1] > 0.0 or self.no_target:
-                    steer, throttle = gap
             if t - self.last_seen_t > self.p["lost_after"] + 1.5 and self.can_reverse(t):
                 self.get_logger().warn("no cones in view: backing up")     # nosed out of the corridor
                 self.reverse_until = t + 1.2
@@ -275,8 +271,6 @@ class Racer(Node):
                     self.get_logger().warn("localisation lost: local follower until the map is matched again")
                     self.local_mode = True
                 steer, throttle = self.follow_local(clusters, cones, dt)
-                if self.no_target:
-                    steer, throttle = self.follow_gap(msg, dt)
                 self.mpc_warm_reset()
                 if t - self.reloc_t > 1.0 and len(z_rel) >= 4:      # look for the car anywhere on the map
                     self.reloc_t = t
@@ -303,11 +297,21 @@ class Racer(Node):
             self.mpc_warm_reset()
         if moving and not self.no_target:
             self.stalled_since = None
+            self.pushed = False
+        if self.push_until is not None:
+            if t < self.push_until:
+                throttle = max(throttle, self.p["push_throttle"])
+            else:
+                self.push_until = None
         elif self.throttle > 0.02 or throttle > 0.02 or self.no_target:
             # stuck on a cone, or the follower stopped with nothing to follow (nosed out of the
             # corridor at a hairpin): back up and look again
             self.stalled_since = self.stalled_since or t      # sticky: a throttle dip does not reset it
-            if t - self.stalled_since > 2.0 and self.can_reverse(t):
+            if t - self.stalled_since > 2.0 and self.push_until is None and not self.pushed:
+                self.get_logger().warn("not moving: pushing harder for a moment")   # a cone under the bumper gives way
+                self.push_until = t + 1.5
+                self.pushed = True
+            elif t - self.stalled_since > 4.0 and self.can_reverse(t):
                 self.get_logger().warn("nothing to follow, backing up" if self.no_target else "stuck, backing up")
                 self.reverse_until = t + 1.2
         if self.halted:
@@ -615,38 +619,6 @@ class Racer(Node):
         v_goal = max(p["map_min_speed"], p["map_speed"] * (1.0 - 0.7 * abs(steer) / MAX_STEER) * min(1.0, reach / 4.0))
         return steer, self.throttle_law(v_goal, dt)
 
-    def follow_gap(self, msg, dt):
-        """Nothing to follow (no coloured cones ahead, no local path): the corridor is still
-        there in the lidar. Steer for the middle of the widest opening within 100 degrees of
-        straight ahead that is more than 2 m deep, at crawl speed; the stall logic still backs
-        up if that does not move the car. Returns the follower's stopped answer if the lidar
-        shows no opening at all."""
-        ranges = np.asarray(msg.ranges, dtype=float)
-        angles = msg.angle_min + np.arange(len(ranges)) * msg.angle_increment
-        ahead = np.abs(angles) < math.radians(100)
-        clear = ahead & np.isfinite(ranges) & (ranges > 2.0)
-        if not np.any(clear):
-            return self.steer * 0.5, 0.0
-        best, run, start = (0, 0, 0), 0, 0
-        for i, c in enumerate(clear):
-            if c:
-                if run == 0:
-                    start = i
-                run += 1
-                if run > best[0]:
-                    best = (run, start, i)
-            else:
-                run = 0
-        if best[0] * abs(msg.angle_increment) < math.radians(12):
-            return self.steer * 0.5, 0.0
-        target = (angles[best[1]] + angles[best[2]]) / 2.0
-        self.no_target = False
-        self.target_t = self.last_t
-        wanted = float(np.clip(target, -MAX_STEER, MAX_STEER))
-        step = (wanted - self.steer) * min(1.0, dt / self.p["steer_tau"])
-        steer = self.steer + float(np.clip(step, -MAX_STEER_RATE * dt, MAX_STEER_RATE * dt))
-        return steer, self.throttle_law(self.p["map_min_speed"], dt)
-
     def follow_local(self, clusters, cones, dt):
         p = self.p
         line = self.local_centreline([(x, y, c) for x, y, c, w in cones])
@@ -682,6 +654,8 @@ class Racer(Node):
         bound = ff if self.speed < 0.3 else 0.5 * ff
         trim = float(np.clip(p["throttle_kp"] * err + p["throttle_ki"] * self.integral, -bound, bound))
         wanted = float(np.clip(ff + trim, 0.0, 1.0))
+        if v_t > 0.0 and self.speed < 0.3:
+            wanted = max(wanted, p["throttle_start"])          # the motor needs this much to get the car rolling
         slew = p["throttle_slew"] * dt
         return float(np.clip(wanted, self.throttle - slew, self.throttle + slew)) if self.throttle > 0.0 else wanted
 
