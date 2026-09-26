@@ -450,9 +450,11 @@ class Racer(Node):
         p = self.p
         lap = self.lap_times[-1]
         track = track_from_rungs(rungs[0], rungs[1], self.slam.colour_override, p["sample_step"], cones=self.slam.lhat) if rungs is not None else None
-        if track is not None and float(np.min(track["half_width"])) < 0.25:      # only an absurd track goes back to the walk
-            self.get_logger().warn("the ordering's track pinches to %.2f m somewhere; using the boundary walk" % float(np.min(track["half_width"])))
-            track, rungs = None, None
+        if track is not None:
+            why = self.track_fault(track)
+            if why:
+                self.get_logger().warn("the ordering's track %s; using the boundary walk" % why)
+                track, rungs = None, None
         if track is None:
             track = build_track(self.slam.lhat, self.slam.colour, self.start[0], (math.cos(self.start[1]), math.sin(self.start[1])), p["sample_step"],
                                 path=self.slam.xhat)
@@ -782,6 +784,24 @@ class Racer(Node):
             q.orientation.w = float(c)
             arr.poses.append(q)
         self.pub_cones.publish(arr)
+
+    @staticmethod
+    def track_fault(track):
+        """What is wrong with a track built from the ordering's rungs, or None: the rungs may
+        reach across to another section (absurd width), leave a pinch, or zigzag (a kink the
+        MPC cannot follow). The boundary walk is the fallback in those cases."""
+        half = track["half_width"]
+        if not 0.5 <= float(np.median(half)) <= 2.5:
+            return "has an absurd width (median half width %.1f m)" % float(np.median(half))
+        if float(np.min(half)) < 0.25:
+            return "pinches to %.2f m" % float(np.min(half))
+        c = track["centre"]
+        d = np.roll(c, -1, axis=0) - c
+        h = np.arctan2(d[:, 1], d[:, 0])
+        turn = np.abs(np.angle(np.exp(1j * np.diff(np.concatenate([h, h[:1]])))))
+        if float(np.max(turn)) > math.radians(60):
+            return "zigzags (%.0f degrees between samples)" % math.degrees(float(np.max(turn)))
+        return None
 
     def can_reverse(self, t):
         """A stuck car may back up only with recovery=reverse (a simulator convenience). The

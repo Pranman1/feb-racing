@@ -132,6 +132,13 @@ def track_from_rungs(blue, yellow, colour, step=0.25, cones=None):
     if n < 8:
         return None
     blue, yellow = blue[:n], yellow[:n]
+    # a rung far longer than the usual one reaches across to another section: not a rung
+    length = np.linalg.norm(blue - yellow, axis=1)
+    usual = float(np.median(length))
+    ok = np.abs(length - usual) < 0.6 * usual
+    blue, yellow, n = blue[ok], yellow[ok], int(np.sum(ok))
+    if n < 8:
+        return None
     centre = (blue + yellow) / 2.0
     half = np.linalg.norm(blue - yellow, axis=1) / 2.0
     # the rungs come every 0.2 m and the odd one is rotated or out of step at a hairpin: drop
@@ -146,7 +153,7 @@ def track_from_rungs(blue, yellow, colour, step=0.25, cones=None):
         if np.all(keep):
             break
         centre, half = centre[keep], half[keep]
-    k = 4
+    k = 6
     pad = np.vstack([centre[-k:], centre, centre[:k]])
     ker = np.ones(2 * k + 1) / (2 * k + 1)
     centre = np.column_stack([np.convolve(pad[:, 0], ker, mode="valid"), np.convolve(pad[:, 1], ker, mode="valid")])

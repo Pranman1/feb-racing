@@ -32,9 +32,13 @@ def lateral_bounds(centre, normal, half_width, cones, clearance):
             continue
         side = d[near, 0] * normal[near, 0] + d[near, 1] * normal[near, 1]      # signed lateral offset of the cone
         idx = np.flatnonzero(near)
-        left = side > 0
+        # boundary cones are already the half width (with their scatter); only a cone well
+        # inside the corridor tightens the bounds, otherwise every cone leaves a step
+        inside = np.abs(side) < half_width[idx] - 0.3
+        left = (side > 0) & inside
+        right = (side <= 0) & inside
         hi[idx[left]] = np.minimum(hi[idx[left]], side[left] - clearance)
-        lo[idx[~left]] = np.maximum(lo[idx[~left]], side[~left] + clearance)
+        lo[idx[right]] = np.maximum(lo[idx[right]], side[right] + clearance)
     # a cone near the centreline leaves no room between the bounds: pass it on the roomier side
     # with a real interval to move in, so the solution bends rather than jumps
     for i in np.flatnonzero(hi - lo < 0.15):
@@ -42,6 +46,19 @@ def lateral_bounds(centre, normal, half_width, cones, clearance):
             lo[i] = hi[i] - 0.15
         else:
             hi[i] = lo[i] + 0.15
+    # bounds may only change slowly along the track (5 cm per sample), so the line inside them
+    # can be smooth: a tighter spot is approached gradually from both sides
+    step = 0.05
+    for arr, sign in ((hi, 1.0), (lo, -1.0)):
+        v = sign * arr
+        for _ in range(2):
+            for i in range(1, N):
+                v[i] = min(v[i], v[i - 1] + step)
+            for i in range(N - 2, -1, -1):
+                v[i] = min(v[i], v[i + 1] + step)
+            v[0] = min(v[0], v[-1] + step)
+            v[-1] = min(v[-1], v[0] + step)
+        arr[:] = sign * v
     return lo, hi
 
 
