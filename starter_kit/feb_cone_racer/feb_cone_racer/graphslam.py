@@ -47,6 +47,7 @@ class GraphSLAM:
         self.xhat = np.array([[x0[0], x0[1]]], dtype=float)
         self.frozen = False
         self.colour_override = None            # colours repaired by the track builder, once frozen
+        self.last_matched = []
 
     @property
     def colour(self):
@@ -184,6 +185,7 @@ class GraphSLAM:
         t, R = self.icp(zw, colour)
         zw = zw @ R.T + t
         self.xhat[-1] = R @ guess + t
+        self.last_matched = []                  # landmarks this keyframe was associated with (loop closure looks at it)
         for i in range(len(zw)):
             j = None
             if len(self.lhat):
@@ -191,6 +193,7 @@ class GraphSLAM:
                 k = int(np.argmin(d))
                 if d[k] < self.new_landmark_dist:
                     j = k
+                    self.last_matched.append(k)
             if j is None:
                 j = len(self.lhat)
                 self.lhat = np.vstack([self.lhat, zw[i]])

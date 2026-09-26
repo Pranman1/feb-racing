@@ -13,7 +13,27 @@
 
 namespace ordering_robust {
 
-inline bool healthy(const ConeOrderingState &s) { return !s.is_closed || s.redConeOrder.size() >= 8; }
+/// Length of a polygon's edges: the lap, roughly, from either boundary.
+inline double perimeter(const std::vector<Point> &pts, const std::vector<Edge> &edges) {
+    double total = 0.0;
+    for (const auto &e : edges) total += std::sqrt(dist_sq(pts[e.fromIdx], pts[e.toIdx]));
+    return total;
+}
+
+/// A closed track is ordered properly when the rung midpoints go round most of the boundary.
+inline bool healthy(const ConeOrderingState &s) {
+    if (!s.is_closed) return true;
+    const size_t n = std::min(s.redConeOrder.size(), s.blueConeOrder.size());
+    if (n < 8) return false;
+    double covered = 0.0;
+    for (size_t i = 1; i < n; i++) {
+        Point a{(s.redConeOrder[i - 1].x + s.blueConeOrder[i - 1].x) / 2, (s.redConeOrder[i - 1].y + s.blueConeOrder[i - 1].y) / 2};
+        Point b{(s.redConeOrder[i].x + s.blueConeOrder[i].x) / 2, (s.redConeOrder[i].y + s.blueConeOrder[i].y) / 2};
+        covered += std::sqrt(dist_sq(a, b));
+    }
+    const double lap = std::min(perimeter(s.bluePoints, s.blueEdgesPolygon), perimeter(s.redPoints, s.redEdgesPolygon));
+    return covered >= 0.6 * lap;
+}
 
 /// Suspicion of every cone: nearest other-colour distance over nearest same-colour distance,
 /// smallest first (a cone that sits among the other colour ranks first).

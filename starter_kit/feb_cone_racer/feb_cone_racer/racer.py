@@ -55,7 +55,7 @@ DEFAULTS = dict(
     speed_per_throttle=23.0, throttle_kp=0.02, throttle_ki=0.03, throttle_slew=0.8, speed_window=0.25, steer_tau=0.15,
     # slam
     keyframe_dist=0.4, slam_range=6.0, loc_range=6.0, loc_corridor=2.5, dx_weight=2.0, z_weight=1.0, new_landmark_dist=0.6, icp_gate=1.5,
-    solve_every=3, min_lap_length=15.0, order_timeout=3.0, lap_close_dist=2.0, min_seen=2, icp_min_matches=5, snap_radius=10.0, snap_gate=6.0,
+    solve_every=3, min_lap_length=15.0, order_timeout=3.0, closure_landmarks=10, lap_close_dist=2.0, min_seen=2, icp_min_matches=5, snap_radius=10.0, snap_gate=6.0,
     # raceline
     sample_step=0.25, car_half_width=0.135, margin=0.55, curvature_reg=0.01,
     v_max=4.0, a_lat=3.5, a_acc=2.5, a_brake=3.0,
@@ -238,6 +238,8 @@ class Racer(Node):
             local = self.follow_rungs(clusters, dt)
             self.lap_one_scans[0 if local is not None else 1] += 1
             steer, throttle = local if local is not None else self.follow_local(clusters, cones, dt)
+            if self.no_target:
+                steer, throttle = self.follow_gap(msg, dt)
             if t - self.last_seen_t > self.p["lost_after"] + 1.5 and self.can_reverse(t):
                 self.get_logger().warn("no cones in view: backing up")     # nosed out of the corridor
                 self.reverse_until = t + 1.2
@@ -267,6 +269,8 @@ class Racer(Node):
                     self.get_logger().warn("localisation lost: local follower until the map is matched again")
                     self.local_mode = True
                 steer, throttle = self.follow_local(clusters, cones, dt)
+                if self.no_target:
+                    steer, throttle = self.follow_gap(msg, dt)
                 self.mpc_warm_reset()
                 if t - self.reloc_t > 1.0 and len(z_rel) >= 4:      # look for the car anywhere on the map
                     self.reloc_t = t
@@ -343,14 +347,19 @@ class Racer(Node):
             return
         # back near the start with the orange gate in view: close the loop with a wide net, so
         # odometry drift over a long lap cannot leave the start cones unmatched
-        if self.travelled > p["min_lap_length"] and np.any(colours == ORANGE) and np.linalg.norm(self.pose - self.start[0]) < p["snap_radius"]:
-            zw = z_rel + self.pose + self.since_key
-            t_snap, R_snap = self.slam.snap(zw, colours, self.start[0], p["snap_radius"], p["snap_gate"])
-            if np.any(t_snap):
+        snap_radius = max(p["snap_radius"], 0.06 * self.travelled)       # drift grows with the lap; orange only stands at the gate
+        if self.travelled > p["min_lap_length"] and np.any(colours == ORANGE) and np.linalg.norm(self.pose - self.start[0]) < snap_radius:
+            # the gate is in view, so the car is within a few metres of the start whatever the
+            # pose says: a unique translation search against the landmarks around the start
+            # (an ICP with a wide net settles on a wrong local fit when the drift is metres)
+            guess = self.pose + self.since_key
+            found = self.slam.relocalise(z_rel, colours, near=self.start[0], radius=snap_radius)
+            if found is not None and np.linalg.norm(found - guess) > 0.05:
+                t_snap = found - guess
                 self.since_key = self.since_key + t_snap
                 self.snap_t = self.last_t
                 self.get_logger().info("loop closure at the start gate: pose corrected by %.2f m, %.1f m from the start"
-                                       % (np.linalg.norm(t_snap), np.linalg.norm(self.pose + self.since_key - self.start[0])))
+                                       % (np.linalg.norm(t_snap), np.linalg.norm(found - self.start[0])))
         self.slam.add(self.since_key, z_rel, colours, weights)
         self.keyframes += 1
         self.since_key = np.zeros(2)
@@ -362,10 +371,15 @@ class Racer(Node):
             except Exception as e:                    # noqa: BLE001
                 self.get_logger().warn("slam solve failed: %s" % e)
         self.pose = self.slam.xhat[-1].copy()
-        # back at the start?
+        # back at the start? Either the pose says so, or (the real loop closure) the cones in
+        # view are the very first ones mapped: then the drift of a long lap does not matter
         d0 = np.linalg.norm(self.pose - self.start[0])
         close = p["lap_close_dist"] * (2.5 if self.last_t - self.snap_t < 3.0 else 1.0)   # the gate match itself says we are here
-        if self.travelled > p["min_lap_length"] and d0 < close and math.cos(self.yaw - self.start[1]) > 0.5:
+        early = sum(1 for k in self.slam.last_matched if k < p["closure_landmarks"])
+        if self.travelled > p["min_lap_length"] + 20.0 and early >= 3 and d0 < max(p["snap_radius"], 0.06 * self.travelled) and math.cos(self.yaw - self.start[1]) > 0.5:
+            self.get_logger().info("loop closure: %d of the first cones in view again, %.1f m from the start" % (early, d0))
+            self.finish_mapping()
+        elif self.travelled > p["min_lap_length"] and d0 < close and math.cos(self.yaw - self.start[1]) > 0.5:
             self.finish_mapping()
         elif self.keyframes % 10 == 0:
             self.get_logger().info("mapping: %d keyframes, %d landmarks, travelled %.1f m" % (self.keyframes, len(self.slam.lhat), self.travelled))
@@ -401,9 +415,16 @@ class Racer(Node):
             res = self.order_future.result()
             rungs = None
             if res is not None and len(res.blue.poses) >= 8:
-                rungs = (np.array([[q.position.x, q.position.y] for q in res.blue.poses]),
-                         np.array([[q.position.x, q.position.y] for q in res.yellow.poses]))
-                self.get_logger().info("cone ordering: %d rungs, %s track" % (len(res.blue.poses), "closed" if res.closed else "open"))
+                b = np.array([[q.position.x, q.position.y] for q in res.blue.poses])
+                y = np.array([[q.position.x, q.position.y] for q in res.yellow.poses])
+                n = min(len(b), len(y))
+                mid = (b[:n] + y[:n]) / 2.0
+                covered = float(np.sum(np.linalg.norm(np.diff(mid, axis=0), axis=1)))
+                if covered >= 0.7 * self.travelled:            # the rungs must go round the whole lap
+                    rungs = (b, y)
+                    self.get_logger().info("cone ordering: %d rungs over %.0f m, %s track" % (n, covered, "closed" if res.closed else "open"))
+                else:
+                    self.get_logger().warn("cone ordering covered only %.0f m of a %.0f m lap; using the boundary walk" % (covered, self.travelled))
             else:
                 self.get_logger().warn("cone ordering returned nothing usable; using the boundary walk")
             self.complete_track(rungs)
@@ -578,6 +599,38 @@ class Racer(Node):
         steer = self.steer + float(np.clip(step, -MAX_STEER_RATE * dt, MAX_STEER_RATE * dt))
         v_goal = max(p["map_min_speed"], p["map_speed"] * (1.0 - 0.7 * abs(steer) / MAX_STEER))
         return steer, self.throttle_law(v_goal, dt)
+
+    def follow_gap(self, msg, dt):
+        """Nothing to follow (no coloured cones ahead, no local path): the corridor is still
+        there in the lidar. Steer for the middle of the widest opening within 100 degrees of
+        straight ahead that is more than 2 m deep, at crawl speed; the stall logic still backs
+        up if that does not move the car. Returns the follower's stopped answer if the lidar
+        shows no opening at all."""
+        ranges = np.asarray(msg.ranges, dtype=float)
+        angles = msg.angle_min + np.arange(len(ranges)) * msg.angle_increment
+        ahead = np.abs(angles) < math.radians(100)
+        clear = ahead & np.isfinite(ranges) & (ranges > 2.0)
+        if not np.any(clear):
+            return self.steer * 0.5, 0.0
+        best, run, start = (0, 0, 0), 0, 0
+        for i, c in enumerate(clear):
+            if c:
+                if run == 0:
+                    start = i
+                run += 1
+                if run > best[0]:
+                    best = (run, start, i)
+            else:
+                run = 0
+        if best[0] * abs(msg.angle_increment) < math.radians(12):
+            return self.steer * 0.5, 0.0
+        target = (angles[best[1]] + angles[best[2]]) / 2.0
+        self.no_target = False
+        self.target_t = self.last_t
+        wanted = float(np.clip(target, -MAX_STEER, MAX_STEER))
+        step = (wanted - self.steer) * min(1.0, dt / self.p["steer_tau"])
+        steer = self.steer + float(np.clip(step, -MAX_STEER_RATE * dt, MAX_STEER_RATE * dt))
+        return steer, self.throttle_law(self.p["map_min_speed"], dt)
 
     def follow_local(self, clusters, cones, dt):
         p = self.p

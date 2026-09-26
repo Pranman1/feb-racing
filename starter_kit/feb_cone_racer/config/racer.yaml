@@ -24,6 +24,7 @@ racer:
     loc_corridor: 2.5         # m; while racing, only landmarks this close to the car's stretch of raceline are matched (adjacent track sections)
     new_landmark_dist: 0.6    # m; a cone farther than this from every known cone of its colour is new
     min_lap_length: 15.0      # m travelled before the car may declare the lap closed
+    closure_landmarks: 10     # seeing three of the first ten cones again (after 35 m) closes the loop whatever the drift
     order_timeout: 3.0        # s to wait for the team's cone ordering (feb_cone_ordering) before the boundary walk takes over
     lap_close_dist: 2.0       # m from the start pose that closes the lap
     # raceline
