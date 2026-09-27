@@ -774,8 +774,14 @@ class Racer(Node):
         self.uprev = np.array([self.delta, 0.0])
 
     def localise(self, z_rel, colours):
-        corrected, matched = self.slam.localise(self.pose, z_rel, colours, subset=self.landmarks_near())
+        subset = self.landmarks_near()
+        corrected, matched = self.slam.localise(self.pose, z_rel, colours, subset=subset)
         shift = float(np.linalg.norm(corrected - self.pose))
+        if self.p["debug"] and matched == 0 and len(z_rel) >= 3:
+            near = self.slam.lhat if subset is None else self.slam.lhat[subset]
+            d = np.min(np.linalg.norm((z_rel + self.pose)[:, None, :] - near[None, :, :], axis=2), axis=1) if len(near) else np.array([np.inf])
+            self.get_logger().info("no match: %d cones in view, %s candidate landmarks, nearest landmark per cone median %.2f m (min %.2f), speed %.1f"
+                                   % (len(z_rel), "all" if subset is None else len(subset), float(np.median(d)), float(np.min(d)), self.speed))
         if matched >= 3:
             self.pose = 0.5 * self.pose + 0.5 * corrected      # trust the map, but no jumps
         if self.last_t - self.loc_log_t > 2.0:

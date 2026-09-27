@@ -6,6 +6,8 @@ around the whole loop). The centreline is sampled along the blue boundary: for e
 the nearest point of the yellow boundary is found and the midpoint taken; the half distance
 between them is the local half width.
 """
+import math
+
 import numpy as np
 
 from .perception import BLUE, ORANGE, YELLOW
@@ -152,9 +154,32 @@ def recentre(centre, half, cones, colour):
             # behind along the turning tangent, so only sides and width are judged)
             opposite = ((pair[0] - centre[i]) @ normal[i]) * ((pair[1] - centre[i]) @ normal[i]) <= 0
             if opposite and 1.2 * usual < width < 3.2 * usual:
-                out[i] = 0.5 * (pair[0] + pair[1])
+                # move sideways only (along the normal): the samples keep their order and
+                # spacing, so a hairpin whose apex pair is the nearest for many samples does
+                # not pull them all onto one point
+                shift = float((0.5 * (pair[0] + pair[1]) - centre[i]) @ normal[i])
+                out[i] = centre[i] + normal[i] * float(np.clip(shift, -usual, usual))
                 hout[i] = 0.5 * width
     return out, hout
+
+
+def drop_kinks(centre, half, limit_deg=60.0, passes=3):
+    """Drop the odd sample that sits off the line: a turn of more than `limit_deg` between
+    neighbouring samples a quarter of a metre apart is no corner (the car's tightest turn is
+    about 25 degrees per quarter metre), it is one sample pulled aside, and it must not fail
+    the whole track."""
+    for _ in range(passes):
+        n = len(centre)
+        if n < 8:
+            break
+        d = np.roll(centre, -1, axis=0) - centre
+        h = np.arctan2(d[:, 1], d[:, 0])
+        turn = np.abs(np.angle(np.exp(1j * (h - np.roll(h, 1)))))       # turn at sample i, between segments i-1 and i
+        bad = (turn > math.radians(limit_deg)) & (np.linalg.norm(d, axis=1) > 0.02) & (np.linalg.norm(np.roll(d, 1, axis=0), axis=1) > 0.02)
+        if not np.any(bad):
+            break
+        centre, half = centre[~bad], half[~bad]
+    return centre, half
 
 
 def track_from_rungs(blue, yellow, colour, step=0.25, cones=None):
@@ -198,6 +223,7 @@ def track_from_rungs(blue, yellow, colour, step=0.25, cones=None):
     if cones is not None and len(cones):
         cones = np.asarray(cones, float).reshape(-1, 2)
         centre, half = recentre(centre, half, cones, np.asarray(colour, dtype=int))
+        centre, half = drop_kinks(centre, half)
         centre, s = resample_closed(centre, step)
         half = np.interp(s, np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(centre, axis=0), axis=1))])[: len(half)], half) if len(centre) != len(half) else half
         # never wider than the nearest mapped cone allows (the rung ends are projections and bunch
