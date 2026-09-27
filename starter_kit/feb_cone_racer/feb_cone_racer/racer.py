@@ -67,7 +67,7 @@ DEFAULTS = dict(
     mpc_horizon=12, mpc_dt=0.1, mpc_max_iter=60, mpc_steer_tau=0.15, mpc_substeps=3,
     w_pos=8.0, w_head=2.0, w_speed=0.6, w_vy=0.2, w_dsteer=0.01, w_dtau=3.0, w_tau=0.3, dtau_max=0.4,
     lost_after=1.5, loc_lost_after=3.0, push_throttle=0.16, debug=False,
-    pursuit_lookahead=1.2, race_speed_scale=0.6,
+    pursuit_lookahead=1.2, race_speed_scale=0.7, corner_scale=0.6,
 )
 
 
@@ -486,8 +486,11 @@ class Racer(Node):
         t0 = self.map_closed_t
         line, _ = min_curvature(track["centre"], track["normal"], track["half_width"], p["car_half_width"], p["margin"], p["curvature_reg"],
                                 cones=self.slam.lhat)
-        v, kappa = speed_profile(line, p["v_max"], p["a_lat"], p["a_acc"], p["a_brake"])
-        self.track, self.raceline, self.race_v = track, line, v * p["race_speed_scale"]
+        # the speed scale is for the straights (v_max); corners keep the lateral limit that
+        # every hairpin has been driven clean with (corner_scale on the speed, so squared on
+        # the acceleration)
+        v, kappa = speed_profile(line, p["v_max"] * p["race_speed_scale"], p["a_lat"] * p["corner_scale"] ** 2, p["a_acc"], p["a_brake"])
+        self.track, self.raceline, self.race_v = track, line, v
         self.race_psi = heading_along(line)
         seg = np.linalg.norm(np.roll(line, -1, axis=0) - line, axis=1)
         self.race_s = np.concatenate([[0.0], np.cumsum(seg)])
@@ -707,10 +710,13 @@ class Racer(Node):
         # the target is the point of the centreline exactly one lookahead away, interpolated
         # between its (cone-spaced) points: the first point beyond the lookahead can be three
         # metres out at a corner, and pure pursuit on it turns far too little
+        # the lookahead grows with speed (a fixed short one weaves at 1.2 m/s), never below
+        # the configured one, which is what turns the car in at a tight corner
+        la = float(np.clip(1.2 * max(self.speed, 0.0), p["lookahead"], 1.8))
         target, prev = None, (0.0, 0.0)
         for q in line:
-            if math.hypot(*q) >= p["lookahead"]:
-                target = self.at_distance(prev, q, p["lookahead"])
+            if math.hypot(*q) >= la:
+                target = self.at_distance(prev, q, la)
                 break
             prev = q
         if target is None and line and math.hypot(*line[-1]) > 0.5:
