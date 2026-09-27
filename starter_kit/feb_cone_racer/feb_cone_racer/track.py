@@ -123,6 +123,40 @@ def repair_by_path(lhat, colour, path):
     return colour
 
 
+def recentre(centre, half, cones, colour):
+    """Put every centreline sample midway between the nearest blue cone on its left and the
+    nearest yellow cone on its right, where both are within a track width and a half. The
+    rung midpoints are only as good as the ordering's boundary projections, which cut the
+    apex of a tight hairpin; the cones themselves say where the track really is."""
+    n = len(centre)
+    tang = np.roll(centre, -1, axis=0) - np.roll(centre, 1, axis=0)
+    tang /= np.maximum(np.linalg.norm(tang, axis=1), 1e-9)[:, None]
+    normal = np.column_stack([-tang[:, 1], tang[:, 0]])
+    usual = float(np.median(half))
+    blue, yellow = cones[colour == BLUE], cones[colour == YELLOW]
+    out, hout = centre.copy(), half.copy()
+    for i in range(n):
+        pair = []
+        for pts in (blue, yellow):
+            if len(pts) == 0:
+                break
+            d = np.linalg.norm(pts - centre[i], axis=1)
+            j = int(np.argmin(d))
+            if d[j] > 2.5 * usual:
+                break
+            pair.append(pts[j])
+        if len(pair) == 2:
+            width = np.linalg.norm(pair[0] - pair[1])
+            # a blue and a yellow cone about a track width apart, one each side of the sample:
+            # that is the corridor here (at a hairpin apex the outer cone is well ahead or
+            # behind along the turning tangent, so only sides and width are judged)
+            opposite = ((pair[0] - centre[i]) @ normal[i]) * ((pair[1] - centre[i]) @ normal[i]) <= 0
+            if opposite and 1.2 * usual < width < 3.2 * usual:
+                out[i] = 0.5 * (pair[0] + pair[1])
+                hout[i] = 0.5 * width
+    return out, hout
+
+
 def track_from_rungs(blue, yellow, colour, step=0.25, cones=None):
     """The track from the team's cone ordering: blue[i] and yellow[i] are the two ends of one
     rung across the track, in order along it. The centreline is the rung midpoints, the half
@@ -153,7 +187,7 @@ def track_from_rungs(blue, yellow, colour, step=0.25, cones=None):
         if np.all(keep):
             break
         centre, half = centre[keep], half[keep]
-    k = 6
+    k = 2
     pad = np.vstack([centre[-k:], centre, centre[:k]])
     ker = np.ones(2 * k + 1) / (2 * k + 1)
     centre = np.column_stack([np.convolve(pad[:, 0], ker, mode="valid"), np.convolve(pad[:, 1], ker, mode="valid")])
@@ -161,10 +195,13 @@ def track_from_rungs(blue, yellow, colour, step=0.25, cones=None):
     s_in = np.concatenate([[0.0], np.cumsum(seg)])
     centre, s = resample_closed(centre, step)
     half = np.interp(s, s_in[:-1], half)
-    # never wider than the nearest mapped cone allows (the rung ends are projections and bunch
-    # up at a hairpin, so they are not used as a boundary line)
     if cones is not None and len(cones):
         cones = np.asarray(cones, float).reshape(-1, 2)
+        centre, half = recentre(centre, half, cones, np.asarray(colour, dtype=int))
+        centre, s = resample_closed(centre, step)
+        half = np.interp(s, np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(centre, axis=0), axis=1))])[: len(half)], half) if len(centre) != len(half) else half
+        # never wider than the nearest mapped cone allows (the rung ends are projections and bunch
+        # up at a hairpin, so they are not used as a boundary line)
         d = np.linalg.norm(centre[:, None, :] - cones[None, :, :], axis=2)
         d[d < 0.3] = np.inf                  # a landmark on the centreline is a stray, not the boundary (the raceline steers round it)
         half = np.minimum(half, np.min(d, axis=1))

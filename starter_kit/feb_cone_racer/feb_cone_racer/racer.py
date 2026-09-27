@@ -141,8 +141,8 @@ class Racer(Node):
         self.halted = False
         self.push_until = None
         self.on_local_path = False
-        self.seen_pose = np.zeros(2)             # where the car was when cones were last in view
-        self.returning = False
+        self.trail = []                          # poses driven with cones in view, every half metre
+        self.retrace_i = None
         self.lap1_target = (float("nan"), float("nan"))
         self.path_reach = 0.0
         self.pushed = False
@@ -253,28 +253,11 @@ class Racer(Node):
                 self.get_logger().info("lap one: %s, target (%.1f, %.1f) in the car frame, reach %.1f m, steer %.2f, throttle %.2f"
                                        % ("local path" if local is not None else "reactive", *self.lap1_target, self.path_reach, steer, throttle))
             if t - self.last_seen_t > p["lost_after"]:
-                # nosed out of the corridor: the dead reckoning still knows where the cones were
-                # last in view, so drive back there (a turn on open ground costs nothing); back
-                # up only when that spot is right here and still shows nothing
-                back = self.seen_pose - self.pose
-                c, s_ = math.cos(-self.yaw), math.sin(-self.yaw)
-                lx, ly = c * back[0] - s_ * back[1], s_ * back[0] + c * back[1]
-                if math.hypot(lx, ly) > 1.0:
-                    if not self.returning:
-                        self.get_logger().warn("no cones in view: heading back %.1f m to where they were last seen" % math.hypot(lx, ly))
-                        self.returning = True
-                    ld = math.hypot(lx, ly)
-                    wanted = float(np.clip(math.atan(2.0 * WHEELBASE * ly / (ld * ld)) if lx > 0 else math.copysign(MAX_STEER, ly if ly != 0 else 1.0), -MAX_STEER, MAX_STEER))
-                    step = (wanted - self.steer) * min(1.0, dt / p["steer_tau"])
-                    steer = self.steer + float(np.clip(step, -MAX_STEER_RATE * dt, MAX_STEER_RATE * dt))
-                    throttle = self.throttle_law(p["map_min_speed"], dt)
-                elif t - self.last_seen_t > p["lost_after"] + 1.5 and self.can_reverse(t):
-                    self.get_logger().warn("no cones in view: backing up")
-                    self.reverse_until = t + 1.2
-                    self.stalled_since = t
+                steer, throttle = self.retrace(t, dt)
             else:
-                self.seen_pose = self.pose.copy()
-                self.returning = False
+                if not self.trail or np.linalg.norm(self.pose - self.trail[-1]) > 0.5:
+                    self.trail.append(self.pose.copy())      # the path driven with cones in view
+                self.retrace_i = None
         else:
             matched = self.localise(z_rel, colours)
             # localisation health: after a few seconds without matches the map position is not
@@ -650,6 +633,38 @@ class Racer(Node):
         steer = self.steer + float(np.clip(step, -MAX_STEER_RATE * dt, MAX_STEER_RATE * dt))
         v_goal = max(p["map_min_speed"], p["map_speed"] * (1.0 - 0.7 * abs(steer) / MAX_STEER) * min(1.0, reach / 4.0))
         return steer, self.throttle_law(v_goal, dt)
+
+    def retrace(self, t, dt):
+        """Nothing in view on the mapping lap: the car has nosed out of the corridor. The dead
+        reckoning still holds the path it drove with cones in view, so it goes back along that
+        path, in reverse while the spot is close behind, forwards otherwise (a turn on open
+        ground costs nothing), one spot further back each time one is reached, until the cones
+        are in view again."""
+        p = self.p
+        if not self.trail:
+            return self.steer * 0.5, 0.0
+        if self.retrace_i is None:
+            self.retrace_i = max(len(self.trail) - 4, 0)         # about two metres back along the path
+            self.get_logger().warn("no cones in view: backing along the path driven, %.1f m to the last spot" % np.linalg.norm(self.trail[self.retrace_i] - self.pose))
+        target = self.trail[self.retrace_i]
+        if np.linalg.norm(target - self.pose) < 0.5 and self.retrace_i > 0:
+            self.retrace_i -= 1
+            target = self.trail[self.retrace_i]
+        back = target - self.pose
+        c, s_ = math.cos(-self.yaw), math.sin(-self.yaw)
+        lx, ly = c * back[0] - s_ * back[1], s_ * back[0] + c * back[1]
+        ld = max(math.hypot(lx, ly), 0.3)
+        if lx < 0.0 and ld < 4.0:
+            wanted = -math.atan(2.0 * WHEELBASE * ly / (ld * ld))         # reversing steers the other way
+            speed = -p["reverse_throttle"]
+        else:
+            wanted = math.atan(2.0 * WHEELBASE * ly / (ld * ld)) if lx > 0.0 else math.copysign(MAX_STEER, ly if ly != 0.0 else 1.0)
+            speed = None
+        wanted = float(np.clip(wanted, -MAX_STEER, MAX_STEER))
+        step = (wanted - self.steer) * min(1.0, dt / p["steer_tau"])
+        steer = self.steer + float(np.clip(step, -MAX_STEER_RATE * dt, MAX_STEER_RATE * dt))
+        self.integral = 0.0
+        return steer, (self.throttle_law(p["map_min_speed"], dt) if speed is None else speed)
 
     def corridor_prefix(self, b, y):
         """How many rungs, from the car on, still look like the track: the ordering is built
