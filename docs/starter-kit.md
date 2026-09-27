@@ -125,7 +125,7 @@ still maps and plans, and pure pursuit drives the raceline. Debug topics: `/feb/
 `/feb/map`, `/feb/raceline`, `/feb/pose`, `/feb/mpc_prediction`, and `/feb/status`, one line twice
 a second with the phase (mapping lap, waiting for the ordering, racing), what is steering (local
 path, reactive follower, MPC, pure pursuit) and any active fallback (map match lost, no cones in
-view, backing up); `./feb-sim logs -f` shows the same story as the racer's log, and `debug: true` in
+view, stopped); `./feb-sim logs -f` shows the same story as the racer's log, and `debug: true` in
 `config/racer.yaml` logs every lap-one steering decision and every scan that matched nothing.
 Parameters, including the vehicle model, are in `config/racer.yaml`. Cone colours: the camera is
 192 by 108 pixels and a cone beyond 4 m is a few pixels, so a blob only colours a cone for the map

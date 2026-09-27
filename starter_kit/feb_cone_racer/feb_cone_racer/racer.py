@@ -66,7 +66,7 @@ DEFAULTS = dict(
     # mpc: problem
     mpc_horizon=12, mpc_dt=0.1, mpc_max_iter=60, mpc_steer_tau=0.15, mpc_substeps=3,
     w_pos=8.0, w_head=2.0, w_speed=0.6, w_vy=0.2, w_dsteer=0.01, w_dtau=3.0, w_tau=0.3, dtau_max=0.4,
-    lost_after=1.5, loc_lost_after=3.0, recovery="stop", push_throttle=0.16, reverse_throttle=0.07, reverse_cooldown=4.0, debug=False,
+    lost_after=1.5, loc_lost_after=3.0, push_throttle=0.16, debug=False,
     pursuit_lookahead=1.2, race_speed_scale=0.6,
 )
 
@@ -136,13 +136,9 @@ class Racer(Node):
         self.good_loc_t = 0.0
         self.local_mode = False
         self.stalled_since = None
-        self.reverse_until = None
-        self.reverse_done_t = -1e9              # reverses may not chain: a few seconds of trying forward in between
         self.halted = False
         self.push_until = None
         self.on_local_path = False
-        self.trail = []                          # poses driven with cones in view, every half metre
-        self.retrace_i = None
         self.lap1_target = (float("nan"), float("nan"))
         self.path_reach = 0.0
         self.pushed = False
@@ -253,11 +249,13 @@ class Racer(Node):
                 self.get_logger().info("lap one: %s, target (%.1f, %.1f) in the car frame, reach %.1f m, steer %.2f, throttle %.2f"
                                        % ("local path" if local is not None else "reactive", *self.lap1_target, self.path_reach, steer, throttle))
             if t - self.last_seen_t > p["lost_after"]:
-                steer, throttle = self.retrace(t, dt)
-            else:
-                if not self.trail or np.linalg.norm(self.pose - self.trail[-1]) > 0.5:
-                    self.trail.append(self.pose.copy())      # the path driven with cones in view
-                self.retrace_i = None
+                # nothing in view: the car has nosed out of the corridor. Hold the wheel and
+                # crawl for a moment in case the cones come back; then stop, as the real car
+                # would (it cannot back up)
+                steer = self.steer
+                throttle = self.throttle_law(p["map_min_speed"], dt) if t - self.last_seen_t < p["lost_after"] + 2.0 else 0.0
+                if throttle == 0.0:
+                    self.halt("nothing in view for %.0f s on the mapping lap" % (t - self.last_seen_t))
         else:
             matched = self.localise(z_rel, colours)
             # localisation health: after a few seconds without matches the map position is not
@@ -268,15 +266,12 @@ class Racer(Node):
             if t - self.last_seen_t > self.p["lost_after"]:
                 # nothing in view: the car has left the corridor. Its dead-reckoned position is
                 # still roughly right, so crawl back towards the raceline by pure pursuit; if that
-                # brings no cones into view for a while, back up instead
+                # brings no cones into view for a while, stop rather than wander
                 self.mpc_warm_reset()
                 if t - self.last_seen_t > 20.0:
-                    steer, throttle = 0.0, 0.0             # lost for good: stop, do not wander
+                    steer, throttle = 0.0, 0.0
+                    self.halt("nothing in view for 20 s")
                 else:
-                    if t - self.last_seen_t > 8.0 and self.can_reverse(t) and self.stalled_since is None:
-                        self.get_logger().warn("no cones in view for long: backing up")
-                        self.reverse_until = t + 1.2
-                        self.stalled_since = t
                     steer, throttle = self.pursuit_step(dt, speed=0.7)
             elif t - self.good_loc_t > self.p["loc_lost_after"]:
                 if not self.local_mode:
@@ -297,16 +292,7 @@ class Racer(Node):
                     self.local_mode = False
                     self.race_idx = self.nearest_index()
                 steer, throttle = self.race_step(dt)
-        # stuck on a cone (wheels may spin, so watch the lidar scene): back away, then carry on
-        if self.reverse_until is not None:
-            if t < self.reverse_until:
-                self.pub_throttle.publish(Float32(data=-self.p["reverse_throttle"]))
-                self.pub_steering.publish(Float32(data=-self.steer / MAX_STEER))
-                return
-            self.reverse_until, self.stalled_since = None, None
-            self.reverse_done_t = t
-            self.throttle, self.integral = 0.0, 0.0
-            self.mpc_warm_reset()
+        # stuck on a cone (wheels may spin, so watch the lidar scene): push once, then stop
         if moving and not self.no_target:
             self.stalled_since = None
             self.pushed = False
@@ -316,16 +302,16 @@ class Racer(Node):
             else:
                 self.push_until = None
         elif self.throttle > 0.02 or throttle > 0.02 or self.no_target:
-            # stuck on a cone, or the follower stopped with nothing to follow (nosed out of the
-            # corridor at a hairpin): back up and look again
+            # stuck on a cone, or the follower stopped with nothing to follow: one push (a cone
+            # under the bumper gives way), and if that does not free the car it stops, as the
+            # real car would; it cannot back up
             self.stalled_since = self.stalled_since or t      # sticky: a throttle dip does not reset it
             if t - self.stalled_since > 2.0 and self.push_until is None and not self.pushed:
-                self.get_logger().warn("not moving: pushing harder for a moment")   # a cone under the bumper gives way
+                self.get_logger().warn("not moving: pushing harder for a moment")
                 self.push_until = t + 1.5
                 self.pushed = True
-            elif t - self.stalled_since > 4.0 and self.can_reverse(t):
-                self.get_logger().warn("nothing to follow, backing up" if self.no_target else "stuck, backing up")
-                self.reverse_until = t + 1.2
+            elif t - self.stalled_since > 6.0:
+                self.halt("nothing to follow" if self.no_target else "stuck on something")
         if self.halted:
             steer, throttle = 0.0, 0.0
         self.steer, self.throttle = steer, throttle
@@ -640,38 +626,6 @@ class Racer(Node):
         v_goal = max(p["map_min_speed"], p["map_speed"] * (1.0 - 0.7 * abs(steer) / MAX_STEER) * min(1.0, reach / 4.0))
         return steer, self.throttle_law(v_goal, dt)
 
-    def retrace(self, t, dt):
-        """Nothing in view on the mapping lap: the car has nosed out of the corridor. The dead
-        reckoning still holds the path it drove with cones in view, so it goes back along that
-        path, in reverse while the spot is close behind, forwards otherwise (a turn on open
-        ground costs nothing), one spot further back each time one is reached, until the cones
-        are in view again."""
-        p = self.p
-        if not self.trail:
-            return self.steer * 0.5, 0.0
-        if self.retrace_i is None:
-            self.retrace_i = max(len(self.trail) - 4, 0)         # about two metres back along the path
-            self.get_logger().warn("no cones in view: backing along the path driven, %.1f m to the last spot" % np.linalg.norm(self.trail[self.retrace_i] - self.pose))
-        target = self.trail[self.retrace_i]
-        if np.linalg.norm(target - self.pose) < 0.5 and self.retrace_i > 0:
-            self.retrace_i -= 1
-            target = self.trail[self.retrace_i]
-        back = target - self.pose
-        c, s_ = math.cos(-self.yaw), math.sin(-self.yaw)
-        lx, ly = c * back[0] - s_ * back[1], s_ * back[0] + c * back[1]
-        ld = max(math.hypot(lx, ly), 0.3)
-        if lx < 0.0 and ld < 4.0:
-            wanted = -math.atan(2.0 * WHEELBASE * ly / (ld * ld))         # reversing steers the other way
-            speed = -p["reverse_throttle"]
-        else:
-            wanted = math.atan(2.0 * WHEELBASE * ly / (ld * ld)) if lx > 0.0 else math.copysign(MAX_STEER, ly if ly != 0.0 else 1.0)
-            speed = None
-        wanted = float(np.clip(wanted, -MAX_STEER, MAX_STEER))
-        step = (wanted - self.steer) * min(1.0, dt / p["steer_tau"])
-        steer = self.steer + float(np.clip(step, -MAX_STEER_RATE * dt, MAX_STEER_RATE * dt))
-        self.integral = 0.0
-        return steer, (self.throttle_law(p["map_min_speed"], dt) if speed is None else speed)
-
     def push_from_cones(self, wanted, clusters):
         """A cone dead ahead pushes the wheel away from it. Only dead ahead, and never past
         straight: the inner cones of a tight bend sit ahead and to the side, and a push that
@@ -921,17 +875,12 @@ class Racer(Node):
             return "zigzags (%.0f degrees between samples)" % math.degrees(float(np.max(turn)))
         return None
 
-    def can_reverse(self, t):
-        """Racing, a stuck car backs up only with recovery=reverse (a simulator convenience);
-        the default, recovery=stop, is what the real car does: it stops, and the log says why.
-        The mapping lap is the exception: it is exploratory, drives on a few metres of known
-        path at a time, and a short gentle back-up out of a dead end costs nothing there."""
-        if self.p["recovery"] != "reverse" and self.mode != "MAPPING":
-            if not self.halted:
-                self.halted = True
-                self.get_logger().error("stopped: the car is stuck and recovery is 'stop' (set recovery: reverse in racer.yaml to let it back up)")
-            return False
-        return self.reverse_until is None and t - self.reverse_done_t > self.p["reverse_cooldown"]
+    def halt(self, why):
+        """Stop for good and say why: the real car cannot back up, so a car that is stuck or
+        has lost the cones is a DNF, and the log says what happened."""
+        if not self.halted:
+            self.halted = True
+            self.get_logger().error("stopped: %s" % why)
 
     def status_line(self, t, moving):
         """One line for /feb/status: phase, what is steering, and every fallback that is active."""
@@ -945,9 +894,7 @@ class Racer(Node):
             detail = "lap %d" % max(len(self.lap_times) - 1, 0)
         flags = []
         if self.halted:
-            flags.append("stopped (stuck)")
-        if self.reverse_until is not None:
-            flags.append("backing up")
+            flags.append("stopped")
         if t - self.last_seen_t > self.p["lost_after"]:
             flags.append("no cones in view")
         if self.mode == "RACING" and t - self.good_loc_t > self.p["loc_lost_after"]:
