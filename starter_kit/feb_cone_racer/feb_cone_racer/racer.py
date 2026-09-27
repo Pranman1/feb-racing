@@ -634,11 +634,7 @@ class Racer(Node):
         self.lap1_target = (float(target[0]), float(target[1]))
         ld = max(math.hypot(*target), 0.3)
         alpha = math.atan2(target[1], target[0])
-        wanted = math.atan(2.0 * WHEELBASE * math.sin(alpha) / ld)
-        for x, y_ in clusters:                                       # a cone right ahead still pushes the wheel away
-            if 0.0 < x < p["avoid_range"] and abs(y_) < 0.5:
-                wanted -= math.copysign(0.6, y_) * (1.0 - x / p["avoid_range"])
-        wanted = float(np.clip(wanted, -MAX_STEER, MAX_STEER))
+        wanted = self.push_from_cones(math.atan(2.0 * WHEELBASE * math.sin(alpha) / ld), clusters)
         step = (wanted - self.steer) * min(1.0, dt / p["steer_tau"])
         steer = self.steer + float(np.clip(step, -MAX_STEER_RATE * dt, MAX_STEER_RATE * dt))
         v_goal = max(p["map_min_speed"], p["map_speed"] * (1.0 - 0.7 * abs(steer) / MAX_STEER) * min(1.0, reach / 4.0))
@@ -675,6 +671,19 @@ class Racer(Node):
         steer = self.steer + float(np.clip(step, -MAX_STEER_RATE * dt, MAX_STEER_RATE * dt))
         self.integral = 0.0
         return steer, (self.throttle_law(p["map_min_speed"], dt) if speed is None else speed)
+
+    def push_from_cones(self, wanted, clusters):
+        """A cone dead ahead pushes the wheel away from it. Only dead ahead, and never past
+        straight: the inner cones of a tight bend sit ahead and to the side, and a push that
+        turned the car the other way sent it out through the outer line."""
+        p = self.p
+        pushed = wanted
+        for x, y in clusters:
+            if 0.0 < x < p["avoid_range"] and abs(y) < 0.3:
+                pushed -= math.copysign(0.4, y) * (1.0 - x / p["avoid_range"])
+        if wanted * pushed < 0.0:
+            pushed = 0.0
+        return float(np.clip(pushed, -MAX_STEER, MAX_STEER))
 
     @staticmethod
     def at_distance(a, b, r):
@@ -743,11 +752,7 @@ class Racer(Node):
         self.lap1_target = (float(target[0]), float(target[1]))
         ld = max(math.hypot(*target), 0.3)
         alpha = math.atan2(target[1], target[0])
-        wanted = math.atan(2.0 * WHEELBASE * math.sin(alpha) / ld)
-        for x, y in clusters:
-            if 0.0 < x < p["avoid_range"] and abs(y) < 0.5:
-                wanted -= math.copysign(0.6, y) * (1.0 - x / p["avoid_range"])
-        wanted = float(np.clip(wanted, -MAX_STEER, MAX_STEER))
+        wanted = self.push_from_cones(math.atan(2.0 * WHEELBASE * math.sin(alpha) / ld), clusters)
         step = (wanted - self.steer) * min(1.0, dt / p["steer_tau"])
         steer = self.steer + float(np.clip(step, -MAX_STEER_RATE * dt, MAX_STEER_RATE * dt))
         v_goal = max(p["map_min_speed"], p["map_speed"] * (1.0 - 0.7 * abs(steer) / MAX_STEER))
@@ -761,8 +766,10 @@ class Racer(Node):
         bound = ff if self.speed < 0.3 else 0.5 * ff
         trim = float(np.clip(p["throttle_kp"] * err + p["throttle_ki"] * self.integral, -bound, bound))
         wanted = float(np.clip(ff + trim, 0.0, 1.0))
-        if v_t > 0.0 and self.speed < 0.3:
-            wanted = max(wanted, p["throttle_start"])          # the motor needs this much to get the car rolling
+        if v_t > 0.0 and self.speed < 0.6:
+            # the motor needs this much to get the car rolling, and more with the wheels turned
+            # (a crawl at full lock stalls on 0.03)
+            wanted = max(wanted, p["throttle_start"] * (1.0 + 0.5 * abs(self.steer) / MAX_STEER))
         slew = p["throttle_slew"] * dt
         return float(np.clip(wanted, self.throttle - slew, self.throttle + slew)) if self.throttle > 0.0 else wanted
 
