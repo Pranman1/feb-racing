@@ -431,7 +431,10 @@ class Racer(Node):
                 n = min(len(b), len(y))
                 mid = (b[:n] + y[:n]) / 2.0
                 covered = float(np.sum(np.linalg.norm(np.diff(mid, axis=0), axis=1)))
-                if res.closed and covered >= 0.7 * self.travelled:   # a closed loop of rungs round the whole lap
+                # a closed loop of rungs round the whole lap: as long as the distance driven, or
+                # as long as the map itself says a lap is (the distance driven includes any
+                # excursion on the way, so it can overstate the lap by half)
+                if res.closed and covered >= 0.7 * min(self.travelled, self.map_lap_length()):
                     rungs = (b, y)
                     self.get_logger().info("cone ordering: %d rungs over %.0f m, closed track" % (n, covered))
                 else:
@@ -443,6 +446,20 @@ class Racer(Node):
         elif self.last_t > self.order_deadline:
             self.get_logger().warn("cone ordering did not answer in time; using the boundary walk")
             self.complete_track(None)
+
+    def map_lap_length(self):
+        """The lap as the map tells it: cones of one colour stand one spacing apart along their
+        boundary, so half the cones times the typical spacing between a cone and its nearest
+        neighbour of the same colour is the length of a boundary."""
+        L, C = self.slam.lhat, self.slam.colour
+        spacings = []
+        for c in (BLUE, YELLOW):
+            P = L[C == c]
+            if len(P) >= 4:
+                d = np.linalg.norm(P[:, None, :] - P[None, :, :], axis=2)
+                np.fill_diagonal(d, np.inf)
+                spacings.append(np.median(d.min(axis=1)) * len(P))
+        return float(np.mean(spacings)) if spacings else self.travelled
 
     def complete_track(self, rungs):
         p = self.p
@@ -693,8 +710,8 @@ class Racer(Node):
                 target = self.at_distance(prev, q, p["lookahead"])
                 break
             prev = q
-        if target is None and line:
-            target = line[-1]
+        if target is None and line and math.hypot(*line[-1]) > 0.5:
+            target = line[-1]                      # a line that ends within reach of the bumper is no target
         if target is None:
             # a scan with nothing ahead (the big start cones fill the view, the cones of a corner
             # not yet in the camera's view): hold the wheel and crawl for a few seconds before
