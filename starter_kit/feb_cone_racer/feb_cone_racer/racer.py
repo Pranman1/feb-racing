@@ -55,7 +55,7 @@ DEFAULTS = dict(
     speed_per_throttle=23.0, throttle_kp=0.02, throttle_ki=0.03, throttle_slew=0.8, speed_window=0.25, steer_tau=0.15,
     # slam
     keyframe_dist=0.4, slam_range=6.0, loc_range=6.0, loc_corridor=2.5, dx_weight=2.0, z_weight=1.0, new_landmark_dist=0.6, icp_gate=1.5,
-    solve_every=3, min_lap_length=15.0, order_timeout=3.0, closure_landmarks=10, lap_close_dist=2.0, min_seen=2, icp_min_matches=5, snap_radius=10.0, snap_gate=6.0,
+    solve_every=3, min_lap_length=15.0, order_timeout=10.0, closure_landmarks=10, lap_close_dist=2.0, min_seen=2, icp_min_matches=5, snap_radius=10.0, snap_gate=6.0,
     # raceline
     sample_step=0.25, car_half_width=0.135, margin=0.7, curvature_reg=0.01,
     v_max=4.0, a_lat=3.5, a_acc=2.5, a_brake=3.0,
