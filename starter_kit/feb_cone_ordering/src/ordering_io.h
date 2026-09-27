@@ -25,6 +25,7 @@ inline double yaw_of(const geometry_msgs::msg::Quaternion &q) {
 inline void run(ConeOrderingState &state, const geometry_msgs::msg::Pose &car, const geometry_msgs::msg::PoseArray &map, bool expect_closed = false) {
     const double yaw = yaw_of(car.orientation);
     const double offsets[] = {0.0, -2.0, 2.0, -4.0, 4.0, -6.0};
+    ConeOrderingState best;
     for (double along : offsets) {
         state = ConeOrderingState{};
         state.car = {{car.position.x + along * std::cos(yaw), car.position.y + along * std::sin(yaw)}, yaw};
@@ -35,7 +36,9 @@ inline void run(ConeOrderingState &state, const geometry_msgs::msg::Pose &car, c
         }
         ordering_robust::update(state, 12, expect_closed);
         if (ordering_robust::healthy(state) && (state.is_closed || !expect_closed)) return;
+        if (state.redConeOrder.size() > best.redConeOrder.size()) best = state;
     }
+    state = best;      // nothing satisfied the caller: the longest ordering found, for the caller to judge
 }
 
 inline geometry_msgs::msg::PoseArray to_array(const std::vector<Point> &pts, const std::string &frame) {
