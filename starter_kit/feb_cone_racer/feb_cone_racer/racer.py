@@ -542,54 +542,64 @@ class Racer(Node):
         return float(np.clip(2.0 * np.median(gaps), self.p["chain_step"], 6.0))
 
     def local_centreline(self, cones):
-        """Midpoints between the ordered chains. A blue chain cone pairs with the yellow cone that
-        lies across the track to its RIGHT (right of the chain's direction of travel), never the
-        nearest yellow regardless of side: at a hairpin the nearest yellow is often on the far
-        branch and the midpoint would cut through the inner cones and turn the car around.
-        Unpaired cones are offset by half the track width along their chain's normal."""
+        """The middle of the corridor in view, as a dense line of points: the blue chain is
+        walked every 0.3 m and each step is paired with the nearest point of the yellow
+        chain that lies across the track to its RIGHT (right of the chain's direction of
+        travel), never the nearest yellow regardless of side: at a hairpin the nearest yellow
+        is often on the far branch and the midpoint would cut through the inner cones and turn
+        the car around. Walking the chain rather than pairing cone to cone matters at a
+        corner: with one midpoint per cone the line stays straight until the cone past the
+        corner, and the car turns a length too late. Where one chain has no partner, its points
+        are offset by half the track width."""
         # the orange start cones stand on the boundary lines: for driving they count as the
         # colour of the side they are on
         cones = [(x, y, (BLUE if y > 0.0 else YELLOW) if c == ORANGE else c) for x, y, c in cones]
         step = self.chain_step(cones)
         left = self.chain([c for c in cones if c[2] == BLUE and c[0] > -1.0], step)
         right = self.chain([c for c in cones if c[2] == YELLOW and c[0] > -1.0], step)
-        half = self.p["track_width"] / 2.0
-
-        def tangents(chain):
-            out = []
-            for i, c in enumerate(chain):
-                a = chain[max(i - 1, 0)]
-                b = chain[min(i + 1, len(chain) - 1)]
-                tx, ty = b[0] - a[0], b[1] - a[1]
-                n = math.hypot(tx, ty)
-                out.append((tx / n, ty / n) if n > 1e-6 else (1.0, 0.0))
-            return out
-
-        lt, rt = tangents(left), tangents(right)
-        points, used = [], set()
-        for i, l in enumerate(left):
-            nx, ny = lt[i][1], -lt[i][0]                       # right-hand normal of the blue chain
+        w, half = self.p["track_width"], self.p["track_width"] / 2.0
+        L, R = self.walk_chain(left), self.walk_chain(right)
+        points = []
+        covered = np.zeros(len(R), dtype=bool)
+        for (px, py), (tx, ty) in L:
+            nx, ny = ty, -tx                                   # right-hand normal of the blue chain
             best, best_score = None, None
-            for j, r in enumerate(right):
-                dx, dy = r[0] - l[0], r[1] - l[1]
+            for j, ((qx, qy), _) in enumerate(R):
+                dx, dy = qx - px, qy - py
                 d = math.hypot(dx, dy)
-                across = dx * nx + dy * ny                       # how far to the right
-                along = abs(dx * lt[i][0] + dy * lt[i][1])       # how far along the track
-                if j in used or d > 1.3 * self.p["track_width"] or across < 0.4 * d:
+                across = dx * nx + dy * ny                      # how far to the right
+                along = abs(dx * tx + dy * ty)                   # how far along the track
+                if d > 1.3 * w or across < 0.4 * d:
                     continue
                 score = along + 0.5 * d
                 if best_score is None or score < best_score:
                     best, best_score = j, score
             if best is None:
-                points.append((l[0] + half * nx, l[1] + half * ny))
+                points.append((px + half * nx, py + half * ny))
             else:
-                used.add(best)
-                points.append(((l[0] + right[best][0]) / 2.0, (l[1] + right[best][1]) / 2.0))
-        for j, r in enumerate(right):
-            if j not in used:
-                nx, ny = -rt[j][1], rt[j][0]                     # left-hand normal of the yellow chain
-                points.append((r[0] + half * nx, r[1] + half * ny))
+                covered[best] = True
+                points.append(((px + R[best][0][0]) / 2.0, (py + R[best][0][1]) / 2.0))
+        for j, ((qx, qy), (tx, ty)) in enumerate(R):
+            if not covered[j]:
+                points.append((qx - half * ty, qy + half * tx))   # left-hand normal of the yellow chain
         return sorted([q for q in points if q[0] > 0.0], key=lambda q: math.hypot(*q))
+
+    @staticmethod
+    def walk_chain(chain, step=0.3):
+        """Points every `step` along a chain of cones, each with the chain's direction there."""
+        if not chain:
+            return []
+        if len(chain) == 1:
+            return [((chain[0][0], chain[0][1]), (1.0, 0.0))]
+        out = []
+        for a, b in zip(chain, chain[1:]):
+            dx, dy = b[0] - a[0], b[1] - a[1]
+            d = math.hypot(dx, dy)
+            tx, ty = dx / d, dy / d
+            n = max(int(d / step), 1)
+            out += [((a[0] + tx * d * k / n, a[1] + ty * d * k / n), (tx, ty)) for k in range(n)]
+        out.append(((chain[-1][0], chain[-1][1]), out[-1][1]))
+        return out
 
     def on_rungs(self, side, msg):
         self.rungs[side] = np.array([[q.position.x, q.position.y] for q in msg.poses]).reshape(-1, 2)
@@ -666,6 +676,18 @@ class Racer(Node):
         self.integral = 0.0
         return steer, (self.throttle_law(p["map_min_speed"], dt) if speed is None else speed)
 
+    @staticmethod
+    def at_distance(a, b, r):
+        """The point of segment a-b at distance r from the origin (b is beyond r, a within)."""
+        ax, ay = a
+        dx, dy = b[0] - ax, b[1] - ay
+        qa, qb, qc = dx * dx + dy * dy, 2.0 * (ax * dx + ay * dy), ax * ax + ay * ay - r * r
+        disc = qb * qb - 4.0 * qa * qc
+        if qa < 1e-9 or disc < 0.0:
+            return b
+        t = float(np.clip((-qb + math.sqrt(disc)) / (2.0 * qa), 0.0, 1.0))
+        return (ax + t * dx, ay + t * dy)
+
     def corridor_prefix(self, b, y):
         """How many rungs, from the car on, still look like the track: the ordering is built
         for a complete map, and on the growing map its path past the last well-mapped cones
@@ -695,7 +717,17 @@ class Racer(Node):
     def follow_local(self, clusters, cones, dt):
         p = self.p
         line = self.local_centreline([(x, y, c) for x, y, c, w in cones])
-        target = next((q for q in line if math.hypot(*q) >= p["lookahead"]), line[-1] if line else None)
+        # the target is the point of the centreline exactly one lookahead away, interpolated
+        # between its (cone-spaced) points: the first point beyond the lookahead can be three
+        # metres out at a corner, and pure pursuit on it turns far too little
+        target, prev = None, (0.0, 0.0)
+        for q in line:
+            if math.hypot(*q) >= p["lookahead"]:
+                target = self.at_distance(prev, q, p["lookahead"])
+                break
+            prev = q
+        if target is None and line:
+            target = line[-1]
         if target is None:
             # a scan with nothing ahead (the big start cones fill the view, a cone hidden for a
             # moment): hold the wheel and crawl for a second before giving up
