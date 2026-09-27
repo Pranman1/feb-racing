@@ -69,9 +69,11 @@ class GraphSLAM:
 
     # ------------------------------------------------------------ data association
 
-    def icp(self, z, colour):
+    def icp(self, z, colour, rotate=True):
         """Rigid transform (t, R) that best lays the world-frame cones z over the map, by
-        mutual nearest neighbours of the same colour; identity if there is nothing to match."""
+        mutual nearest neighbours of the same colour; identity if there is nothing to match.
+        With rotate=False only the translation is fitted: the heading is known from the IMU,
+        and three cones in a row (a straight) cannot pin a rotation, the fit then spins."""
         t, R = np.zeros(2), np.eye(2)
         if len(z) < 2 or len(self.lhat) < 2:
             return t, R
@@ -102,6 +104,9 @@ class GraphSLAM:
                 return np.zeros(2), np.eye(2)
             X, Y = np.array(X), np.array(Y)
             xm, ym = X.mean(axis=0), Y.mean(axis=0)
+            if not rotate:
+                R, t = np.eye(2), ym - xm
+                continue
             U, _, Vt = np.linalg.svd((X - xm).T @ (Y - ym))
             Rn = (U @ Vt).T
             if np.linalg.det(Rn) < 0:
@@ -260,7 +265,10 @@ class GraphSLAM:
         saved_min = self.icp_min_matches
         self.icp_min_matches = 3                 # a hairpin shows only a few cones; three are enough to hold position
         try:
-            t, R = self.icp(zw, colour)
+            # against a frozen map the geometry alone places the car: cones stand a metre or
+            # more apart and the gate is a fraction of that, so a cone's colour (wrong one
+            # time in twenty at speed) would only lose matches, never add one
+            t, R = self.icp(zw, np.zeros_like(colour), rotate=False)
         finally:
             self.icp_min_matches = saved_min
         if not np.any(t) and wide:
