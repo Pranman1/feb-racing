@@ -567,30 +567,33 @@ class Racer(Node):
         right = self.chain([c for c in cones if c[2] == YELLOW], step)
         w, half = self.p["track_width"], self.p["track_width"] / 2.0
         L, R = self.walk_chain(left), self.walk_chain(right)
+        # walked from both sides: the inner chain of a corner is a sharp vertex and the outer
+        # one a wide arc, and midpoints made from one side alone follow that side's shape
+        points = self.midpoints(L, R, 1.0, w, half) + self.midpoints(R, L, -1.0, w, half)
+        return sorted([q for q in points if q[0] > 0.0], key=lambda q: math.hypot(*q))
+
+    @staticmethod
+    def midpoints(A, B, side, w, half):
+        """Midpoints between the walked chain A and the walked chain B, one per step of A: the
+        step is paired with the nearest point of B that lies across the track to its right
+        (side +1, A blue) or left (side -1, A yellow); a step with no partner is offset by half
+        the track width."""
         points = []
-        covered = np.zeros(len(R), dtype=bool)
-        for (px, py), (tx, ty) in L:
-            nx, ny = ty, -tx                                   # right-hand normal of the blue chain
+        for (px, py), (tx, ty) in A:
+            nx, ny = side * ty, -side * tx                      # normal towards the other chain
             best, best_score = None, None
-            for j, ((qx, qy), _) in enumerate(R):
+            for (qx, qy), _ in B:
                 dx, dy = qx - px, qy - py
                 d = math.hypot(dx, dy)
-                across = dx * nx + dy * ny                      # how far to the right
-                along = abs(dx * tx + dy * ty)                   # how far along the track
+                across = dx * nx + dy * ny                      # how far across the track
+                along = abs(dx * tx + dy * ty)                   # how far along it
                 if d > 1.3 * w or across < 0.4 * d:
                     continue
                 score = along + 0.5 * d
                 if best_score is None or score < best_score:
-                    best, best_score = j, score
-            if best is None:
-                points.append((px + half * nx, py + half * ny))
-            else:
-                covered[best] = True
-                points.append(((px + R[best][0][0]) / 2.0, (py + R[best][0][1]) / 2.0))
-        for j, ((qx, qy), (tx, ty)) in enumerate(R):
-            if not covered[j]:
-                points.append((qx - half * ty, qy + half * tx))   # left-hand normal of the yellow chain
-        return sorted([q for q in points if q[0] > 0.0], key=lambda q: math.hypot(*q))
+                    best, best_score = (qx, qy), score
+            points.append((px + half * nx, py + half * ny) if best is None else ((px + best[0]) / 2.0, (py + best[1]) / 2.0))
+        return points
 
     @staticmethod
     def walk_chain(chain, step=0.3):
@@ -743,10 +746,11 @@ class Racer(Node):
         bound = ff if self.speed < 0.3 else 0.5 * ff
         trim = float(np.clip(p["throttle_kp"] * err + p["throttle_ki"] * self.integral, -bound, bound))
         wanted = float(np.clip(ff + trim, 0.0, 1.0))
-        if v_t > 0.0 and self.speed < 0.6:
+        if v_t > 0.0 and self.speed < 0.8:
             # the motor needs this much to get the car rolling, and more with the wheels turned
-            # (a crawl at full lock stalls on 0.03)
-            wanted = max(wanted, p["throttle_start"] * (1.0 + 0.5 * abs(self.steer) / MAX_STEER))
+            # (a crawl at full lock stalls on 0.03); the floor fades out as the car gets going
+            floor = p["throttle_start"] * (1.0 + 0.5 * abs(self.steer) / MAX_STEER)
+            wanted = max(wanted, floor * float(np.clip((0.8 - self.speed) / 0.5, 0.0, 1.0)))
         slew = p["throttle_slew"] * dt
         return float(np.clip(wanted, self.throttle - slew, self.throttle + slew)) if self.throttle > 0.0 else wanted
 
