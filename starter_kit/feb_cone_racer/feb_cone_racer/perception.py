@@ -16,7 +16,7 @@ UNKNOWN = 0                              # a lidar cone the camera has not colou
 class Perception:
     def __init__(self, p):
         self.p = p
-        self.blobs = []                 # [(colour, u_centre_px, top_row_px, bottom_row_px, area)] from the latest image
+        self.blobs = []                 # [(colour, u_centre_px, top_row_px, bottom_row_px, area, dim)] from the latest image
         self.image_width = None
         self.prev = []                  # last scan's cones: (x, y, colour, age, colour votes)
         self.prev_yaw = None
@@ -54,11 +54,10 @@ class Perception:
                 # (a speck on the ground, a streak at the horizon) is not one, and matched to a
                 # lidar cone it hands that cone the wrong colour
                 inside = mask[y:y + bh, x:x + bw] > 0
-                if float(np.mean(hsv[y:y + bh, x:x + bw, 2][inside])) < self.p["blob_min_value"]:
-                    continue
+                dim = float(np.mean(hsv[y:y + bh, x:x + bw, 2][inside])) < self.p["blob_min_value"]
                 # the start cones are big: a small orange-hued blob is a shaded yellow cone
                 label = YELLOW if colour == ORANGE and area < self.p["orange_min_px"] else colour
-                blobs.append((label, x + bw / 2.0, float(y), float(y + bh), area))   # colour, column, top row, bottom row, area
+                blobs.append((label, x + bw / 2.0, float(y), float(y + bh), area, dim))   # colour, column, top row, bottom row, area, dim
         self.blobs = blobs
 
     # ------------------------------------------------------------ lidar
@@ -108,7 +107,7 @@ class Perception:
         ambiguous) where ambiguous means another cone sits within a few pixels of its column."""
         n = len(clusters)
         cols = [self.pixel_column(x, y, yaw_rate) if self.image_width else float("nan") for x, y in clusters]
-        colour, taken = [None] * n, set()
+        colour, dim, taken = [None] * n, [False] * n, set()
         if self.blobs and self.image_width:
             tol = self.p["match_px_frac"] * self.image_width
             pairs = sorted((abs(b[1] - cols[i]), i, k) for i in range(n) if not math.isnan(cols[i])
@@ -117,11 +116,11 @@ class Perception:
             for d, i, k in pairs:
                 if i in done or k in taken:
                     continue
-                colour[i], done.add(i), taken.add(k)
-                colour[i] = self.blobs[k][0]
+                done.add(i), taken.add(k)
+                colour[i], dim[i] = self.blobs[k][0], self.blobs[k][5]
         amb_px = 0.065 * self.image_width if self.image_width else 12.0
         ambiguous = [not math.isnan(cols[i]) and any(j != i and not math.isnan(cols[j]) and abs(cols[j] - cols[i]) < amb_px for j in range(n)) for i in range(n)]
-        return colour, ambiguous
+        return colour, ambiguous, dim
 
     def fuse(self, clusters, speed, yaw, dt, yaw_rate=0.0):
         """Colour each lidar cone: camera first, then the colour it had last scan (moved into
@@ -140,7 +139,7 @@ class Perception:
         for x, y, colour, age, votes in self.prev:
             x0, y0 = x - ds, y
             moved.append((c * x0 + s * y0, -s * x0 + c * y0, colour, age + 1, votes))
-        cam_colour, ambiguous = self.assign(clusters, yaw_rate)
+        cam_colour, ambiguous, dim = self.assign(clusters, yaw_rate)
         out, result = [], []
         for i, (x, y) in enumerate(clusters):
             # the camera's word counts for less the farther the cone: a far cone is a few pixels
@@ -159,12 +158,16 @@ class Perception:
                     best, best_d = (pc, page, pv), d
             if best is not None:
                 votes = {c: 0.9 * v for c, v in best[2].items()}
-            if colour is not None:
+            if colour is not None and not dim[i]:
                 votes[colour] = votes.get(colour, 0.0) + weight
                 colour = max(votes, key=votes.get)
             elif best is not None:
                 colour, age = best[0], best[1]
                 weight = 0.3
+            elif colour is not None:
+                # a dim blob (a dark far cone, or a speck on the ground): too doubtful to vote
+                # for the map, but still a better guess for driving than the side of the car
+                weight = 0.0
             if colour is None and 0.0 < x < self.p["side_guess_range"] and abs(y) < self.p["track_width"]:
                 colour, age, weight = (BLUE if y > 0.0 else YELLOW), self.p["track_memory"] - 1, 0.0
             # a cone right beside the car is that side's boundary as long as the car is between

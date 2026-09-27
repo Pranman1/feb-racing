@@ -676,18 +676,20 @@ class Racer(Node):
         w = self.p["track_width"]
         n = min(len(b), len(y))
         mid = (b[:n] + y[:n]) / 2.0
-        heading = None
+        # the direction of the path is judged over a metre at a time (the rungs come every
+        # 0.2 m and their ends jitter, so neighbouring midpoints say nothing about direction)
+        back = 0
         for i in range(n):
             if not 0.5 * w <= np.linalg.norm(b[i] - y[i]) <= 1.6 * w:
                 return i
-            if i > 0:
-                d = mid[i] - mid[i - 1]
-                if np.linalg.norm(d) < 0.02:
-                    continue
-                h = math.atan2(d[1], d[0])
-                if heading is not None and abs(math.atan2(math.sin(h - heading), math.cos(h - heading))) > math.radians(35):
-                    return i
-                heading = h
+            while back < i and np.linalg.norm(mid[i] - mid[back]) > 1.0:
+                back += 1
+            if back > 0 and np.linalg.norm(mid[i] - mid[back]) > 0.8:
+                d1, d0 = mid[i] - mid[back], mid[back] - mid[max(back - (i - back), 0)]
+                if np.linalg.norm(d0) > 0.8:
+                    turn = math.atan2(d1[0] * d0[1] - d1[1] * d0[0], d1 @ d0)
+                    if abs(turn) > math.radians(100):
+                        return i
         return n
 
     def follow_local(self, clusters, cones, dt):
