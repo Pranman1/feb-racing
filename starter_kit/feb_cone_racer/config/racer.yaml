@@ -17,6 +17,7 @@ racer:
     map_speed: 1.2
     map_min_speed: 0.8
     lookahead: 1.0
+    follow_range: 3.5         # m; the reactive follower chains only the cones this near (their colours are reliable, far ones are not)
     local_path_lookahead: 1.4   # m, pure-pursuit target along the live cone ordering's local path on lap one
     local_path_min_reach: 2.0 # m of trusted path ahead before lap one follows it; shorter, the reactive follower drives
     rung_max_age: 1.0         # s; older rungs hand lap one back to the reactive follower
@@ -31,7 +32,7 @@ racer:
     lap_close_dist: 2.0       # m from the start pose that closes the lap
     # raceline
     sample_step: 0.25
-    margin: 0.55              # m kept from the cones beyond the car's half width: tracking error is about 0.45 m at speed (a cone hit stalls the car)
+    margin: 0.7               # m kept from the cones beyond the car's half width: tracking error is about 0.45 m at speed (a cone hit stalls the car)
     v_max: 4.0                # m/s cap of the speed profile
     a_lat: 3.5                # m/s^2 lateral limit used for cornering speed
     a_acc: 2.5

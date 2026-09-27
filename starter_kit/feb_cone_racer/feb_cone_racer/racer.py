@@ -51,13 +51,13 @@ DEFAULTS = dict(
     hsv_blue=[105, 220, 8, 135, 255, 255], hsv_yellow=[18, 150, 8, 40, 255, 255], hsv_orange=[0, 150, 15, 15, 255, 255],
     band_top=0.20, band_bottom=0.36, band_floor=0.21, orange_min_px=35, blob_min_value=25,
     # lap-1 follower
-    map_speed=1.2, map_min_speed=0.8, lookahead=1.0, throttle_start=0.07, chain_step=1.8, avoid_range=0.9, local_path_lookahead=1.4, local_path_min_reach=2.0, rung_max_age=1.0,
+    map_speed=1.2, map_min_speed=0.8, lookahead=1.0, follow_range=3.5, throttle_start=0.07, chain_step=1.8, avoid_range=0.9, local_path_lookahead=1.4, local_path_min_reach=2.0, rung_max_age=1.0,
     speed_per_throttle=23.0, throttle_kp=0.02, throttle_ki=0.03, throttle_slew=0.8, speed_window=0.25, steer_tau=0.15,
     # slam
     keyframe_dist=0.4, slam_range=6.0, loc_range=6.0, loc_corridor=2.5, dx_weight=2.0, z_weight=1.0, new_landmark_dist=0.6, icp_gate=1.5,
     solve_every=3, min_lap_length=15.0, order_timeout=3.0, closure_landmarks=10, lap_close_dist=2.0, min_seen=2, icp_min_matches=5, snap_radius=10.0, snap_gate=6.0,
     # raceline
-    sample_step=0.25, car_half_width=0.135, margin=0.55, curvature_reg=0.01,
+    sample_step=0.25, car_half_width=0.135, margin=0.7, curvature_reg=0.01,
     v_max=4.0, a_lat=3.5, a_acc=2.5, a_brake=3.0,
     # mpc: model
     mass=3.9, inertia_z=0.10, lf=0.175, lr=0.175, tyre_B=8.0, tyre_C=1.4, tyre_D=18.0,   # L 0.35 m effective (yaw-rate fit)
@@ -253,7 +253,7 @@ class Racer(Node):
                 # crawl for a moment in case the cones come back; then stop, as the real car
                 # would (it cannot back up)
                 steer = self.steer
-                throttle = self.throttle_law(p["map_min_speed"], dt) if t - self.last_seen_t < p["lost_after"] + 2.0 else 0.0
+                throttle = self.throttle_law(p["map_min_speed"], dt) if t - self.last_seen_t < p["lost_after"] + 4.0 else 0.0
                 if throttle == 0.0:
                     self.halt("nothing in view for %.0f s on the mapping lap" % (t - self.last_seen_t))
         else:
@@ -540,9 +540,13 @@ class Racer(Node):
         # the orange start cones stand on the boundary lines: for driving they count as the
         # colour of the side they are on
         cones = [(x, y, (BLUE if y > 0.0 else YELLOW) if c == ORANGE else c) for x, y, c in cones]
+        # only the cones nearby: a cone's colour is reliable within a few metres and not
+        # beyond (a far wall of cones read as the wrong colour turned the chains the wrong way
+        # at a corner), and the target is one lookahead away
+        cones = [c for c in cones if c[0] > -1.0 and math.hypot(c[0], c[1]) < self.p["follow_range"]]
         step = self.chain_step(cones)
-        left = self.chain([c for c in cones if c[2] == BLUE and c[0] > -1.0], step)
-        right = self.chain([c for c in cones if c[2] == YELLOW and c[0] > -1.0], step)
+        left = self.chain([c for c in cones if c[2] == BLUE], step)
+        right = self.chain([c for c in cones if c[2] == YELLOW], step)
         w, half = self.p["track_width"], self.p["track_width"] / 2.0
         L, R = self.walk_chain(left), self.walk_chain(right)
         points = []
@@ -692,9 +696,10 @@ class Racer(Node):
         if target is None and line:
             target = line[-1]
         if target is None:
-            # a scan with nothing ahead (the big start cones fill the view, a cone hidden for a
-            # moment): hold the wheel and crawl for a second before giving up
-            if self.last_t - self.target_t < 1.0:
+            # a scan with nothing ahead (the big start cones fill the view, the cones of a corner
+            # not yet in the camera's view): hold the wheel and crawl for a few seconds before
+            # giving up; the corner's cones come into view as the car turns
+            if self.last_t - self.target_t < 4.0:
                 self.no_target = False
                 return self.steer, self.throttle_law(p["map_min_speed"], dt)
             self.no_target = True
