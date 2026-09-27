@@ -324,6 +324,16 @@ def _build(lhat, colour, start_xy, start_heading, step, path=None):
     seg_l, seg_r = 2.0 * np.median(np.linalg.norm(np.roll(left, -1, axis=0) - left, axis=1)), 2.0 * np.median(np.linalg.norm(np.roll(right, -1, axis=0) - right, axis=1))
     half = np.array([min(np.linalg.norm(nearest_on_polyline(left, q, seg_l) - q), np.linalg.norm(nearest_on_polyline(right, q, seg_r) - q)) for q in centre])
     half = np.minimum(half, h_med)
+    # the same tidy-up as the ordering's track: each sample midway between the nearest blue and
+    # yellow cones, and a sample the walk pulled across to the neighbouring leg of a hairpin
+    # (a kink) dropped
+    for _ in range(2):                       # twice: the second pass sees tangents of a line already made continuous at the seam
+        centre, half = recentre(centre, half, lhat, colour)
+        centre, half = drop_kinks(centre, half)
+        centre, s = resample_closed(centre, step)
+        half = np.interp(s, np.linspace(0.0, s[-1], len(half), endpoint=False), half) if len(half) != len(centre) else half
+    half = np.array([min(np.linalg.norm(nearest_on_polyline(left, q, seg_l) - q), np.linalg.norm(nearest_on_polyline(right, q, seg_r) - q)) for q in centre])
+    half = np.minimum(half, h_med)
     track = _finish(centre, half, s, step, left)
     track.update(left=left, right=right)
     return track
