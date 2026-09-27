@@ -128,6 +128,7 @@ class Racer(Node):
         self.clusters_now = []
         self.last_dt = 0.1
         self.odo_speed = 0.0
+        self.pose_speed, self.pose_speed_t, self.last_loc_pose = 0.0, -1e9, None   # speed from consecutive map-matched poses
         self.loc_log_t = 0.0
         self.last_seen_t = 0.0
         self.no_target = False
@@ -767,6 +768,15 @@ class Racer(Node):
                                    % (len(z_rel), "all" if subset is None else len(subset), float(np.median(d)), float(np.min(d)), self.speed))
         if matched >= 3:
             self.pose = 0.5 * self.pose + 0.5 * corrected      # trust the map, but no jumps
+            # the speed the map sees: the wheels over-read by a third when they slip at a
+            # corner exit, and the MPC planning from that speed brakes and steers for a car
+            # that is not there
+            if self.last_loc_pose is not None:
+                self.pose_speed = 0.5 * self.pose_speed + 0.5 * min(float(np.linalg.norm(self.pose - self.last_loc_pose)) / max(self.last_dt, 0.05), 8.0)
+                self.pose_speed_t = self.last_t
+            self.last_loc_pose = self.pose.copy()
+        else:
+            self.last_loc_pose = None
         if self.last_t - self.loc_log_t > 2.0:
             self.loc_log_t = self.last_t
             self.get_logger().info("localise: %d cones in view, %d matched, correction %.2f m, speed %.1f, mpc %.0f ms" % (len(z_rel), matched, shift, self.speed, self.solve_ms))
@@ -828,7 +838,8 @@ class Racer(Node):
         if self.mpc is not None:
             # delay compensation: where the car will be when this command bites
             x, y = self.pose
-            psi, v, d = self.yaw, max(self.odo_speed, 0.0), self.delta
+            psi, d = self.yaw, self.delta
+            v = self.pose_speed if self.last_t - self.pose_speed_t < 0.3 else max(self.odo_speed, 0.0)
             for _ in range(3):
                 h = STEER_DELAY / 3.0
                 x += v * math.cos(psi) * h
