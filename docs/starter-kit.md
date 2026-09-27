@@ -138,6 +138,30 @@ touching one. `race_speed_scale` (0.6) is the knob to
 turn up, and where the work is: at 0.7 the map match starts slipping at speed and cones get
 touched, so faster laps mean better localisation and tracking, not a bigger number.
 
+### Taking the racer to the real car: `calibrate_camera`
+
+Everything in `config/racer.yaml` under *camera* is about this car's camera and has to be
+fitted again for another one. Record a bag while driving past cones (lidar, `front_camera`,
+`imu`; a minute or two, some corners) and run
+
+```bash
+ros2 run feb_cone_racer calibrate_camera <bag> --params config/racer.yaml
+ros2 run feb_cone_racer calibrate_camera <bag> --params config/racer.yaml --track tracks/fsg/track.json   # simulator bag with IPS truth
+```
+
+It pairs lidar cones with the camera blobs that clearly belong to them (one blob at the cone's
+expected column, nothing else on that bearing) and fits, in one least-squares problem, where a
+point in front of the lidar lands in the image: `camera_hfov_deg`, `camera_ahead`,
+`camera_lateral`, `camera_col_bias` and `camera_lag_s` (how much older than the scan the image
+is, from the error against yaw rate). From the same blobs it proposes the image band the cones
+live in (`band_top`, `band_bottom`, `band_floor`) and the brightness gate (`blob_min_value`).
+With `--track`, the true cones and the bag's IPS say which colour every cone really is, so it
+also fits the HSV bounds per colour from the cones' own pixels and reports the colour accuracy
+by range. It prints a yaml snippet with the fit quality beside it (pairs used, residual in
+pixels): under about 5 px is a good fit, and on the simulator's own bag it reproduces the
+numbers in `racer.yaml`. What does not transfer by calibration: the vehicle model (`mass`,
+tyres, the longitudinal fit) and the raceline margin, which are the car's, and the MPC weights.
+
 ### `feb_cone_ordering`: the team's cone ordering, as a node
 
 `src/algorithms/` is a verbatim copy of the FSAE stack's `cone_ordering` (Akhil Agarwal,

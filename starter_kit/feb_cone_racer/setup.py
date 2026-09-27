@@ -20,5 +20,5 @@ setup(
     maintainer_email="pranavbhatttheonlyone@gmail.com",
     description="Cone-track racer: GraphSLAM map, raceline, nonlinear MPC",
     license="MIT",
-    entry_points={"console_scripts": ["racer = feb_cone_racer.racer:main"]},
+    entry_points={"console_scripts": ["racer = feb_cone_racer.racer:main", "calibrate_camera = feb_cone_racer.calibrate:main"]},
 )
