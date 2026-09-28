@@ -17,8 +17,9 @@ racer:
     map_speed: 1.2
     map_min_speed: 0.8
     speed_tau: 0.8            # s; the mapping lap slows at once but speeds up over this, so the car does not lurch when the known path ahead jumps
-    slip_allow: 0.3           # m/s the wheels may read above what the map says the car is doing; beyond that they are
-                              # slipping and the dead reckoning would run ahead of the car
+    slip_allow: 1.0           # m/s the wheels may read above what the map says the car is doing; beyond that they
+                              # are slipping and the dead reckoning would run ahead of the car. Kept loose on purpose:
+                              # the map's own speed lags a little, and a tight cap reads low and has the MPC add throttle
     lookahead: 1.0
     follow_range: 3.5         # m; the reactive follower chains only the cones this near (their colours are reliable, far ones are not)
     local_path_lookahead: 1.4   # m, pure-pursuit target along the live cone ordering's local path on lap one
