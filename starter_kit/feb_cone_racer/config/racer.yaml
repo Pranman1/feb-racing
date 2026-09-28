@@ -39,24 +39,23 @@ racer:
     # raceline
     sample_step: 0.25
     margin: 0.7               # m kept from the cones beyond the car's half width: tracking error is about 0.45 m at speed (a cone hit stalls the car)
-    v_max: 4.0                # m/s cap of the speed profile
-    a_lat: 3.5                # m/s^2 lateral limit used for cornering speed
-    a_acc: 2.5
-    a_brake: 3.0
-    race_speed_scale: 0.8     # scales the straight-line cap v_max. Measured over whole 17-track passes:
+    v_max: 5.5                # m/s cap of the speed profile; the car reaches 4.9 at throttle 0.20 and 7.3 at 0.30
+    a_lat: 5.0                # m/s^2 cornering limit. Skidpad measures 5.8 available, and the team's own
+    a_acc: 6.0                # RoboRacer stack runs 5.0 for 10-11 s laps on a track of this size
+    a_brake: 5.5
+    race_speed_scale: 1.0     # the limits above are now the measured ones, so the scales are knobs for an
                               # tracks (hairpins, Silverstone) with 0 steering reversals and 0.24 m of line error;
                               # 1.4 is fine on open layouts but runs 2 m wide on those two (mpc_bench)
-    corner_scale: 0.8         # 0.8/0.8 is clean on 16 of 17 tracks, 1.0/0.8 is 10% faster but clean on 14-15;
-                              # 1.0/1.0 and above leave the corridor. Either number is a knob for an organiser
+    corner_scale: 1.0         # organiser who wants a slower field, not a way of hiding a controller problem
                               # who wants a slower field. The car's measured grip is 5.8 m/s^2 lateral, so
                               # a_lat 3.5 x 0.8^2 is 39% of it, which is the margin the map's error needs
                               # 15.4; either axis at 1.0 is safe but 1.0/1.0 and 1.2/1.2 left the track after
                               # two laps. The car's measured grip is 5.8 m/s^2 lateral, so corner_scale 1.0
                               # (a_lat 3.5) is 60% of it, which is the margin the map error needs
     # mpc model (sysid-calibrated values go here)
-    long_a: 27.7              # refit from step responses in the simulator (see docs): the old 74.4/3.2 pair
-    long_b: 1.08              # had the car accelerating at 8 m/s^2 where it really makes 3.4, and settling in
-    idle_brake: 0.69          # 0.3 s where it really takes 0.9 s, so the MPC hunted for the throttle
+    long_a: 21.9              # refit on moving samples only (the earlier fit averaged in the seconds
+    long_b: 0.77              # the car spent already stopped, which hid the braking term entirely)
+    idle_brake: 2.81          # m/s^2 with the throttle shut: measured 5.3 at 4.9 m/s, 6.2 at 7.3 m/s
     tyre_B: 8.0
     tyre_C: 1.4
     tyre_D: 18.0
@@ -69,7 +68,7 @@ racer:
     w_pos: 8.0
     w_head: 2.0
     w_speed: 0.6
-    w_dsteer: 6.0             # on the steering rate (rad/s)^2. At 0.01 the solver bought tracking with
+    w_dsteer: 15.0            # on the steering rate (rad/s)^2. At 0.01 the solver bought tracking with
                               # lock-to-lock flicks the servo cannot perform: 110 reversals and 60% of the
                               # lap at full lock on the bench. At 6 it is 0 reversals and a 0.4 rad/s peak,
                               # with better tracking and a faster lap (mpc_bench, fs_comp_2021)
