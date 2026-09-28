@@ -52,7 +52,7 @@ DEFAULTS = dict(
     band_top=0.20, band_bottom=0.36, band_floor=0.21, orange_min_px=35, blob_min_value=25,
     # lap-1 follower
     map_speed=1.2, map_min_speed=0.8, lookahead=1.0, follow_range=3.5, throttle_start=0.07, chain_step=1.8, avoid_range=0.9, local_path_lookahead=1.4, local_path_min_reach=2.0, rung_max_age=1.0,
-    speed_per_throttle=23.0, speed_tau=0.8, throttle_kp=0.02, throttle_ki=0.03, throttle_slew=0.8, speed_window=0.25, steer_tau=0.15,
+    speed_per_throttle=25.6, speed_tau=0.8, throttle_kp=0.02, throttle_ki=0.03, throttle_slew=0.8, speed_window=0.25, steer_tau=0.15,
     # slam
     keyframe_dist=0.4, slam_range=6.0, loc_range=6.0, loc_corridor=2.5, dx_weight=2.0, z_weight=1.0, new_landmark_dist=0.6, icp_gate=1.5,
     solve_every=3, min_lap_length=15.0, order_timeout=10.0, closure_landmarks=10, lap_close_dist=2.0, min_seen=2, icp_min_matches=5, snap_radius=10.0, snap_gate=6.0,
@@ -61,7 +61,7 @@ DEFAULTS = dict(
     v_max=4.0, a_lat=3.5, a_acc=2.5, a_brake=3.0,
     # mpc: model
     mass=3.9, inertia_z=0.10, lf=0.175, lr=0.175, tyre_B=8.0, tyre_C=1.4, tyre_D=18.0,   # L 0.35 m effective (yaw-rate fit)
-    long_a=74.4, long_b=3.2, idle_brake=0.71,            # sysid fit on this car (feb_driver/tools/sysid_fit.py); b set so the steady state matches the 23 m/s per unit throttle seen when racing
+    long_a=27.7, long_b=1.08, idle_brake=0.69,            # sysid fit on this car (feb_driver/tools/sysid_fit.py); b set so the steady state matches the 23 m/s per unit throttle seen when racing
     max_steer=MAX_STEER, max_steer_rate=MAX_STEER_RATE, tau_max=0.28, v_cap=6.0,
     # mpc: problem
     mpc_horizon=12, mpc_dt=0.1, mpc_max_iter=60, mpc_steer_tau=0.15, mpc_substeps=3,

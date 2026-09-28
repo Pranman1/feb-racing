@@ -43,9 +43,9 @@ racer:
                               # 1.4 is fine on open layouts but runs 2 m wide on those two (mpc_bench)
     corner_scale: 1.2         # scales the cornering speed (a_lat by its square)
     # mpc model (sysid-calibrated values go here)
-    long_a: 74.4
-    long_b: 3.2               # steady state 23 m/s per unit throttle, as measured when racing
-    idle_brake: 0.71
+    long_a: 27.7              # refit from step responses in the simulator (see docs): the old 74.4/3.2 pair
+    long_b: 1.08              # had the car accelerating at 8 m/s^2 where it really makes 3.4, and settling in
+    idle_brake: 0.69          # 0.3 s where it really takes 0.9 s, so the MPC hunted for the throttle
     tyre_B: 8.0
     tyre_C: 1.4
     tyre_D: 18.0

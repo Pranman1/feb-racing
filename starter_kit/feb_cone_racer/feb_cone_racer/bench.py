@@ -97,7 +97,7 @@ def reference(line, race_s, race_v, race_psi, i0, N, DT, step):
     return ref
 
 
-def run(track_json, p, rate=10.0, laps=1.0, quiet=True):
+def run(track_json, p, rate=10.0, laps=1.0, slip=0.0, speed_source="wheel", jitter=0.0, seed=1):
     line, s_line, race_v, race_psi = build_line(track_json, p)
     n = len(line)
     mpc = BicycleMPC(p)
@@ -106,14 +106,22 @@ def run(track_json, p, rate=10.0, laps=1.0, quiet=True):
     z = np.array([line[0, 0], line[0, 1], race_psi[0], max(race_v[0], 0.5), 0.0, 0.0, 0.0])
     plant = Plant(p, z)
     dt = 1.0 / rate
+    rng = np.random.default_rng(seed)
     delay = [(0.0, 0.0)] * max(int(round(STEER_DELAY / dt)), 1)
     uprev = np.array([0.0, 0.0])
     lap_len = float(s_line[-1])
     travelled, t, idx_prev = 0.0, 0.0, 0
-    steers, rates, errs, speeds, solves = [], [], [], [], []
-    last_cmd = 0.0
+    steers, rates, errs, speeds, solves, ripple = [], [], [], [], [], []
+    last_cmd, last_tau, wheel = 0.0, 0.0, 0.0
+    last_pos = plant.z[:2].copy()
     while travelled < laps * lap_len and t < 4.0 * laps * lap_len:
         x, y, psi, vx, vy, r, d = plant.z
+        # what the controller is told the speed is. The wheels over-read when they slip, which
+        # they do under torque, and the racer feeds that straight to the MPC; `pose` is what a
+        # map match gives instead, the displacement between scans.
+        wheel = 0.5 * wheel + 0.5 * (vx + slip * last_tau)
+        v_meas = wheel if speed_source == "wheel" else float(np.linalg.norm(plant.z[:2] - last_pos)) / dt
+        last_pos = plant.z[:2].copy()
         i = int(np.argmin(np.linalg.norm(line - np.array([x, y]), axis=1)))
         # the racer's own delay compensation, kinematic over STEER_DELAY
         px, py, ppsi = x, y, psi
@@ -125,25 +133,30 @@ def run(track_json, p, rate=10.0, laps=1.0, quiet=True):
         ref = reference(line, s_line, race_v, race_psi, i, mpc.N, mpc.DT, p["sample_step"])
         ref[2] = ppsi + np.array([wrap(a - ppsi) for a in ref[2]])
         t0 = time.time()
-        out = mpc.solve(np.array([px, py, ppsi, vx, 0.0, r, d]), ref, uprev)
+        out = mpc.solve(np.array([px, py, ppsi, max(v_meas, 0.0), 0.0, r, d]), ref, uprev)
         solves.append(1000.0 * (time.time() - t0))
         if out is None:
             cmd, tau = last_cmd, 0.0
         else:
             uprev = out[0]
             cmd, tau = float(np.clip(out[0][0], -MAX_STEER, MAX_STEER)), float(np.clip(out[0][1], 0.0, p["tau_max"]))
+        last_tau = tau
         delay.append((cmd, tau))
         applied = delay.pop(0)
-        plant.step(applied[0], applied[1], dt)
+        # the bridge does not deliver on a metronome: the command is held for however long the
+        # next scan takes, while the MPC planned it for exactly mpc_dt
+        held = float(np.clip(dt + jitter * rng.standard_normal(), 0.4 * dt, 2.0 * dt)) if jitter > 0 else dt
+        plant.step(applied[0], applied[1], held)
         rates.append((cmd - last_cmd) / dt)
         last_cmd = cmd
         steers.append(cmd)
         errs.append(float(np.min(np.linalg.norm(line - plant.z[:2], axis=1))))
         speeds.append(float(plant.z[3]))
+        ripple.append(float(plant.z[3]))
         step_s = s_line[i] - s_line[idx_prev]
         travelled += step_s + (lap_len if step_s < -0.5 * lap_len else 0.0)
         idx_prev = i
-        t += dt
+        t += held if jitter > 0 else dt
         if errs[-1] > 3.0:
             break
     rates = np.array(rates)
@@ -156,6 +169,7 @@ def run(track_json, p, rate=10.0, laps=1.0, quiet=True):
                rate_rms=float(np.sqrt(np.mean(np.square(rates)))), rate_max=float(np.max(np.abs(rates))),
                reversals=reversals, reversals_per_100m=100.0 * reversals / max(travelled, 1.0),
                v_mean=float(np.mean(speeds)), v_max=float(np.max(speeds)), solve_ms=float(np.mean(solves)),
+               v_ripple=float(np.std(np.array(ripple) - np.convolve(ripple, np.ones(11) / 11, mode="same"))),
                saturated=float(np.mean(np.abs(np.array(steers)) > 0.95 * MAX_STEER)))
     return out
 
@@ -178,7 +192,7 @@ def crawl(p, v_target=1.2, secs=25.0, rate=10.0, vary=0.0, period=1.0):
             dv = p["long_a"] * tau - p["long_b"] * vx - p["idle_brake"] * (1.0 - math.tanh(40.0 * tau))
             vx = max(vx + 0.001 * dv, 0.0)
         shim.speed = 0.5 * shim.speed + 0.5 * vx        # the encoder smoothing the node does
-        t += dt
+        t += held if jitter > 0 else dt
         if t > 5.0:
             vs.append(vx)
             taus.append(tau)
@@ -190,16 +204,18 @@ def crawl(p, v_target=1.2, secs=25.0, rate=10.0, vary=0.0, period=1.0):
 
 def report(name, m):
     print("%-22s %s lap %6.1f s (%.2f laps) | line error rms %.2f max %.2f m | steering rate rms %5.2f max %5.2f rad/s | "
-          "reversals %4d (%.1f per 100 m) | at full lock %4.1f%% | v mean %.2f max %.2f | mpc %.0f ms"
+          "reversals %4d | v mean %.2f ripple %.2f m/s | mpc %.0f ms"
           % (name, "  " if m["finished"] else "LOST", m["lap_time"], m["laps"], m["err_rms"], m["err_max"],
-             m["rate_rms"], m["rate_max"], m["reversals"], m["reversals_per_100m"], 100 * m["saturated"],
-             m["v_mean"], m["v_max"], m["solve_ms"]))
+             m["rate_rms"], m["rate_max"], m["reversals"], m["v_mean"], m["v_ripple"], m["solve_ms"]))
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="closed-loop bench for the racer's MPC, no simulator")
     ap.add_argument("track", nargs="?", help="a track.json (its centreline is the line to follow)")
     ap.add_argument("--laps", type=float, default=1.0)
+    ap.add_argument("--jitter", type=float, default=0.0, help="standard deviation of the control period, seconds (the bridge shows 0.024)")
+    ap.add_argument("--slip", type=float, default=0.0, help="wheel over-read per unit throttle, m/s (the simulator shows about 3.5)")
+    ap.add_argument("--speed-source", choices=["wheel", "pose"], default="wheel", help="what the controller is told the speed is")
     ap.add_argument("--crawl", action="store_true", help="bench the lap-one speed law instead of the MPC")
     ap.add_argument("--period", type=float, default=1.0, help="with --vary: how often the target dips, seconds")
     ap.add_argument("--vary", type=float, default=0.0, help="with --crawl: how far the target dips every second (the follower slows for steering and a short path)")
@@ -217,7 +233,7 @@ def main(argv=None):
               "in the idle brake %.0f%% of the time" % (p["map_speed"], c["v_mean"], c["v_ripple"], c["v_std"],
                                                         c["tau_mean"], c["tau_min"], c["tau_max"], 100 * c["braking"]))
         return
-    report("baseline", run(args.track, p, args.rate, args.laps))
+    report("baseline", run(args.track, p, args.rate, args.laps, args.slip, args.speed_source, args.jitter))
 
 
 if __name__ == "__main__":
