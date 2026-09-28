@@ -52,7 +52,7 @@ DEFAULTS = dict(
     band_top=0.20, band_bottom=0.36, band_floor=0.21, orange_min_px=35, blob_min_value=25,
     # lap-1 follower
     map_speed=1.2, map_min_speed=0.8, lookahead=1.0, follow_range=3.5, throttle_start=0.07, chain_step=1.8, avoid_range=0.9, local_path_lookahead=1.4, local_path_min_reach=2.0, rung_max_age=1.0,
-    speed_per_throttle=25.6, speed_tau=0.8, throttle_kp=0.02, throttle_ki=0.03, throttle_slew=0.8, speed_window=0.25, steer_tau=0.15,
+    speed_per_throttle=25.6, speed_tau=0.8, slip_allow=0.3, throttle_kp=0.02, throttle_ki=0.03, throttle_slew=0.8, speed_window=0.25, steer_tau=0.15,
     # slam
     keyframe_dist=0.4, slam_range=6.0, loc_range=6.0, loc_corridor=2.5, dx_weight=2.0, z_weight=1.0, new_landmark_dist=0.6, icp_gate=1.5,
     solve_every=3, min_lap_length=15.0, order_timeout=10.0, closure_landmarks=10, lap_close_dist=2.0, min_seen=2, icp_min_matches=5, snap_radius=10.0, snap_gate=6.0,
@@ -134,6 +134,7 @@ class Racer(Node):
         self.odo_speed = 0.0
         self.v_cmd = 0.0                         # the speed asked of the throttle law, rate limited
         self.v_goal = None                       # the follower's own speed, smoothed
+        self.map_v, self.map_v_t, self.map_v_pose = 0.0, None, None   # speed as the map sees it
         self.loc_log_t = 0.0
         self.last_seen_t = 0.0
         self.no_target = False
@@ -215,7 +216,14 @@ class Racer(Node):
 
         # dead reckoning: wheel speed, slew-limited to what the car can physically do (spinning
         # wheels read high), and only while the lidar scene actually moves past us
-        self.odo_speed = float(np.clip(self.speed, self.odo_speed - 6.0 * dt, self.odo_speed + 4.0 * dt))
+        # the wheels over-read when they slip, and the dead reckoning then runs ahead of the
+        # car: the pose drifts, the map match is lost, and the car drives out of the corridor
+        # long after the slide that started it. While the map is matching it says how fast the
+        # car really moves, and the wheels may not claim much more than that.
+        v_wheel = self.speed
+        if self.map_v_t is not None and t - self.map_v_t < 0.5:
+            v_wheel = min(v_wheel, self.map_v + p["slip_allow"])
+        self.odo_speed = float(np.clip(v_wheel, self.odo_speed - 6.0 * dt, self.odo_speed + 4.0 * dt))
         moving_now = self.prev_clusters is None or self.scene_moving(msg, peek=True)
         ds = self.odo_speed * dt if moving_now else 0.0
         dx = np.array([ds * math.cos(self.yaw), ds * math.sin(self.yaw)])
@@ -806,6 +814,16 @@ class Racer(Node):
                                    % (len(z_rel), "all" if subset is None else len(subset), float(np.median(d)), float(np.min(d)), self.speed))
         if matched >= 3:
             self.pose = 0.5 * self.pose + 0.5 * corrected      # trust the map, but no jumps
+        # how fast the map says the car is moving: the distance between two well matched poses.
+        # Only a confident match counts, so a poor one never slows the car by mistake.
+        if matched >= 5 and self.last_dt > 0.01:
+            if self.map_v_pose is not None:
+                v = float(np.linalg.norm(self.pose - self.map_v_pose)) / self.last_dt
+                self.map_v = v if self.map_v_t is None else 0.6 * self.map_v + 0.4 * v
+                self.map_v_t = self.last_t
+            self.map_v_pose = self.pose.copy()
+        else:
+            self.map_v_pose = None
         if self.last_t - self.loc_log_t > 2.0:
             self.loc_log_t = self.last_t
             self.get_logger().info("localise: %d cones in view, %d matched, correction %.2f m, speed %.1f, mpc %.0f ms" % (len(z_rel), matched, shift, self.speed, self.solve_ms))
