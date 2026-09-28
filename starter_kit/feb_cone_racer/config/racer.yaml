@@ -19,6 +19,12 @@ racer:
     speed_tau: 0.8            # s; the mapping lap slows at once but speeds up over this, so the car does not lurch when the known path ahead jumps
     recover_for: 8.0          # s the mapping lap may spend turning back towards the cones after losing sight of
                               # them, driving forwards; after that it stops, since it may not reverse
+    ax_bias_tau: 0.5          # s; how quickly the MPC learns the gap between the acceleration its model
+                              # predicts and the one the car delivers, and plans with it instead
+    ax_bias_max: 0.0          # m/s^2 of acceleration correction the MPC may learn, 0 to switch it off. It is
+                              # off because it needs a model whose time constant is right: with one that is not,
+                              # a constant offset makes the optimiser over-command and the car ran away (1.0 to
+                              # 6.9 m/s in two seconds on FEB loop). Worth turning on once the response is fitted
     slip_allow: 1.0           # m/s the wheels may read above what the map says the car is doing; beyond that they
                               # are slipping and the dead reckoning would run ahead of the car. Kept loose on purpose:
                               # the map's own speed lags a little, and a tight cap reads low and has the MPC add throttle
@@ -53,9 +59,11 @@ racer:
                               # two laps. The car's measured grip is 5.8 m/s^2 lateral, so corner_scale 1.0
                               # (a_lat 3.5) is 60% of it, which is the margin the map error needs
     # mpc model (sysid-calibrated values go here)
-    long_a: 152.0             # from the team's own RoboRacer sysid on this same vehicle and simulator
-    long_b: 6.09              # (~/roboracer config/sysid_params.json, 1747 samples): the throttle responds
-    idle_brake: 16.5          # in 0.16 s, and shutting it brakes at 16.5 m/s^2 nearly independently of speed
+    long_a: 152.0             # from the team's RoboRacer sysid on this vehicle (~/roboracer). Step responses
+    long_b: 6.09              # measured here give 21.9/0.77/2.81, whose steady state agrees (24.6 vs 24.95 m/s
+    idle_brake: 16.5          # per unit throttle) but whose transients are far slower. Theirs drives better on
+                              # the car: 8.9-9.2 s laps against 10.0. The response is not settled; see STATUS
+                              # 4.9 m/s and 6.2 at 7.3, not 16.5, and the throttle takes about a second
     tyre_B: 8.0
     tyre_C: 1.4
     tyre_D: 18.0

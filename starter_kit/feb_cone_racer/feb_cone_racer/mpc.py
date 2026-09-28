@@ -39,7 +39,7 @@ class BicycleMPC:
 
     # ------------------------------------------------------------ model
 
-    def dynamics(self, z, u):
+    def dynamics(self, z, u, ax_bias=0.0):
         p = self.p
         x, y, psi, vx, vy, r, d = z[0], z[1], z[2], z[3], z[4], z[5], z[6]
         dcmd, tau = u[0], u[1]
@@ -50,7 +50,7 @@ class BicycleMPC:
         ar = -ca.atan((vy - lr * r) / vxs)
         Ff = p["tyre_D"] * ca.sin(p["tyre_C"] * ca.atan(p["tyre_B"] * af))
         Fr = p["tyre_D"] * ca.sin(p["tyre_C"] * ca.atan(p["tyre_B"] * ar))
-        ax = p["long_a"] * tau - p["long_b"] * vx - p["idle_brake"] * (1.0 - ca.tanh(40.0 * tau))   # idle brake fades in as the throttle closes
+        ax = p["long_a"] * tau - p["long_b"] * vx - p["idle_brake"] * (1.0 - ca.tanh(40.0 * tau)) + ax_bias   # idle brake fades in as the throttle closes; ax_bias is what the car really does minus what this says
         return ca.vertcat(vx * ca.cos(psi) - vy * ca.sin(psi),
                           vx * ca.sin(psi) + vy * ca.cos(psi),
                           r,
@@ -59,16 +59,16 @@ class BicycleMPC:
                           (lf * Ff * ca.cos(d) - lr * Fr) / Iz,
                           dd)
 
-    def step(self, z, u):
+    def step(self, z, u, ax_bias=0.0):
         """One MPC interval, integrated in a few RK4 substeps: the yaw dynamics of a 4 kg car
         are fast (small inertia), so one 0.1 s step would be inaccurate and hard to solve."""
         n = int(self.p["mpc_substeps"])
         h = self.DT / n
         for _ in range(n):
-            k1 = self.dynamics(z, u)
-            k2 = self.dynamics(z + h / 2 * k1, u)
-            k3 = self.dynamics(z + h / 2 * k2, u)
-            k4 = self.dynamics(z + h * k3, u)
+            k1 = self.dynamics(z, u, ax_bias)
+            k2 = self.dynamics(z + h / 2 * k1, u, ax_bias)
+            k3 = self.dynamics(z + h / 2 * k2, u, ax_bias)
+            k4 = self.dynamics(z + h * k3, u, ax_bias)
             z = z + h / 6 * (k1 + 2 * k2 + 2 * k3 + k4)
         return z
 
@@ -81,13 +81,18 @@ class BicycleMPC:
         z0 = ca.SX.sym("z0", 7)
         ref = ca.SX.sym("ref", 4, N)          # x, y, psi, v per stage
         uprev = ca.SX.sym("uprev", 2)
+        # what the car really accelerates minus what the model says it should, measured as it
+        # drives and held constant over the horizon. A model fitted offline is never exact, and
+        # without this the optimiser plans an acceleration it does not get, arrives short, and
+        # corrects again every step, which is the throttle hunting up and down (offset-free MPC).
+        ax_bias = ca.SX.sym("ax_bias")
         g, lbg, ubg = [], [], []
         g.append(Z[:, 0] - z0)
         lbg += [0] * 7
         ubg += [0] * 7
         cost = 0
         for k in range(N):
-            zn = self.step(Z[:, k], U[:, k])
+            zn = self.step(Z[:, k], U[:, k], ax_bias)
             g.append(Z[:, k + 1] - zn)
             lbg += [0] * 7
             ubg += [0] * 7
@@ -112,7 +117,7 @@ class BicycleMPC:
             cost += p["w_dtau"] * ((U[1, k] - prev[1]) / self.DT) ** 2
             cost += p["w_tau"] * U[1, k] ** 2
         w = ca.vertcat(ca.vec(Z), ca.vec(U))
-        params = ca.vertcat(z0, ca.vec(ref), uprev)
+        params = ca.vertcat(z0, ca.vec(ref), uprev, ax_bias)
         nlp = {"x": w, "f": cost, "g": ca.vertcat(*g), "p": params}
         opts = {"ipopt.print_level": 0, "print_time": False, "ipopt.max_iter": int(p["mpc_max_iter"]),
                 "ipopt.tol": 1e-3, "ipopt.acceptable_tol": 1e-2, "ipopt.warm_start_init_point": "yes",
@@ -126,8 +131,9 @@ class BicycleMPC:
         ubu = np.tile([p["max_steer"], p["tau_max"]], N)
         self.lbx, self.ubx = np.concatenate([lbz, lbu]), np.concatenate([ubz, ubu])
 
-    def solve(self, z0, ref, uprev):
-        """z0 (7,), ref (4, N), uprev (2,). Returns (u0 (2,), predicted states (7, N+1)) or None."""
+    def solve(self, z0, ref, uprev, ax_bias=0.0):
+        """z0 (7,), ref (4, N), uprev (2,), ax_bias (m/s^2). Returns (u0 (2,), predicted states
+        (7, N+1)) or None."""
         N = self.N
         if self.warm is None:
             Zg = np.repeat(np.asarray(z0, float)[:, None], N + 1, axis=1)
@@ -138,7 +144,7 @@ class BicycleMPC:
             x0 = np.concatenate([Zg.flatten(order="F"), Ug.flatten(order="F")])
         else:
             x0 = self.warm
-        pvec = np.concatenate([np.asarray(z0, float), np.asarray(ref, float).flatten(order="F"), np.asarray(uprev, float)])
+        pvec = np.concatenate([np.asarray(z0, float), np.asarray(ref, float).flatten(order="F"), np.asarray(uprev, float), [float(ax_bias)]])
         try:
             sol = self.solver(x0=x0, p=pvec, lbx=self.lbx, ubx=self.ubx, lbg=self.lbg, ubg=self.ubg)
         except Exception:

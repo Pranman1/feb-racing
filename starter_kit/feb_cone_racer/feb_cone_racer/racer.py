@@ -37,6 +37,10 @@ except ImportError:
 NS = "/autodrive/roboracer_1/"
 QOS = QoSProfile(reliability=QoSReliabilityPolicy.RELIABLE, durability=QoSDurabilityPolicy.VOLATILE,
                  history=QoSHistoryPolicy.KEEP_LAST, depth=10)
+# the raceline is published once, when the track is ready: latched, so anything that attaches
+# later (Foxglove, a probe) still receives it
+QOS_LATCHED = QoSProfile(reliability=QoSReliabilityPolicy.RELIABLE,
+                         durability=QoSDurabilityPolicy.TRANSIENT_LOCAL, depth=1)
 WHEELBASE = 0.324
 WHEEL_RADIUS = 0.059
 MAX_STEER = 0.5236
@@ -52,7 +56,7 @@ DEFAULTS = dict(
     band_top=0.20, band_bottom=0.36, band_floor=0.21, orange_min_px=35, blob_min_value=25,
     # lap-1 follower
     map_speed=1.2, map_min_speed=0.8, lookahead=1.0, follow_range=3.5, throttle_start=0.07, chain_step=1.8, avoid_range=0.9, local_path_lookahead=1.4, local_path_min_reach=2.0, rung_max_age=1.0,
-    speed_per_throttle=24.95, speed_tau=0.8, slip_allow=1.0, throttle_kp=0.02, throttle_ki=0.03, throttle_slew=0.8, speed_window=0.25, steer_tau=0.15,
+    speed_per_throttle=24.95, ax_bias_tau=0.5, ax_bias_max=0.0, speed_tau=0.8, slip_allow=1.0, throttle_kp=0.02, throttle_ki=0.03, throttle_slew=0.8, speed_window=0.25, steer_tau=0.15,
     # slam
     keyframe_dist=0.4, slam_range=6.0, loc_range=6.0, loc_corridor=2.5, dx_weight=2.0, z_weight=1.0, new_landmark_dist=0.6, icp_gate=1.5,
     solve_every=3, min_lap_length=15.0, order_timeout=10.0, closure_landmarks=10, lap_close_dist=2.0, min_seen=2, icp_min_matches=5, snap_radius=10.0, snap_gate=6.0,
@@ -135,6 +139,7 @@ class Racer(Node):
         self.v_cmd = 0.0                         # the speed asked of the throttle law, rate limited
         self.v_goal = None                       # the follower's own speed, smoothed
         self.map_v, self.map_v_t, self.map_v_pose = 0.0, None, None   # speed as the map sees it
+        self.ax_bias = 0.0                       # measured acceleration minus the model's
         self.seen_pose, self.recovering = np.zeros(2), False          # where cones were last in view
         self.loc_log_t = 0.0
         self.last_seen_t = 0.0
@@ -163,7 +168,7 @@ class Racer(Node):
         self.lap_one_scans = [0, 0]              # scans of lap one on the team's local path, on the reactive follower
         self.order_client = self.create_client(OrderCones, "/feb/order_cones") if OrderCones is not None else None
         self.order_future = None
-        self.pub_line = self.create_publisher(Path, "/feb/raceline", 10)
+        self.pub_line = self.create_publisher(Path, "/feb/raceline", QOS_LATCHED)
         self.pub_pose = self.create_publisher(PoseStamped, "/feb/pose", 10)
         self.pub_status = self.create_publisher(String, "/feb/status", 10)      # phase, what steers, active fallbacks
         self.status_t = -1e9
@@ -224,7 +229,19 @@ class Racer(Node):
         v_wheel = self.speed
         if self.map_v_t is not None and t - self.map_v_t < 0.5:
             v_wheel = min(v_wheel, self.map_v + p["slip_allow"])
+        prev_v = self.odo_speed
         self.odo_speed = float(np.clip(v_wheel, self.odo_speed - 6.0 * dt, self.odo_speed + 4.0 * dt))
+        # what the car really does along its axis, minus what the model says it should have done
+        # with the throttle it was given. A model fitted offline is never exact; feeding the
+        # difference back means the optimiser plans from the car in front of it rather than from
+        # the car it was fitted to, and stops chasing an acceleration that never arrives.
+        if dt > 0.02 and self.mode == "RACING":
+            tau = float(self.uprev[1])
+            model = p["long_a"] * tau - p["long_b"] * prev_v - p["idle_brake"] * (1.0 - math.tanh(40.0 * tau))
+            measured = (self.odo_speed - prev_v) / dt
+            self.ax_bias += (float(np.clip(measured - model, -p["ax_bias_max"], p["ax_bias_max"])) - self.ax_bias) * min(1.0, dt / p["ax_bias_tau"])
+        elif self.mode != "RACING":
+            self.ax_bias = 0.0
         moving_now = self.prev_clusters is None or self.scene_moving(msg, peek=True)
         ds = self.odo_speed * dt if moving_now else 0.0
         dx = np.array([ds * math.cos(self.yaw), ds * math.sin(self.yaw)])
@@ -915,7 +932,7 @@ class Racer(Node):
             # unwrap the reference heading around the current one
             ref[2] = psi + np.array([wrap(a - psi) for a in ref[2]])
             t0 = time.time()
-            out = self.mpc.solve(z0, ref, self.uprev)
+            out = self.mpc.solve(z0, ref, self.uprev, self.ax_bias)
             self.solve_ms = 0.8 * self.solve_ms + 0.2 * 1000 * (time.time() - t0)
             if out is not None:
                 u0, Z = out
