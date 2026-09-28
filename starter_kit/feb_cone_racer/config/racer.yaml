@@ -85,7 +85,10 @@ racer:
     w_dtau: 3.0
     dtau_max: 0.4             # throttle units per second, hard bound in the MPC
     dsteer_max: 3.2           # rad/s, the servo's own rate: a hard bound in the MPC, so the plan is executable
-    w_tau: 0.3
+    w_tau: 0.0                # penalty on throttle. It must be zero: the simulator brakes with full motor
+                              # torque on all four wheels the moment the throttle reaches zero (VehicleController
+                              # Drive(), BrakeTorque = MotorTorque), so any reward for easing off buys a braking
+                              # event the optimiser then has to undo, which is the throttle pumping up and down
     tau_max: 0.30             # throttle cap; the car reaches 7.3 m/s at this, well past v_max
     v_cap: 6.0                # m/s ceiling for the MPC's own state; it is lowered to the speed profile's
                               # own cap (v_max x race_speed_scale) at startup, never raised
