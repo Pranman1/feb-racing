@@ -67,7 +67,7 @@ DEFAULTS = dict(
     mpc_horizon=12, mpc_dt=0.1, mpc_max_iter=60, mpc_steer_tau=0.15, mpc_substeps=3,
     w_pos=8.0, w_head=2.0, w_speed=0.6, w_vy=0.2, w_dsteer=6.0, w_dtau=3.0, w_tau=0.3, dtau_max=0.4, dsteer_max=MAX_STEER_RATE,
     lost_after=1.5, loc_lost_after=3.0, push_throttle=0.16, debug=False,
-    pursuit_lookahead=1.2, race_speed_scale=1.2, corner_scale=1.2,
+    pursuit_lookahead=1.2, race_speed_scale=0.8, corner_scale=1.0,
 )
 
 
