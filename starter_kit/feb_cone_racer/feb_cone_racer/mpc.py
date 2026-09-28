@@ -6,7 +6,8 @@ Input  u = [delta_cmd, tau]                    (commanded steering angle, thrott
 
 Steering actuator: the wheels follow the command through a first-order lag,
     ddelta = (delta_cmd - delta) / tau_s,
-close to what the simulator's servo does (about 0.19 s to respond, 3.2 rad/s at most).
+close to what the simulator's servo does (about 0.19 s to respond, 3.2 rad/s at most). The
+command's own rate is bounded by `dsteer_max` so the plan stays inside that servo.
 
 Longitudinal: the simulator's throttle behaves like a first-order motor,
     dvx = a*tau - b*vx - c*brake(tau) + vy*r,   brake(tau) ~ 1 when tau is near zero
@@ -90,7 +91,13 @@ class BicycleMPC:
             g.append(Z[:, k + 1] - zn)
             lbg += [0] * 7
             ubg += [0] * 7
-            # throttle may only change so fast: a hard bound, so the solution cannot chatter
+            # the inputs may only change as fast as the car can move them: hard bounds, so the
+            # plan is something the servo and the motor can actually execute. Without the
+            # steering one the solver buys tracking with lock-to-lock flicks it cannot perform,
+            # the next solve sees a car that did not follow the plan, and it flicks back.
+            g.append(U[0, k] - (uprev[0] if k == 0 else U[0, k - 1]))
+            lbg += [-p["dsteer_max"] * self.DT]
+            ubg += [p["dsteer_max"] * self.DT]
             g.append(U[1, k] - (uprev[1] if k == 0 else U[1, k - 1]))
             lbg += [-p["dtau_max"] * self.DT]
             ubg += [p["dtau_max"] * self.DT]

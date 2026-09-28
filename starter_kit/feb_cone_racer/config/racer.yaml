@@ -37,8 +37,8 @@ racer:
     a_lat: 3.5                # m/s^2 lateral limit used for cornering speed
     a_acc: 2.5
     a_brake: 3.0
-    race_speed_scale: 0.6     # scales the straight-line cap v_max; 0.7 stays inside the cones on 16 of 17 tracks but the MPC steers bang-bang above about 2.5 m/s, so it is not smooth yet
-    corner_scale: 0.6         # scales the cornering speed (a_lat by its square): 0.6 is what every hairpin was driven clean with
+    race_speed_scale: 1.0     # scales the straight-line cap v_max; the controller is smooth to at least 1.4 on the bench
+    corner_scale: 1.0         # scales the cornering speed (a_lat by its square)
     # mpc model (sysid-calibrated values go here)
     long_a: 74.4
     long_b: 3.2               # steady state 23 m/s per unit throttle, as measured when racing
@@ -55,12 +55,16 @@ racer:
     w_pos: 8.0
     w_head: 2.0
     w_speed: 0.6
-    w_dsteer: 0.01
+    w_dsteer: 6.0             # on the steering rate (rad/s)^2. At 0.01 the solver bought tracking with
+                              # lock-to-lock flicks the servo cannot perform: 110 reversals and 60% of the
+                              # lap at full lock on the bench. At 6 it is 0 reversals and a 0.4 rad/s peak,
+                              # with better tracking and a faster lap (mpc_bench, fs_comp_2021)
     mpc_steer_tau: 0.15       # s, the steering servo's lag in the model
     w_dtau: 3.0
     dtau_max: 0.4             # throttle units per second, hard bound in the MPC
+    dsteer_max: 3.2           # rad/s, the servo's own rate: a hard bound in the MPC, so the plan is executable
     w_tau: 0.3
-    tau_max: 0.14             # throttle cap: the wheels spin above this; about 3.3 m/s steady state
+    tau_max: 0.20             # throttle cap; about 4.7 m/s steady state (0.14 was a limp to hide the oscillation)
     push_throttle: 0.16       # not moving with the throttle on: push this hard for 1.5 s before giving up (a cone under the bumper)
     throttle_start: 0.07      # the least throttle that gets the car rolling from rest
     debug: false              # log every lap-one steering decision (which follower, target, reach)
