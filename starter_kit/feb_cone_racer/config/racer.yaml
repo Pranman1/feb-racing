@@ -38,10 +38,10 @@ racer:
     a_lat: 3.5                # m/s^2 lateral limit used for cornering speed
     a_acc: 2.5
     a_brake: 3.0
-    race_speed_scale: 0.8     # scales the straight-line cap v_max. Measured on loop_cones, 200 s each:
+    race_speed_scale: 1.0     # scales the straight-line cap v_max. Measured on loop_cones, 200 s each:
                               # tracks (hairpins, Silverstone) with 0 steering reversals and 0.24 m of line error;
                               # 1.4 is fine on open layouts but runs 2 m wide on those two (mpc_bench)
-    corner_scale: 1.0         # 0.8/1.0 ran 10 laps clean at 13.9 s, 1.0/0.8 nine at 14.4, 0.8/0.8 nine at
+    corner_scale: 0.8         # 0.8/1.0 ran 10 laps clean at 13.9 s, 1.0/0.8 nine at 14.4, 0.8/0.8 nine at
                               # 15.4; either axis at 1.0 is safe but 1.0/1.0 and 1.2/1.2 left the track after
                               # two laps. The car's measured grip is 5.8 m/s^2 lateral, so corner_scale 1.0
                               # (a_lat 3.5) is 60% of it, which is the margin the map error needs
