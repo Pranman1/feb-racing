@@ -52,7 +52,7 @@ DEFAULTS = dict(
     band_top=0.20, band_bottom=0.36, band_floor=0.21, orange_min_px=35, blob_min_value=25,
     # lap-1 follower
     map_speed=1.2, map_min_speed=0.8, lookahead=1.0, follow_range=3.5, throttle_start=0.07, chain_step=1.8, avoid_range=0.9, local_path_lookahead=1.4, local_path_min_reach=2.0, rung_max_age=1.0,
-    speed_per_throttle=23.0, throttle_kp=0.02, throttle_ki=0.03, throttle_slew=0.8, speed_window=0.25, steer_tau=0.15,
+    speed_per_throttle=23.0, speed_tau=0.8, throttle_kp=0.02, throttle_ki=0.03, throttle_slew=0.8, speed_window=0.25, steer_tau=0.15,
     # slam
     keyframe_dist=0.4, slam_range=6.0, loc_range=6.0, loc_corridor=2.5, dx_weight=2.0, z_weight=1.0, new_landmark_dist=0.6, icp_gate=1.5,
     solve_every=3, min_lap_length=15.0, order_timeout=10.0, closure_landmarks=10, lap_close_dist=2.0, min_seen=2, icp_min_matches=5, snap_radius=10.0, snap_gate=6.0,
@@ -128,6 +128,8 @@ class Racer(Node):
         self.clusters_now = []
         self.last_dt = 0.1
         self.odo_speed = 0.0
+        self.v_cmd = 0.0                         # the speed asked of the throttle law, rate limited
+        self.v_goal = None                       # the follower's own speed, smoothed
         self.loc_log_t = 0.0
         self.last_seen_t = 0.0
         self.no_target = False
@@ -651,7 +653,7 @@ class Racer(Node):
         step = (wanted - self.steer) * min(1.0, dt / p["steer_tau"])
         steer = self.steer + float(np.clip(step, -MAX_STEER_RATE * dt, MAX_STEER_RATE * dt))
         v_goal = max(p["map_min_speed"], p["map_speed"] * (1.0 - 0.7 * abs(steer) / MAX_STEER) * min(1.0, reach / 4.0))
-        return steer, self.throttle_law(v_goal, dt)
+        return steer, self.throttle_law(self.smooth_speed(v_goal, dt), dt)
 
     def push_from_cones(self, wanted, clusters):
         """A cone dead ahead pushes the wheel away from it. Only dead ahead, and never past
@@ -741,21 +743,44 @@ class Racer(Node):
         step = (wanted - self.steer) * min(1.0, dt / p["steer_tau"])
         steer = self.steer + float(np.clip(step, -MAX_STEER_RATE * dt, MAX_STEER_RATE * dt))
         v_goal = max(p["map_min_speed"], p["map_speed"] * (1.0 - 0.7 * abs(steer) / MAX_STEER))
-        return steer, self.throttle_law(v_goal, dt)
+        return steer, self.throttle_law(self.smooth_speed(v_goal, dt), dt)
+
+    def smooth_speed(self, v_goal, dt):
+        """Slow down at once, speed up gently. The mapping lap's speed is scaled by how far the
+        known path reaches and by how hard the wheel is turned, and both jump from scan to scan
+        as rungs come and go; a car that chases those jumps lurches forward and coasts. Braking
+        is never delayed, so the car still slows the moment the path ahead shortens."""
+        if self.v_goal is None or v_goal < self.v_goal:
+            self.v_goal = v_goal
+        else:
+            self.v_goal += (v_goal - self.v_goal) * min(1.0, dt / self.p["speed_tau"])
+        return self.v_goal
 
     def throttle_law(self, v_t, dt):
         p = self.p
+        # the target may only change as fast as the car can accelerate or brake. The follower's
+        # speed jumps whenever the known path shortens or the wheel turns, and a 0.4 m/s step
+        # asks for 4 m/s^2 in one scan: the car surges, overshoots, coasts into the motor's
+        # idle brake and surges again, which is the lurching of the mapping lap.
+        if v_t > 0.0:
+            v_t = float(np.clip(v_t, self.v_cmd - p["a_brake"] * dt, self.v_cmd + p["a_acc"] * dt))
+        self.v_cmd = max(v_t, 0.0)
         ff = v_t / p["speed_per_throttle"]
         err = v_t - max(self.speed, 0.0)
         self.integral = float(np.clip(self.integral + err * dt, -0.8, 0.8))
         bound = ff if self.speed < 0.3 else 0.5 * ff
         trim = float(np.clip(p["throttle_kp"] * err + p["throttle_ki"] * self.integral, -bound, bound))
         wanted = float(np.clip(ff + trim, 0.0, 1.0))
-        if v_t > 0.0 and self.speed < 0.8:
-            # the motor needs this much to get the car rolling, and more with the wheels turned
-            # (a crawl at full lock stalls on 0.03); the floor fades out as the car gets going
+        if v_t > 0.0:
+            # below about 0.03 the motor brakes rather than coasts, so a trim that dips there
+            # while a positive speed is wanted takes speed off the car for no reason
+            wanted = max(wanted, 0.7 * ff)
+        if v_t > 0.0 and self.speed < 0.25:
+            # getting rolling from rest needs more than the steady-state throttle, and more
+            # again with the wheels turned (a crawl at full lock stalls on 0.03). It fades out
+            # well below the crawl speed, so it never fights the regulator at its own setpoint
             floor = p["throttle_start"] * (1.0 + 0.5 * abs(self.steer) / MAX_STEER)
-            wanted = max(wanted, floor * float(np.clip((0.8 - self.speed) / 0.5, 0.0, 1.0)))
+            wanted = max(wanted, floor * float(np.clip((0.25 - self.speed) / 0.2, 0.0, 1.0)))
         slew = p["throttle_slew"] * dt
         return float(np.clip(wanted, self.throttle - slew, self.throttle + slew)) if self.throttle > 0.0 else wanted
 

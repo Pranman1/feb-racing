@@ -16,6 +16,7 @@ racer:
     # lap 1: the mapping lap, driven by the simple follower
     map_speed: 1.2
     map_min_speed: 0.8
+    speed_tau: 0.8            # s; the mapping lap slows at once but speeds up over this, so the car does not lurch when the known path ahead jumps
     lookahead: 1.0
     follow_range: 3.5         # m; the reactive follower chains only the cones this near (their colours are reliable, far ones are not)
     local_path_lookahead: 1.4   # m, pure-pursuit target along the live cone ordering's local path on lap one

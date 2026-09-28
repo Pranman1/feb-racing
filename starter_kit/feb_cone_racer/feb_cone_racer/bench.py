@@ -160,6 +160,34 @@ def run(track_json, p, rate=10.0, laps=1.0, quiet=True):
     return out
 
 
+def crawl(p, v_target=1.2, secs=25.0, rate=10.0, vary=0.0, period=1.0):
+    """The lap-one speed law against the same longitudinal model: does the crawl hold its
+    speed, or surge and coast? `throttle_law` is called exactly as the node calls it. With
+    `vary` the target steps between v_target and v_target - vary every `period` seconds, the
+    way the follower's does when the known path shortens or the wheel turns."""
+    from .racer import Racer
+    shim = type("S", (), {})()
+    shim.p, shim.integral, shim.throttle, shim.speed, shim.steer, shim.v_cmd = p, 0.0, 0.0, 0.0, 0.0, 0.0
+    dt, vx, t = 1.0 / rate, 0.0, 0.0
+    vs, taus = [], []
+    while t < secs:
+        v_t = v_target - (vary if int(t / period) % 2 else 0.0)
+        tau = Racer.throttle_law(shim, v_t, dt)
+        shim.throttle = tau
+        for _ in range(int(round(dt / 0.001))):
+            dv = p["long_a"] * tau - p["long_b"] * vx - p["idle_brake"] * (1.0 - math.tanh(40.0 * tau))
+            vx = max(vx + 0.001 * dv, 0.0)
+        shim.speed = 0.5 * shim.speed + 0.5 * vx        # the encoder smoothing the node does
+        t += dt
+        if t > 5.0:
+            vs.append(vx)
+            taus.append(tau)
+    vs, taus = np.array(vs), np.array(taus)
+    braking = float(np.mean(taus < 0.03))
+    return dict(v_mean=float(vs.mean()), v_ripple=float(vs.max() - vs.min()), v_std=float(vs.std()),
+                tau_mean=float(taus.mean()), tau_min=float(taus.min()), tau_max=float(taus.max()), braking=braking)
+
+
 def report(name, m):
     print("%-22s %s lap %6.1f s (%.2f laps) | line error rms %.2f max %.2f m | steering rate rms %5.2f max %5.2f rad/s | "
           "reversals %4d (%.1f per 100 m) | at full lock %4.1f%% | v mean %.2f max %.2f | mpc %.0f ms"
@@ -170,8 +198,11 @@ def report(name, m):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="closed-loop bench for the racer's MPC, no simulator")
-    ap.add_argument("track", help="a track.json (its centreline is the line to follow)")
+    ap.add_argument("track", nargs="?", help="a track.json (its centreline is the line to follow)")
     ap.add_argument("--laps", type=float, default=1.0)
+    ap.add_argument("--crawl", action="store_true", help="bench the lap-one speed law instead of the MPC")
+    ap.add_argument("--period", type=float, default=1.0, help="with --vary: how often the target dips, seconds")
+    ap.add_argument("--vary", type=float, default=0.0, help="with --crawl: how far the target dips every second (the follower slows for steering and a short path)")
     ap.add_argument("--rate", type=float, default=10.0, help="control rate, Hz (the bridge runs at 10)")
     ap.add_argument("-p", "--param", action="append", default=[], metavar="name:=value",
                     help="override a racer parameter, e.g. -p w_dsteer:=2.0")
@@ -180,6 +211,12 @@ def main(argv=None):
     for o in args.param:
         k, _, v = o.partition(":=")
         p[k] = type(p[k])(float(v)) if isinstance(p[k], (int, float)) and not isinstance(p[k], bool) else v
+    if args.crawl:
+        c = crawl(p, p["map_speed"], vary=args.vary, period=args.period)
+        print("lap-one crawl at %.1f m/s: speed mean %.2f, ripple %.2f, std %.3f m/s | throttle %.3f (%.3f..%.3f), "
+              "in the idle brake %.0f%% of the time" % (p["map_speed"], c["v_mean"], c["v_ripple"], c["v_std"],
+                                                        c["tau_mean"], c["tau_min"], c["tau_max"], 100 * c["braking"]))
+        return
     report("baseline", run(args.track, p, args.rate, args.laps))
 
 
