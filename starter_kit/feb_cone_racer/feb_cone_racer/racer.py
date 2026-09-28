@@ -66,7 +66,7 @@ DEFAULTS = dict(
     # mpc: problem
     mpc_horizon=12, mpc_dt=0.1, mpc_max_iter=60, mpc_steer_tau=0.15, mpc_substeps=3,
     w_pos=8.0, w_head=2.0, w_speed=0.6, w_vy=0.2, w_dsteer=6.0, w_dtau=3.0, w_tau=0.3, dtau_max=0.4, dsteer_max=MAX_STEER_RATE,
-    lost_after=1.5, loc_lost_after=3.0, push_throttle=0.16, debug=False,
+    lost_after=1.5, loc_lost_after=3.0, recover_for=8.0, push_throttle=0.16, debug=False,
     pursuit_lookahead=1.2, race_speed_scale=1.0, corner_scale=0.8,
 )
 
@@ -135,6 +135,7 @@ class Racer(Node):
         self.v_cmd = 0.0                         # the speed asked of the throttle law, rate limited
         self.v_goal = None                       # the follower's own speed, smoothed
         self.map_v, self.map_v_t, self.map_v_pose = 0.0, None, None   # speed as the map sees it
+        self.seen_pose, self.recovering = np.zeros(2), False          # where cones were last in view
         self.loc_log_t = 0.0
         self.last_seen_t = 0.0
         self.no_target = False
@@ -263,13 +264,9 @@ class Racer(Node):
                 self.get_logger().info("lap one: %s, target (%.1f, %.1f) in the car frame, reach %.1f m, steer %.2f, throttle %.2f"
                                        % ("local path" if local is not None else "reactive", *self.lap1_target, self.path_reach, steer, throttle))
             if t - self.last_seen_t > p["lost_after"]:
-                # nothing in view: the car has nosed out of the corridor. Hold the wheel and
-                # crawl for a moment in case the cones come back; then stop, as the real car
-                # would (it cannot back up)
-                steer = self.steer
-                throttle = self.throttle_law(p["map_min_speed"], dt) if t - self.last_seen_t < p["lost_after"] + 4.0 else 0.0
-                if throttle == 0.0:
-                    self.halt("nothing in view for %.0f s on the mapping lap" % (t - self.last_seen_t))
+                steer, throttle = self.recover(t, dt)
+            else:
+                self.seen_pose, self.recovering = self.pose.copy(), False
         else:
             matched = self.localise(z_rel, colours)
             # localisation health: after a few seconds without matches the map position is not
@@ -691,6 +688,28 @@ class Racer(Node):
             return b
         t = float(np.clip((-qb + math.sqrt(disc)) / (2.0 * qa), 0.0, 1.0))
         return (ax + t * dx, ay + t * dy)
+
+    def recover(self, t, dt):
+        """Nothing in view on the mapping lap: the car has nosed out of the corridor. It turns
+        back towards the last place the cones were in view and crawls there. That is ordinary
+        forward driving, which the real car can do; it never reverses, and if the cones do not
+        come back within `recover_for` it stops and says so."""
+        p = self.p
+        back = self.seen_pose - self.pose
+        c, s_ = math.cos(-self.yaw), math.sin(-self.yaw)
+        lx, ly = c * back[0] - s_ * back[1], s_ * back[0] + c * back[1]
+        if t - self.last_seen_t > p["lost_after"] + p["recover_for"] or math.hypot(lx, ly) < 0.3:
+            self.halt("nothing in view for %.0f s on the mapping lap" % (t - self.last_seen_t))
+            return 0.0, 0.0
+        if not self.recovering:
+            self.recovering = True
+            self.get_logger().warn("no cones in view: turning back towards them, %.1f m away" % math.hypot(lx, ly))
+        # towards the spot when it is ahead, otherwise turn as hard as the car can, still forwards
+        wanted = math.atan2(ly, lx) if lx > 0.3 else math.copysign(MAX_STEER, ly if ly != 0.0 else 1.0)
+        wanted = float(np.clip(wanted, -MAX_STEER, MAX_STEER))
+        step = (wanted - self.steer) * min(1.0, dt / p["steer_tau"])
+        steer = self.steer + float(np.clip(step, -MAX_STEER_RATE * dt, MAX_STEER_RATE * dt))
+        return steer, self.throttle_law(p["map_min_speed"], dt)
 
     def corridor_prefix(self, b, y):
         """How many rungs, from the car on, still look like the track: the ordering is built
