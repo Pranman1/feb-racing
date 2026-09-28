@@ -68,7 +68,8 @@ racer:
     dsteer_max: 3.2           # rad/s, the servo's own rate: a hard bound in the MPC, so the plan is executable
     w_tau: 0.3
     tau_max: 0.28             # throttle cap; about 6.5 m/s steady state (0.14 was a limp to hide the oscillation)
-    v_cap: 6.0                # m/s, the speed the MPC's own model may plan up to
+    v_cap: 6.0                # m/s ceiling for the MPC's own state; it is lowered to the speed profile's
+                              # own cap (v_max x race_speed_scale) at startup, never raised
     push_throttle: 0.16       # not moving with the throttle on: push this hard for 1.5 s before giving up (a cone under the bumper)
     throttle_start: 0.07      # the least throttle that gets the car rolling from rest
     debug: false              # log every lap-one steering decision (which follower, target, reach)

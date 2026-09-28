@@ -87,6 +87,10 @@ class Racer(Node):
                               icp_min_matches=int(p["icp_min_matches"]))
         try:
             from .mpc import BicycleMPC
+            # the MPC may not plan faster than the speed profile it is following: with a state
+            # bound above the profile's own cap, a model error lets it run past its plan, which
+            # is how the car reached 6.3 m/s on a 4.8 m/s line and left the corridor
+            p["v_cap"] = min(p["v_cap"], p["v_max"] * p["race_speed_scale"])
             self.mpc = BicycleMPC(p)
             if not self.mpc.ok:
                 self.mpc = None
