@@ -58,7 +58,7 @@ DEFAULTS = dict(
     solve_every=3, min_lap_length=15.0, order_timeout=10.0, closure_landmarks=10, lap_close_dist=2.0, min_seen=2, icp_min_matches=5, snap_radius=10.0, snap_gate=6.0,
     # raceline
     sample_step=0.25, car_half_width=0.135, margin=0.7, curvature_reg=0.01,
-    v_max=5.9, a_lat=5.0, a_acc=9.0, a_brake=7.0,
+    v_max=5.9, a_lat=4.0, a_acc=9.0, a_brake=7.0,
     # mpc: model
     mass=3.9, inertia_z=0.10, lf=0.175, lr=0.175, tyre_B=8.0, tyre_C=1.4, tyre_D=18.0,   # L 0.35 m effective (yaw-rate fit)
     long_a=152.0, long_b=6.09, idle_brake=16.5,            # sysid fit on this car (feb_driver/tools/sysid_fit.py); b set so the steady state matches the 23 m/s per unit throttle seen when racing

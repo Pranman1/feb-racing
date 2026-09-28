@@ -40,7 +40,7 @@ racer:
     sample_step: 0.25
     margin: 0.7               # m kept from the cones beyond the car's half width: tracking error is about 0.45 m at speed (a cone hit stalls the car)
     v_max: 5.9                # m/s, their measured top speed
-    a_lat: 5.0                # m/s^2, the cornering they race on (saturation measured at 6.5)
+    a_lat: 4.0                # m/s^2, the cornering they race on (saturation measured at 6.5)
     a_acc: 9.0
     a_brake: 7.0
     race_speed_scale: 1.0     # the limits above are now the measured ones, so the scales are knobs for an
