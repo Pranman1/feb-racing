@@ -115,19 +115,24 @@ does the job (a step that follows the cone spacing and survives a missing cone, 
 re-measured, the mapping path filling in where the boundaries collapse). Then a
 **minimum-curvature raceline** is solved as a sparse QP (CasADi, 10 ms for 1300 points) and
 a **speed profile** laid over it from lateral, acceleration and braking limits. From then on
-the car localises against the map by ICP on every lidar cone, colour-blind and translation
-only (the IMU heading is absolute, and a rotation fitted to three cones in a row would spin),
-finds itself again anywhere on the map from the IMU heading if the match is lost, and a
-**nonlinear MPC**
-(dynamic bicycle model with Pacejka-style tyres and the sysid longitudinal model, direct
-multiple shooting, IPOPT, about 10 ms a solve) tracks the raceline. Without CasADi the node
-still maps and plans, and pure pursuit drives the raceline. Debug topics: `/feb/cones`,
+the car's speed comes from the wheel encoders put through the measured tyre curve (the throttle
+sets the wheel speed at once, so the encoders on their own are the command coming back), its
+position from dead reckoning corrected against the map by ICP on every lidar cone, colour-blind
+and translation only (the IMU heading is absolute, and a rotation fitted to three cones in a row
+would spin), and an **MPC** tracks the raceline: a kinematic bicycle with a steering-rate and a
+tyre-force input, the formulation of the team's own controller, with the car's measured limits
+and its 0.12 s actuation delay (direct multiple shooting, IPOPT, about 2 ms a solve). The
+throttle is the planned tyre force through the inverse tyre curve, so the wheels are never spun
+or locked. Without CasADi the node still maps and plans, and pure pursuit drives the raceline.
+The vehicle model is `feb_cone_racer/vehicle.py`; `tools/dynid.py` measures it in the simulator
+and `tools/dynfit.py` checks the model against the recording. `python3 -m feb_cone_racer.bench
+<track.json>` drives the modelled car with the real controller, offline, in ten seconds. Debug topics: `/feb/cones`,
 `/feb/map`, `/feb/raceline`, `/feb/pose`, `/feb/mpc_prediction`, and `/feb/status`, one line twice
 a second with the phase (mapping lap, waiting for the ordering, racing), what is steering (local
 path, reactive follower, MPC, pure pursuit) and any active fallback (map match lost, no cones in
 view, stopped); `./feb-sim logs -f` shows the same story as the racer's log, and `debug: true` in
 `config/racer.yaml` logs every lap-one steering decision and every scan that matched nothing.
-Parameters, including the vehicle model, are in `config/racer.yaml`. Cone colours: the camera is
+Parameters are in `config/racer.yaml` and, for the racing half, `feb_cone_racer/params.py`. Cone colours: the camera is
 192 by 108 pixels and a cone beyond 4 m is a few pixels, so a blob only colours a cone for the map
 if it is brighter than the ground (a dark speck in the right hue used to hand a lidar cone the
 wrong colour one time in ten); dim blobs still colour cones for driving, votes carry per tracked

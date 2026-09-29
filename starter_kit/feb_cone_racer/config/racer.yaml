@@ -1,4 +1,4 @@
-# Cone racer parameters. Every value has a comment in racer.py's DEFAULTS.
+# Cone racer parameters. Defaults and the reason for each: racer.py (mapping) and params.py (racing).
 racer:
   ros__parameters:
     # camera: HSV bounds (h_lo, s_lo, v_lo, h_hi, s_hi, v_hi) and the image band where cones live,
@@ -19,15 +19,6 @@ racer:
     speed_tau: 0.8            # s; the mapping lap slows at once but speeds up over this, so the car does not lurch when the known path ahead jumps
     recover_for: 8.0          # s the mapping lap may spend turning back towards the cones after losing sight of
                               # them, driving forwards; after that it stops, since it may not reverse
-    ax_bias_tau: 0.5          # s; how quickly the MPC learns the gap between the acceleration its model
-                              # predicts and the one the car delivers, and plans with it instead
-    ax_bias_max: 0.0          # m/s^2 of acceleration correction the MPC may learn, 0 to switch it off. It is
-                              # off because it needs a model whose time constant is right: with one that is not,
-                              # a constant offset makes the optimiser over-command and the car ran away (1.0 to
-                              # 6.9 m/s in two seconds on FEB loop). Worth turning on once the response is fitted
-    slip_allow: 1.0           # m/s the wheels may read above what the map says the car is doing; beyond that they
-                              # are slipping and the dead reckoning would run ahead of the car. Kept loose on purpose:
-                              # the map's own speed lags a little, and a tight cap reads low and has the MPC add throttle
     lookahead: 1.0
     follow_range: 3.5         # m; the reactive follower chains only the cones this near (their colours are reliable, far ones are not)
     local_path_lookahead: 1.4   # m, pure-pursuit target along the live cone ordering's local path on lap one
@@ -42,68 +33,27 @@ racer:
     closure_landmarks: 10     # seeing three of the first ten cones again (after 35 m) closes the loop whatever the drift
     order_timeout: 10.0       # s to wait for the team's cone ordering (feb_cone_ordering) before the boundary walk takes over
     lap_close_dist: 2.0       # m from the start pose that closes the lap
-    # raceline
-    sample_step: 0.25
-    curv_window: 2.0          # m of raceline the curvature is averaged over before it sets a speed limit
-    loc_gain_along: 0.08      # how much of the map match is believed along the track, and how much across
-    loc_gain_across: 0.5      # it; cones line the track, so a match pins the car across it and barely at
-    loc_max_step: 0.25        # all along it, while dead reckoning is the opposite. See localise().
-    margin: 0.7               # m kept from the cones beyond the car's half width: tracking error is about 0.45 m at speed (a cone hit stalls the car)
-    v_max: 5.9                # m/s, their measured top speed
-    a_lat: 4.0                # m/s^2, the cornering they race on (saturation measured at 6.5)
-    a_acc: 9.0
-    a_brake: 7.0
-    race_speed_scale: 0.85    # How much of the plan to actually ask for. At 1.0 the car overshoots the
-    corner_scale: 0.85        # planned speed by up to 2 m/s a tenth of the lap, and those peaks are what
-                              # put it into the cones: on the loop it crashed inside two laps in five runs
-                              # out of six. At 0.85 it ran ten and eleven laps at 10.6 s.
-                              #
-                              # The room is the reason. The corridor between the cones is 2.3 m wide and
-                              # the raceline keeps 0.84 m off them, so there is about 0.3 m of slack,
-                              # while the position estimate is out by 0.7 m along the track and reaches
-                              # 2 m. The error is larger than the slack, so the margin has to come from
-                              # somewhere, and until the estimate is better it comes from speed. Put this
-                              # back to 1.0 when the along-track estimate is fixed; that is worth about
-                              # 1.7 s a lap here.
-    # mpc model (sysid-calibrated values go here)
-    long_a: 152.0             # from the team's RoboRacer sysid on this vehicle (~/roboracer). Step responses
-    long_b: 6.09              # measured here give 21.9/0.77/2.81, whose steady state agrees (24.6 vs 24.95 m/s
-    idle_brake: 16.5          # per unit throttle) but whose transients are far slower. Theirs drives better on
-                              # the car: 8.9-9.2 s laps against 10.0. The response is not settled; see STATUS
-                              # 4.9 m/s and 6.2 at 7.3, not 16.5, and the throttle takes about a second
-    tyre_B: 8.0
-    tyre_C: 1.4
-    tyre_D: 18.0
-    inertia_z: 0.10
-    lf: 0.175                 # half of the 0.35 m effective wheelbase from the yaw-rate fit
-    lr: 0.175
-    # mpc weights
+    # racing: where the car is. The speed comes from the wheels through the measured tyre curve;
+    # the position from dead reckoning, corrected each scan against the map
+    loc_gain_along: 0.3       # share of the map match's correction taken along the car's heading, per scan
+    loc_gain_across: 0.5      # and across it. Cones line the track, so a match pins the car across it better than along it
+    loc_max_step: 0.25        # m, the most one scan may move the estimate
+    lost_after: 1.5           # s without cones in view or a map match before the plan is slowed to blind_speed
+    blind_speed: 0.5
+    give_up_after: 8.0        # s of that before the car stops
+    # racing: the raceline and the speed plan. What the tyres are asked for, against what was measured on
+    # this car (tools/dynid.py): 6.3 m/s^2 sideways, and 5.4 m/s^2 along the car even with the tyre sliding
+    margin: 0.7               # m kept from the cones beyond the car's half width
+    v_max: 5.9                # m/s
+    a_lat: 5.0                # m/s^2 of cornering planned
+    a_acc: 4.6                # m/s^2 of tyre force planned, driving
+    a_brake: 4.6              # and braking
+    race_speed_scale: 1.0     # scales v_max: an organiser's knob for a slower field, not a fix for anything
+    corner_scale: 1.0         # scales corner speed
+    # racing: the MPC. Its weights and limits are in feb_cone_racer/params.py, each with its reason; any of
+    # them can be set here
     mpc_horizon: 12
     mpc_dt: 0.1
-    w_pos: 8.0
-    w_head: 2.0
-    w_speed: 10.0             # the MPC barely cared about speed at 0.6 against w_pos 8.0: it tracked the line
-                              # beautifully and ignored the speed plan, running a third slower than asked
-    w_dsteer: 15.0            # on the steering rate (rad/s)^2. At 0.01 the solver bought tracking with
-                              # lock-to-lock flicks the servo cannot perform: 110 reversals and 60% of the
-                              # lap at full lock on the bench. At 6 it is 0 reversals and a 0.4 rad/s peak,
-                              # with better tracking and a faster lap (mpc_bench, fs_comp_2021)
-    mpc_steer_tau: 0.15       # s, the steering servo's lag in the model
-    w_dtau: 3.0
-    ax_sat: 9.8               # m/s^2 the tyres can put down. Torque arrives instantly and is far past grip,
-                              # so the model saturates rather than believing 27 m/s^2 is available
-    tau_band: 0.15            # how far the throttle may sit from what the reference speed needs in steady
-                              # state. Zero throttle is full braking here, so the optimiser is not allowed
-                              # to wander down to it and wind back up (the RoboRacer stack's bounded trim)
-    dtau_max: 0.4             # throttle units per second, hard bound in the MPC
-    dsteer_max: 3.2           # rad/s, the servo's own rate: a hard bound in the MPC, so the plan is executable
-    w_tau: 0.0                # penalty on throttle. It must be zero: the simulator brakes with full motor
-                              # torque on all four wheels the moment the throttle reaches zero (VehicleController
-                              # Drive(), BrakeTorque = MotorTorque), so any reward for easing off buys a braking
-                              # event the optimiser then has to undo, which is the throttle pumping up and down
-    tau_max: 0.30             # throttle cap; the car reaches 7.3 m/s at this, well past v_max
-    v_cap: 6.0                # m/s ceiling for the MPC's own state; it is lowered to the speed profile's
-                              # own cap (v_max x race_speed_scale) at startup, never raised
     push_throttle: 0.16       # not moving with the throttle on: push this hard for 1.5 s before giving up (a cone under the bumper)
     throttle_start: 0.07      # the least throttle that gets the car rolling from rest
     debug: false              # log every lap-one steering decision (which follower, target, reach)

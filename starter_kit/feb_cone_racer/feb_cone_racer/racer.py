@@ -1,13 +1,13 @@
-"""Cone-track racer: map the track on lap 1, then race a raceline with nonlinear MPC.
+"""Cone-track racer: map the track on lap 1, then race a raceline with MPC.
 
 Lap 1 (MAPPING): the simple cone follower drives (perception -> local centreline -> pure
 pursuit, slowly) while GraphSLAM builds a map of the cones from odometry (wheel speed + IMU
 heading) and the coloured cones seen each scan. When the car is back at its start the map is
 frozen, the boundaries ordered, the centreline sampled, a minimum-curvature raceline and a
 speed profile computed.
-Laps 2+ (RACING): the car localises against the frozen map (ICP of the cones it sees) and a
-nonlinear MPC on a dynamic bicycle model tracks the raceline at the profile's speed. If the
-solver ever fails, pure pursuit on the raceline takes over for that scan.
+Laps 2+ (RACING): the body's speed comes from the wheels through the measured tyre curve, the
+position from dead reckoning corrected against the frozen map (ICP of the cones in view), and
+an MPC on the car's measured model tracks the raceline (controller.py, mpc.py, vehicle.py).
 
 Inputs: lidar, front_camera, imu, wheel encoders, steering feedback. No ground truth.
 Outputs: steering_command, throttle_command. Debug topics under /feb/.
@@ -24,10 +24,13 @@ from rclpy.qos import QoSDurabilityPolicy, QoSHistoryPolicy, QoSProfile, QoSReli
 from sensor_msgs.msg import Image, Imu, JointState, LaserScan
 from std_msgs.msg import Float32, String
 
+from .controller import RaceController, wrap
 from .graphslam import GraphSLAM
+from .params import RACE
 from .perception import BLUE, ORANGE, UNKNOWN, YELLOW, Perception
-from .raceline import heading_along, min_curvature, speed_profile
+from .raceline import min_curvature, speed_plan
 from .track import build_track, repair_by_path, track_from_rungs
+from .vehicle import AXLE_TO_LIDAR, BodySpeed
 
 try:                                     # the team's cone ordering, if its package is in the stack
     from feb_cone_ordering.srv import OrderCones
@@ -45,7 +48,6 @@ WHEELBASE = 0.324
 WHEEL_RADIUS = 0.059
 MAX_STEER = 0.5236
 MAX_STEER_RATE = 3.2
-STEER_DELAY = 0.19          # s, steering command to wheel, sysid
 
 DEFAULTS = dict(
     # perception (as feb_cone_driver)
@@ -56,23 +58,22 @@ DEFAULTS = dict(
     band_top=0.20, band_bottom=0.36, band_floor=0.21, orange_min_px=35, blob_min_value=25,
     # lap-1 follower
     map_speed=1.2, map_min_speed=0.8, lookahead=1.0, follow_range=3.5, throttle_start=0.07, chain_step=1.8, avoid_range=0.9, local_path_lookahead=1.4, local_path_min_reach=2.0, rung_max_age=1.0,
-    speed_per_throttle=24.95, ax_bias_tau=0.5, ax_bias_max=0.0, speed_tau=0.8, slip_allow=1.0, throttle_kp=0.02, throttle_ki=0.03, throttle_slew=0.8, speed_window=0.25, steer_tau=0.15,
+    speed_per_throttle=24.95, speed_tau=0.8, throttle_kp=0.02, throttle_ki=0.03, throttle_slew=0.8, speed_window=0.25, steer_tau=0.15,
+    push_throttle=0.16, recover_for=8.0,
     # slam
     keyframe_dist=0.4, slam_range=6.0, loc_range=6.0, loc_corridor=2.5, dx_weight=2.0, z_weight=1.0, new_landmark_dist=0.6, icp_gate=1.5,
     solve_every=3, min_lap_length=15.0, order_timeout=10.0, closure_landmarks=10, lap_close_dist=2.0, min_seen=2, icp_min_matches=5, snap_radius=10.0, snap_gate=6.0,
-    # raceline
-    sample_step=0.25, curv_window=2.0, car_half_width=0.135, margin=0.7, curvature_reg=0.01,
-    v_max=5.9, a_lat=4.0, a_acc=9.0, a_brake=7.0,
-    # mpc: model
-    mass=3.9, inertia_z=0.10, lf=0.175, lr=0.175, tyre_B=8.0, tyre_C=1.4, tyre_D=18.0,   # L 0.35 m effective (yaw-rate fit)
-    long_a=152.0, long_b=6.09, idle_brake=16.5,            # sysid fit on this car (feb_driver/tools/sysid_fit.py); b set so the steady state matches the 23 m/s per unit throttle seen when racing
-    max_steer=MAX_STEER, max_steer_rate=MAX_STEER_RATE, tau_max=0.30, v_cap=6.0,
-    # mpc: problem
-    mpc_horizon=12, mpc_dt=0.1, mpc_max_iter=60, mpc_steer_tau=0.15, mpc_substeps=3,
-    w_pos=8.0, w_head=2.0, w_speed=10.0, w_vy=0.2, w_dsteer=15.0, w_dtau=3.0, w_tau=0.0, dtau_max=0.4, dsteer_max=MAX_STEER_RATE, ax_sat=9.8, tau_band=0.15,
-    loc_gain_along=0.08, loc_gain_across=0.5, loc_max_step=0.25,
-    lost_after=1.5, loc_lost_after=3.0, recover_for=8.0, push_throttle=0.16, debug=False,
-    pursuit_lookahead=1.2, race_speed_scale=1.0, corner_scale=1.0,
+    # racing: where the car is
+    loc_gain_along=0.3,       # share of the map match's correction taken along the car's heading, per scan
+    loc_gain_across=0.5,      # and across it
+    loc_max_step=0.25,        # m, the most a single scan may move the estimate
+    lost_after=1.5,           # s without cones in view, or without a map match, before the plan is slowed
+    loc_lost_after=3.0,       # s without a map match before the car is looked for anywhere on the map
+    blind_speed=0.5,          # share of the plan's speed driven while blind or unmatched
+    give_up_after=8.0,        # s blind or unmatched before the car stops
+    debug=False,
+    # racing: raceline, speed plan and MPC (params.py)
+    **RACE,
 )
 
 
@@ -91,12 +92,10 @@ class Racer(Node):
         self.slam = GraphSLAM((0.0, 0.0), p["dx_weight"], p["z_weight"], p["new_landmark_dist"], p["icp_gate"],
                               icp_min_matches=int(p["icp_min_matches"]))
         try:
-            from .mpc import BicycleMPC
-            # the MPC may not plan faster than the speed profile it is following: with a state
-            # bound above the profile's own cap, a model error lets it run past its plan, which
-            # is how the car reached 6.3 m/s on a 4.8 m/s line and left the corridor
-            p["v_cap"] = min(p["v_cap"], p["v_max"] * p["race_speed_scale"])
-            self.mpc = BicycleMPC(p)
+            from .mpc import KinematicMPC
+            # the MPC may not plan faster than the speed plan it is following
+            p["v_cap"] = min(p["v_cap"], p["v_max"] * p["race_speed_scale"] + 0.3)
+            self.mpc = KinematicMPC(p)
             if not self.mpc.ok:
                 self.mpc = None
         except Exception as e:                      # noqa: BLE001
@@ -104,6 +103,8 @@ class Racer(Node):
             self.mpc = None
         if self.mpc is None:
             self.get_logger().warn("CasADi not importable: mapping and raceline still run, control falls back to pure pursuit")
+        self.ctl = RaceController(p, self.mpc)
+        self.body = BodySpeed()                  # the body's speed while racing, from the wheels through the tyre
 
         # vehicle state
         self.yaw = None
@@ -121,15 +122,16 @@ class Racer(Node):
         self.track = None
         self.raceline = None             # (N,2)
         self.race_v = None
-        self.race_psi = None
-        self.race_s = None
-        self.race_idx = 0
+        self.enc_now = {}                # latest (stamp, angle) of each wheel encoder
+        self.enc_prev = None             # (stamp, mean angle) at the previous racing scan
+        self.race_yaw = None             # heading at the previous racing scan
+        self.race_s = None               # progress along the raceline at the previous racing scan
+        self.icp_track = []              # (time, position the map match gave): is the car going anywhere?
         # control state
         self.steer = 0.0
         self.throttle = 0.0
         self.integral = 0.0
         self.last_t = None
-        self.uprev = np.zeros(2)
         self.lap_times = []
         self.lap_start_t = None
         self.solve_ms = 0.0
@@ -139,8 +141,6 @@ class Racer(Node):
         self.odo_speed = 0.0
         self.v_cmd = 0.0                         # the speed asked of the throttle law, rate limited
         self.v_goal = None                       # the follower's own speed, smoothed
-        self.map_v, self.map_v_t, self.map_v_pose = 0.0, None, None   # speed as the map sees it
-        self.ax_bias = 0.0                       # measured acceleration minus the model's
         self.seen_pose, self.recovering = np.zeros(2), False          # where cones were last in view
         self.loc_log_t = 0.0
         self.last_seen_t = 0.0
@@ -148,7 +148,7 @@ class Racer(Node):
         self.snap_t = -1e9
         self.target_t = -1e9
         self.good_loc_t = 0.0
-        self.local_mode = False
+        self.reloc_t = 0.0
         self.stalled_since = None
         self.halted = False
         self.push_until = None
@@ -199,6 +199,7 @@ class Racer(Node):
         if hist and angle < hist[-1][1] - 50.0:      # the counter was reset (a small decrease is the car reversing)
             hist.clear()
         hist.append((t, angle))
+        self.enc_now[msg.header.frame_id] = (t, angle)
         while len(hist) > 2 and t - hist[0][0] > self.p["speed_window"]:
             hist.pop(0)
         if len(hist) < 2 or t - hist[0][0] < 1e-3:
@@ -221,28 +222,23 @@ class Racer(Node):
         cones = self.perception.fuse(clusters, self.speed, self.yaw, dt, self.yaw_rate)
         self.publish_cones(msg.header, cones)
 
-        # dead reckoning: wheel speed, slew-limited to what the car can physically do (spinning
-        # wheels read high), and only while the lidar scene actually moves past us
-        # the wheels over-read when they slip, and the dead reckoning then runs ahead of the
-        # car: the pose drifts, the map match is lost, and the car drives out of the corridor
-        # long after the slide that started it. While the map is matching it says how fast the
-        # car really moves, and the wheels may not claim much more than that.
-        v_wheel = self.speed
-        if self.map_v_t is not None and t - self.map_v_t < 0.5:
-            v_wheel = min(v_wheel, self.map_v + p["slip_allow"])
-        prev_v = self.odo_speed
-        self.odo_speed = float(np.clip(v_wheel, self.odo_speed - 6.0 * dt, self.odo_speed + 4.0 * dt))
-        # what the car really does along its axis, minus what the model says it should have done
-        # with the throttle it was given. A model fitted offline is never exact; feeding the
-        # difference back means the optimiser plans from the car in front of it rather than from
-        # the car it was fitted to, and stops chasing an acceleration that never arrives.
-        if dt > 0.02 and self.mode == "RACING":
-            tau = float(self.uprev[1])
-            model = p["long_a"] * tau - p["long_b"] * prev_v - p["idle_brake"] * (1.0 - math.tanh(40.0 * tau))
-            measured = (self.odo_speed - prev_v) / dt
-            self.ax_bias += (float(np.clip(measured - model, -p["ax_bias_max"], p["ax_bias_max"])) - self.ax_bias) * min(1.0, dt / p["ax_bias_tau"])
-        elif self.mode != "RACING":
-            self.ax_bias = 0.0
+        if self.mode == "RACING":
+            steer, throttle = self.race_scan(t, dt, clusters, cones)
+            if self.halted:
+                steer, throttle = 0.0, 0.0
+            self.steer, self.throttle = steer, throttle
+            if t - self.status_t > 0.5:
+                self.status_t = t
+                self.pub_status.publish(String(data=self.status_line(t, True)))
+            self.pub_throttle.publish(Float32(data=float(throttle)))
+            self.pub_steering.publish(Float32(data=float(steer / MAX_STEER)))
+            self.publish_pose(msg.header)
+            return
+
+        # the mapping lap. Dead reckoning: wheel speed, slew-limited to what the car can do, and
+        # only while the lidar scene actually moves past us (at the mapping lap's pace the
+        # wheels and the body agree, and a car stopped against a cone must not map on)
+        self.odo_speed = float(np.clip(self.speed, self.odo_speed - 6.0 * dt, self.odo_speed + 4.0 * dt))
         moving_now = self.prev_clusters is None or self.scene_moving(msg, peek=True)
         ds = self.odo_speed * dt if moving_now else 0.0
         dx = np.array([ds * math.cos(self.yaw), ds * math.sin(self.yaw)])
@@ -253,10 +249,7 @@ class Racer(Node):
 
         # cones for the map: every coloured cone within range gives a position edge; only a
         # colour the camera confirmed this scan carries a full vote for the landmark's colour
-        rng = self.p["slam_range"] if self.mode == "MAPPING" else self.p["loc_range"]
-        obs = [(x, y, c, w) for x, y, c, w in cones if math.hypot(x, y) < rng]
-        if self.mode != "MAPPING":                # for localisation every lidar cone counts, coloured or not
-            obs += [(x, y, UNKNOWN, 0.0) for x, y in self.perception.unknown if math.hypot(x, y) < rng]
+        obs = [(x, y, c, w) for x, y, c, w in cones if math.hypot(x, y) < self.p["slam_range"]]
         cy, sy = math.cos(self.yaw), math.sin(self.yaw)
         z_rel = np.array([[cy * x - sy * y, sy * x + cy * y] for x, y, c, w in obs]).reshape(-1, 2)
         colours = np.array([c for _, _, c, _ in obs], dtype=int)
@@ -285,42 +278,6 @@ class Racer(Node):
                 steer, throttle = self.recover(t, dt)
             else:
                 self.seen_pose, self.recovering = self.pose.copy(), False
-        else:
-            matched = self.localise(z_rel, colours)
-            # localisation health: after a few seconds without matches the map position is not
-            # to be trusted, so the local follower (the mapping-lap driver) takes over until the
-            # map is matched again; with nothing in view at all, stop rather than bolt
-            if matched >= 3 or len(z_rel) < 3:
-                self.good_loc_t = t                 # matched, or too little in view to judge
-            if t - self.last_seen_t > self.p["lost_after"]:
-                # nothing in view: the car has left the corridor. Its dead-reckoned position is
-                # still roughly right, so crawl back towards the raceline by pure pursuit; if that
-                # brings no cones into view for a while, stop rather than wander
-                self.mpc_warm_reset()
-                if t - self.last_seen_t > 20.0:
-                    steer, throttle = 0.0, 0.0
-                    self.halt("nothing in view for 20 s")
-                else:
-                    steer, throttle = self.pursuit_step(dt, speed=0.7)
-            elif t - self.good_loc_t > self.p["loc_lost_after"]:
-                if not self.local_mode:
-                    self.get_logger().warn("localisation lost: local follower until the map is matched again")
-                    self.local_mode = True
-                steer, throttle = self.follow_local(clusters, cones, dt)
-                self.mpc_warm_reset()
-                if t - self.reloc_t > 1.0 and len(z_rel) >= 4:      # look for the car anywhere on the map
-                    self.reloc_t = t
-                    found = self.slam.relocalise(z_rel, colours)
-                    if found is not None:
-                        self.get_logger().info("relocalised: map position moved %.1f m" % np.linalg.norm(found - self.pose))
-                        self.pose = found
-                        self.good_loc_t = t
-            else:
-                if self.local_mode:
-                    self.get_logger().info("localisation back: MPC on the raceline")
-                    self.local_mode = False
-                    self.race_idx = self.nearest_index()
-                steer, throttle = self.race_step(dt)
         # stuck on a cone (wheels may spin, so watch the lidar scene): push once, then stop
         if moving and not self.no_target:
             self.stalled_since = None
@@ -515,25 +472,20 @@ class Racer(Node):
         t0 = self.map_closed_t
         line, _ = min_curvature(track["centre"], track["normal"], track["half_width"], p["car_half_width"], p["margin"], p["curvature_reg"],
                                 cones=self.slam.lhat)
-        # the speed scale is for the straights (v_max); corners keep the lateral limit that
-        # every hairpin has been driven clean with (corner_scale on the speed, so squared on
-        # the acceleration)
-        v, kappa = speed_profile(line, p["v_max"] * p["race_speed_scale"], p["a_lat"] * p["corner_scale"] ** 2, p["a_acc"], p["a_brake"],
-                                 curv_window=p["curv_window"])
+        v, _ = speed_plan(line, p["v_max"] * p["race_speed_scale"], p["a_lat"] * p["corner_scale"] ** 2, p["a_acc"], p["a_brake"],
+                          curv_window=p["curv_window"])
         self.track, self.raceline, self.race_v = track, line, v
-        self.race_psi = heading_along(line)
-        seg = np.linalg.norm(np.roll(line, -1, axis=0) - line, axis=1)
-        self.race_s = np.concatenate([[0.0], np.cumsum(seg)])
-        self.race_idx = int(np.argmin(np.linalg.norm(line - self.pose, axis=1)))
+        self.ctl.reset()
+        self.ctl.set_raceline(line, v)
+        self.body.v = max(self.speed, 0.0)
+        self.enc_prev, self.race_yaw, self.race_s, self.icp_track = None, self.yaw, None, []
         self.mode = "RACING"
-        self.half_lap = False
-        self.local_mode = np.linalg.norm(line[self.race_idx] - self.pose) > 1.0   # off the line: follower first
         self.lap_start_t = self.last_t
-        self.good_loc_t = self.last_t
-        self.reloc_t = self.last_t
-        self.get_logger().info("track ready %.0f ms after the map closed (lap %.1f s): %s, raceline %.1f m, %d points, v %.1f..%.1f m/s -> RACING with %s"
+        self.good_loc_t = self.last_seen_t = self.reloc_t = self.last_t
+        plan_lap = float(np.sum(np.diff(self.ctl.line.s) / np.maximum(v, 0.2)))      # what driving the plan exactly would take
+        self.get_logger().info("track ready %.0f ms after the map closed (lap %.1f s): %s, raceline %.1f m, %d points, v %.1f..%.1f m/s, the plan is a %.2f s lap -> RACING with %s"
                                % (1000 * (time.time() - t0), lap, "team cone ordering" if rungs is not None else "boundary walk",
-                                  self.race_s[-1], len(line), v.min(), v.max(), "MPC" if self.mpc else "pure pursuit"))
+                                  self.ctl.line.length, len(line), v.min(), v.max(), plan_lap, "MPC" if self.mpc else "pure pursuit"))
         self.publish_map()
 
     # ------------------------------------------------------------ lap-1 follower (the simple driver)
@@ -836,155 +788,123 @@ class Racer(Node):
 
     # ------------------------------------------------------------ racing
 
-    def mpc_warm_reset(self):
-        if self.mpc is not None:
-            self.mpc.warm = None
-        self.uprev = np.array([self.delta, 0.0])
+    def wheel_speed(self):
+        """The wheels' speed over the last scan, from the encoders' own angles and stamps."""
+        if len(self.enc_now) < 2:
+            return max(self.speed, 0.0)
+        stamp = max(e[0] for e in self.enc_now.values())
+        angle = float(np.mean([e[1] for e in self.enc_now.values()]))
+        prev, self.enc_prev = self.enc_prev, (stamp, angle)
+        if prev is None or stamp - prev[0] < 1e-3 or abs(angle - prev[1]) > 200.0:
+            return max(self.speed, 0.0)
+        return (angle - prev[1]) / (stamp - prev[0]) * WHEEL_RADIUS
 
-    def localise(self, z_rel, colours):
+    def race_scan(self, t, dt, clusters, cones):
+        """One scan of a racing lap: where the car is, then what it should do."""
         p = self.p
-        subset = self.landmarks_near()
-        corrected, matched = self.slam.localise(self.pose, z_rel, colours, subset=subset)
-        shift = float(np.linalg.norm(corrected - self.pose))
-        if self.p["debug"] and matched == 0 and len(z_rel) >= 3:
-            near = self.slam.lhat if subset is None else self.slam.lhat[subset]
-            d = np.min(np.linalg.norm((z_rel + self.pose)[:, None, :] - near[None, :, :], axis=2), axis=1) if len(near) else np.array([np.inf])
-            self.get_logger().info("no match: %d cones in view, %s candidate landmarks, nearest landmark per cone median %.2f m (min %.2f), speed %.1f"
-                                   % (len(z_rel), "all" if subset is None else len(subset), float(np.median(d)), float(np.min(d)), self.speed))
+        # speed: the wheels, put through the tyre. The encoders count the wheels, and the
+        # throttle sets the wheel speed at once, so on their own they are the command coming
+        # back; the tyre curve says how the body follows (vehicle.BodySpeed)
+        v = self.body.update(self.wheel_speed(), dt, self.yaw_rate, self.delta)
+        self.odo_speed = v
+        # dead reckoning: the rear axle moves along the heading, and the lidar, which is the
+        # point the map match places, swings round it as the car turns
+        mid = self.race_yaw + 0.5 * wrap(self.yaw - self.race_yaw)
+        ahead = np.array([math.cos(self.yaw), math.sin(self.yaw)])
+        self.pose = (self.pose - AXLE_TO_LIDAR * np.array([math.cos(self.race_yaw), math.sin(self.race_yaw)])
+                     + v * dt * np.array([math.cos(mid), math.sin(mid)]) + AXLE_TO_LIDAR * ahead)
+        self.race_yaw = self.yaw
+        self.travelled += v * dt
+        # the map: every lidar cone within range counts, coloured or not
+        obs = [(x, y, c) for x, y, c, w in cones] + [(x, y, UNKNOWN) for x, y in self.perception.unknown]
+        obs = [o for o in obs if math.hypot(o[0], o[1]) < p["loc_range"]]
+        z_rel = np.array([[ahead[0] * x - ahead[1] * y, ahead[1] * x + ahead[0] * y] for x, y, c in obs]).reshape(-1, 2)
+        colours = np.array([c for _, _, c in obs], dtype=int)
+        matched = self.localise(t, z_rel, colours)
+        if len(cones) >= 2 or sum(1 for x, y in clusters if x > -0.5 and math.hypot(x, y) < 6.0) >= 2:
+            self.last_seen_t = t
+        if matched >= 3 or len(z_rel) < 3:
+            self.good_loc_t = t                     # matched, or too little in view to judge
+        blind, lost = t - self.last_seen_t, t - self.good_loc_t
+        if t - self.loc_log_t > 2.0:
+            self.loc_log_t = t
+            self.get_logger().info("racing: %d cones in view, %d matched, speed %.1f of %.1f m/s, %.2f m off the line, mpc %.0f ms"
+                                   % (len(z_rel), matched, v, self.ctl.info.get("v_plan", 0.0), self.ctl.info.get("off", 0.0), self.ctl.solve_ms))
+        if max(blind, lost) > p["give_up_after"]:
+            self.halt("no cones in view for %.0f s" % blind if blind > lost else "the map has not matched for %.0f s" % lost)
+            return 0.0, 0.0
+        if self.stuck(t):
+            self.halt("not moving with the wheels turning")
+            return 0.0, 0.0
+        if lost > p["loc_lost_after"] and len(z_rel) >= 4 and t - self.reloc_t > 1.0:
+            self.reloc_t = t                        # look for the car anywhere on the map
+            found = self.slam.relocalise(z_rel, colours)
+            if found is not None:
+                self.get_logger().info("relocalised: map position moved %.1f m" % np.linalg.norm(found - self.pose))
+                self.pose, self.good_loc_t = found, t
+                self.ctl.s = None
+        # all of the plan while the map is matching, a share of it while the car drives on dead
+        # reckoning alone
+        self.ctl.speed_scale = 1.0 if max(blind, lost) < p["lost_after"] else p["blind_speed"]
+        rear = self.pose - AXLE_TO_LIDAR * ahead
+        steer, throttle = self.ctl.step(t, rear[0], rear[1], self.yaw, v, self.delta)
+        if self.ctl.info.get("Z") is not None:
+            self.publish_prediction(self.ctl.info["Z"])
+        s, length = self.ctl.s, self.ctl.line.length
+        if self.race_s is not None and self.race_s > 0.8 * length and s < 0.2 * length:
+            self.lap_times.append(t - self.lap_start_t)
+            self.lap_start_t = t
+            self.get_logger().info("lap %d: %.2f s (mpc %.0f ms/solve)" % (len(self.lap_times) - 1, self.lap_times[-1], self.ctl.solve_ms))
+        self.race_s = s
+        return steer, throttle
+
+    def localise(self, t, z_rel, colours):
+        """Correct the dead-reckoned position against the frozen map. Cones line the track, so a
+        match says where the car is across the track precisely and along it less so (slide the
+        estimate one cone along and the boundary fits as well); dead reckoning is the opposite.
+        Each scan takes a share of the correction, a smaller one along the heading, and never
+        more than `loc_max_step`: the car cannot teleport."""
+        p = self.p
+        corrected, matched = self.slam.localise(self.pose, z_rel, colours, subset=self.landmarks_near())
         if matched >= 3:
-            # Cones line the track, so a match against them says where the car is across the
-            # track precisely and where it is along the track hardly at all: sliding the estimate
-            # back by one cone fits the boundary just as well. That is what went wrong. The
-            # estimate slipped a cone (0.93 m on the loop) while the match still reported a 4 cm
-            # residual, the car turned in a metre late, and clipped the cone on the inside of the
-            # corner. Measured over a race the error is entirely along the track: 0.22 m normally
-            # and 1.20 m when it slipped, against 0.03 m across it.
-            #
-            # Dead reckoning is the other way round: the wheel speed is unbiased, so it knows how
-            # far the car has gone, and it is the heading that walks it sideways. Each is trusted
-            # for what it is good at.
             delta = corrected - self.pose
             c, sn = math.cos(self.yaw), math.sin(self.yaw)
-            along, across = delta[0] * c + delta[1] * sn, -delta[0] * sn + delta[1] * c
-            if self.last_t - self.good_loc_t > p["loc_lost_after"]:
-                along, across = 0.5 * along, 0.5 * across      # match lost: the map is all there is
-            else:
-                along, across = p["loc_gain_along"] * along, p["loc_gain_across"] * across
+            along = p["loc_gain_along"] * (delta[0] * c + delta[1] * sn)
+            across = p["loc_gain_across"] * (-delta[0] * sn + delta[1] * c)
             step = np.array([along * c - across * sn, along * sn + across * c])
             n = float(np.linalg.norm(step))
             if n > p["loc_max_step"]:
-                step *= p["loc_max_step"] / n                  # the car cannot teleport
+                step *= p["loc_max_step"] / n
             self.pose = self.pose + step
-        # how fast the map says the car is moving: the distance between two well matched poses.
-        # Only a confident match counts, so a poor one never slows the car by mistake.
-        if matched >= 5 and self.last_dt > 0.01:
-            if self.map_v_pose is not None:
-                v = float(np.linalg.norm(self.pose - self.map_v_pose)) / self.last_dt
-                self.map_v = v if self.map_v_t is None else 0.6 * self.map_v + 0.4 * v
-                self.map_v_t = self.last_t
-            self.map_v_pose = self.pose.copy()
-        else:
-            self.map_v_pose = None
-        if self.last_t - self.loc_log_t > 2.0:
-            self.loc_log_t = self.last_t
-            self.get_logger().info("localise: %d cones in view, %d matched, correction %.2f m, speed %.1f, mpc %.0f ms" % (len(z_rel), matched, shift, self.speed, self.solve_ms))
-        # lap timing on the raceline index wrap, once the far side of the loop has been passed
-        n = len(self.raceline)
-        i = self.nearest_index()
-        if 0.4 * n < i < 0.6 * n:
-            self.half_lap = True
-        if self.race_idx > 0.8 * n and i < 0.2 * n and self.half_lap:
-            lap = self.last_t - self.lap_start_t
-            self.lap_start_t = self.last_t
-            self.half_lap = False
-            self.lap_times.append(lap)
-            self.get_logger().info("lap %d: %.2f s (mpc %.0f ms/solve)" % (len(self.lap_times) - 1, lap, self.solve_ms))
-        self.race_idx = i
+            self.icp_track.append((t, corrected))
+            self.icp_track = [e for e in self.icp_track if t - e[0] < 4.0]
         return matched
+
+    def stuck(self, t):
+        """True when the map match has placed the car within 0.3 m of the same spot for three
+        seconds while the wheels turn: it is against something."""
+        if self.body.v < 0.5 and self.throttle < 0.05:
+            return False
+        old = [e for e in self.icp_track if t - e[0] > 3.0]
+        recent = [e for e in self.icp_track if t - e[0] <= 3.0]
+        if not old or len(recent) < 10:
+            return False
+        pts = np.array([e[1] for e in recent] + [old[-1][1]])
+        return bool(np.max(np.linalg.norm(pts - pts[-1], axis=1)) < 0.3)
 
     def landmarks_near(self):
         """The landmarks within reach of the stretch of raceline around the car: on a layout
         whose sections run side by side, the cones of the neighbouring section must not be
         candidates, or the match slides across to them. Everything when the map match is lost."""
-        if self.local_mode or self.last_t - self.good_loc_t > self.p["loc_lost_after"]:
+        if self.ctl.s is None or self.last_t - self.good_loc_t > self.p["loc_lost_after"]:
             return None
         n = len(self.raceline)
-        idx = np.arange(self.race_idx - int(8.0 / self.p["sample_step"]), self.race_idx + int(15.0 / self.p["sample_step"])) % n
+        i0 = int(self.ctl.s / self.p["sample_step"])
+        idx = np.arange(i0 - int(8.0 / self.p["sample_step"]), i0 + int(15.0 / self.p["sample_step"])) % n
         stretch = self.raceline[idx]
         d = np.min(np.linalg.norm(self.slam.lhat[:, None, :] - stretch[None, :, :], axis=2), axis=1)
         near = np.flatnonzero(d < self.p["loc_corridor"])
         return near if len(near) >= 4 else None
-
-    def nearest_index(self):
-        n = len(self.raceline)
-        window = np.arange(self.race_idx - 10, self.race_idx + 40) % n
-        d = np.linalg.norm(self.raceline[window] - self.pose, axis=1)
-        if d.min() > 2.0:                                   # far from where we thought: search everywhere
-            return int(np.argmin(np.linalg.norm(self.raceline - self.pose, axis=1)))
-        return int(window[int(np.argmin(d))])
-
-    def reference(self, i0, v_now):
-        """Raceline points ahead, one per MPC stage, spaced by the profile speed times DT."""
-        N, DT = self.mpc.N, self.mpc.DT
-        n = len(self.raceline)
-        s = self.race_s[i0]
-        ref = np.zeros((4, N))
-        v = max(v_now, 0.5)
-        idx = i0
-        for k in range(N):
-            v = self.race_v[idx]
-            s += v * DT
-            idx = (i0 + int(round((s - self.race_s[i0]) / self.p["sample_step"]))) % n
-            ref[0, k], ref[1, k] = self.raceline[idx]
-            ref[2, k] = self.race_psi[idx]
-            ref[3, k] = self.race_v[idx]
-        return ref
-
-    def race_step(self, dt):
-        self.no_target = False
-        i = self.race_idx
-        if self.mpc is not None:
-            # delay compensation: where the car will be when this command bites
-            x, y = self.pose
-            psi, v, d = self.yaw, max(self.odo_speed, 0.0), self.delta
-            for _ in range(3):
-                h = STEER_DELAY / 3.0
-                x += v * math.cos(psi) * h
-                y += v * math.sin(psi) * h
-                psi += v * math.tan(d) / WHEELBASE * h
-            z0 = np.array([x, y, psi, v, 0.0, self.yaw_rate, d])
-            ref = self.reference(i, v)
-            # unwrap the reference heading around the current one
-            ref[2] = psi + np.array([wrap(a - psi) for a in ref[2]])
-            t0 = time.time()
-            out = self.mpc.solve(z0, ref, self.uprev, self.ax_bias)
-            self.solve_ms = 0.8 * self.solve_ms + 0.2 * 1000 * (time.time() - t0)
-            if out is not None:
-                u0, Z = out
-                self.uprev = u0
-                self.publish_prediction(Z)
-                return float(np.clip(u0[0], -MAX_STEER, MAX_STEER)), float(np.clip(u0[1], 0.0, 1.0))
-        return self.pursuit_step(dt)
-
-    def pursuit_step(self, dt, speed=None):
-        """Pure pursuit on the raceline: the fallback when the MPC is unavailable or fails, and
-        the way back when the car has lost sight of the cones."""
-        self.no_target = False
-        i = self.race_idx = self.nearest_index()
-        n = len(self.raceline)
-        j = i
-        while np.linalg.norm(self.raceline[j] - self.pose) < self.p["pursuit_lookahead"]:
-            j = (j + 1) % n
-            if j == i:
-                break
-        tx, ty = self.raceline[j] - self.pose
-        c, s = math.cos(-self.yaw), math.sin(-self.yaw)
-        lx, ly = c * tx - s * ty, s * tx + c * ty
-        ld = max(math.hypot(lx, ly), 0.3)
-        wanted = float(np.clip(math.atan(2.0 * WHEELBASE * ly / (ld * ld)), -MAX_STEER, MAX_STEER))
-        step = (wanted - self.steer) * min(1.0, dt / self.p["steer_tau"])
-        steer = self.steer + float(np.clip(step, -MAX_STEER_RATE * dt, MAX_STEER_RATE * dt))
-        return steer, self.throttle_law(float(self.race_v[i]) if speed is None else speed, dt)
 
     # ------------------------------------------------------------ debug topics
 
@@ -1030,15 +950,15 @@ class Racer(Node):
         elif self.mode == "ORDERING":
             what, detail = "map closed, waiting for the cone ordering", "%d cones" % len(self.slam.lhat)
         else:
-            what = "racing on " + ("the reactive follower (localisation lost)" if self.local_mode else ("MPC" if self.mpc else "pure pursuit"))
-            asked = float(self.race_v[self.race_idx]) if self.race_v is not None and len(self.race_v) else 0.0
-            detail = "lap %d | %.1f of %.1f m/s" % (max(len(self.lap_times) - 1, 0), self.odo_speed, asked)
+            what = "racing on " + ("MPC" if self.ctl.info.get("ok") else "pure pursuit")
+            detail = "lap %d | %.1f of %.1f m/s | %.2f m off the line" % (max(len(self.lap_times) - 1, 0), self.odo_speed,
+                                                                          self.ctl.info.get("v_plan", 0.0), self.ctl.info.get("off", 0.0))
         flags = []
         if self.halted:
             flags.append("stopped")
         if t - self.last_seen_t > self.p["lost_after"]:
             flags.append("no cones in view")
-        if self.mode == "RACING" and t - self.good_loc_t > self.p["loc_lost_after"]:
+        if self.mode == "RACING" and t - self.good_loc_t > self.p["lost_after"]:
             flags.append("map match lost")
         if not moving and self.throttle > 0.02:
             flags.append("not moving")

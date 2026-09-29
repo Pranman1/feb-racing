@@ -148,6 +148,29 @@ def speed_profile(path, v_max, a_lat, a_acc, a_brake, v_min=0.5, curv_window=2.0
     return np.maximum(v, v_min), kappa
 
 
+def speed_plan(path, v_max, a_lat, a_acc, a_brake, curv_window=2.0, v_min=0.5):
+    """Speed along a closed path from what the tyres can do: `a_lat` of cornering, and a tyre
+    force of `a_acc` driving and `a_brake` braking (m/s^2). The body's drag and the drag of
+    cornering are the car's own (vehicle.py): they take from the acceleration and add to the
+    braking, so the plan brakes later and accelerates less at speed, as the car does."""
+    from .vehicle import CORNER_DRAG, DRAG, WHEELBASE
+    ds = np.linalg.norm(np.roll(path, -1, axis=0) - path, axis=1)
+    kappa = np.abs(smooth_loop(curvature(path), round(curv_window / max(float(np.mean(ds)), 1e-6))))
+    turn = CORNER_DRAG * kappa * np.arctan(WHEELBASE * kappa)        # cornering drag per v^2
+    v = np.minimum(v_max, np.sqrt(a_lat / np.maximum(kappa, 1e-6)))
+    N = len(v)
+    for _ in range(2):
+        for i in range(N):                                   # forward: what the tyres can add
+            j = (i + 1) % N
+            a = a_acc - DRAG * v[i] - turn[i] * v[i] ** 2
+            v[j] = min(v[j], np.sqrt(max(v[i] ** 2 + 2.0 * a * ds[i], v_min ** 2)))
+        for i in range(N - 1, -1, -1):                       # backward: what they can take off
+            j = (i - 1) % N
+            a = a_brake + DRAG * v[i] + turn[i] * v[i] ** 2
+            v[j] = min(v[j], np.sqrt(v[i] ** 2 + 2.0 * a * ds[j]))
+    return np.maximum(v, v_min), kappa
+
+
 def heading_along(path):
     nxt, prv = np.roll(path, -1, axis=0), np.roll(path, 1, axis=0)
     d = nxt - prv
