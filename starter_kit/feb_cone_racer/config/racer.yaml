@@ -41,6 +41,7 @@ racer:
     lost_after: 1.5           # s without cones in view or a map match before the plan is slowed to blind_speed
     blind_speed: 0.5
     give_up_after: 8.0        # s of that before the car stops
+    pin_turn: 0.8             # rad the raceline turns from the race start before racing pace: the first corner pins the car along the track
     # racing: the raceline and the speed plan. What the tyres are asked for, against what was measured on
     # this car (tools/dynid.py): 6.3 m/s^2 sideways, and 5.4 m/s^2 along the car even with the tyre sliding
     margin: 0.7               # m kept from the cones beyond the car's half width

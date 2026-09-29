@@ -71,7 +71,8 @@ DEFAULTS = dict(
     loc_lost_after=3.0,       # s without a map match before the car is looked for anywhere on the map
     blind_speed=0.5,          # share of the plan's speed driven while blind or unmatched
     give_up_after=8.0,        # s blind or unmatched before the car stops
-    start_ramp=2.5,           # s over which the racing laps come up to the plan's pace once the map match is confirmed
+    start_ramp=2.5,           # s over which the racing laps come up to the plan's pace once the first corner is behind the car
+    pin_turn=0.8,             # rad the raceline has to turn from the race start before the car's place along the track counts as pinned
     debug=False,
     # racing: raceline, speed plan and MPC (params.py)
     **RACE,
@@ -487,6 +488,7 @@ class Racer(Node):
         self.body.v = max(self.speed, 0.0)
         self.enc_prev, self.race_yaw, self.race_s, self.icp_track = None, self.yaw, None, []
         self.matched_run, self.race_ready_t, self.still_since = 0, None, None
+        self.pinned_t, self.start_heading, self.corner_pace = None, None, float(np.min(v))
         self.mode = "RACING"
         self.lap_start_t = self.last_t
         self.good_loc_t = self.last_seen_t = self.reloc_t = self.last_t
@@ -719,6 +721,9 @@ class Racer(Node):
     def follow_local(self, clusters, cones, dt):
         p = self.p
         line = self.local_centreline([(x, y, c) for x, y, c, w in cones])
+        if p["debug"]:
+            self.get_logger().info("reactive: cones %s | line %s" % (" ".join("%s(%.1f,%.1f,%.1f)" % ("?BYO"[int(c)], x, y, w) for x, y, c, w in cones),
+                                                                    " ".join("(%.1f,%.1f)" % q for q in line[:8])))
         # the target is the point of the centreline exactly one lookahead away, interpolated
         # between its (cone-spaced) points: the first point beyond the lookahead can be three
         # metres out at a corner, and pure pursuit on it turns far too little
@@ -832,7 +837,7 @@ class Racer(Node):
         self.matched_run = self.matched_run + 1 if matched >= 4 else 0
         if self.race_ready_t is None and self.matched_run >= 3:
             self.race_ready_t = t
-            self.get_logger().info("map match confirmed: %d of %d cones, racing pace from here" % (matched, len(z_rel)))
+            self.get_logger().info("map match confirmed: %d of %d cones, the pace of the slowest corner from here" % (matched, len(z_rel)))
         self.still_since = (self.still_since or t) if self.scene_still() and self.body.v > 0.5 else None
         if len(cones) >= 2 or sum(1 for x, y in clusters if x > -0.5 and math.hypot(x, y) < 6.0) >= 2:
             self.last_seen_t = t
@@ -857,16 +862,22 @@ class Racer(Node):
                 self.get_logger().info("relocalised: map position moved %.1f m" % np.linalg.norm(found - self.pose))
                 self.pose, self.good_loc_t = found, t
                 self.ctl.s = None
-        # how much of the plan to ask for. None of it beyond the mapping lap's pace until the map
-        # match is confirmed (the mapping lap can end beside a cone, a little off the map), then
-        # up to all of it over `start_ramp`; a share of it while the car drives on dead
-        # reckoning alone
+        # how much of the plan to ask for. The mapping lap's pace until the map match is
+        # confirmed (the mapping lap can end beside a cone, a little off the map). Then the pace
+        # of the plan's slowest corner, which needs no braking point, until the first corner is
+        # behind the car: where the lap closes the map has a seam, and on a straight of evenly
+        # spaced cones the match sits as well one cone along, so the car may believe it is a
+        # cone's spacing from where it is, and at racing pace it then brakes that much late. A
+        # corner pins it. From there up to all of the plan over `start_ramp`; a share of it while
+        # the car drives on dead reckoning alone
         if self.race_ready_t is None:
-            self.ctl.speed_cap, self.ctl.speed_scale = p["map_speed"], 1.0
+            self.ctl.speed_cap = p["map_speed"]
+        elif self.pinned_t is None:
+            self.ctl.speed_cap = self.corner_pace
         else:
-            self.ctl.speed_cap = 99.0
-            ramp = float(np.clip((t - self.race_ready_t) / p["start_ramp"], 0.0, 1.0))
-            self.ctl.speed_scale = (0.4 + 0.6 * ramp) * (1.0 if max(blind, lost) < p["lost_after"] else p["blind_speed"])
+            ramp = float(np.clip((t - self.pinned_t) / p["start_ramp"], 0.0, 1.0))
+            self.ctl.speed_cap = self.corner_pace + ramp * (p["v_max"] - self.corner_pace) if ramp < 1.0 else 99.0
+        self.ctl.speed_scale = 1.0 if max(blind, lost) < p["lost_after"] else p["blind_speed"]
         rear = self.pose - AXLE_TO_LIDAR * ahead
         steer, throttle = self.ctl.step(t, rear[0], rear[1], self.yaw, v, self.delta)
         if self.ctl.info.get("Z") is not None:
@@ -877,6 +888,12 @@ class Racer(Node):
             self.lap_start_t = t
             self.get_logger().info("lap %d: %.2f s (mpc %.0f ms/solve)" % (len(self.lap_times) - 1, self.lap_times[-1], self.ctl.solve_ms))
         self.race_s = s
+        if self.pinned_t is None and self.race_ready_t is not None:
+            heading = float(self.ctl.line.at(s)[2])
+            self.start_heading = heading if self.start_heading is None else self.start_heading
+            if abs(wrap(heading - self.start_heading)) > p["pin_turn"]:
+                self.pinned_t = t
+                self.get_logger().info("first corner behind the car, racing pace from here")
         return steer, throttle
 
     def localise(self, t, z_rel, colours):
