@@ -13,7 +13,7 @@ RACE = dict(
     curvature_reg=0.01,
     # speed plan: what the tyres are asked for. Measured limits are 6.3 m/s^2 sideways and a
     # tyre force of 5.4 m/s^2 along the car that is there even when the tyre slides
-    v_max=5.9,
+    v_max=7.0,                # m/s. 5.9 and 7.0 were each run over all seventeen cone tracks: both clean, 7.0 is 3 to 12% faster
     a_lat=5.0,
     a_acc=4.6,
     a_brake=4.6,

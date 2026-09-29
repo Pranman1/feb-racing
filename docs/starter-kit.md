@@ -138,7 +138,7 @@ if it is brighter than the ground (a dark speck in the right hue used to hand a 
 wrong colour one time in ten); dim blobs still colour cones for driving, votes carry per tracked
 cone, and a reading from far away counts for less. In testing (2026-09-29, every run with its own mapping lap) it laps
 all seventeen cone tracks without touching a cone, each lap within 0.2 s of its plan: the loop in
-7.6 s after a 36 s mapping lap, comp 2021 in 37.3 s, Spa in 96.4 s. `v_max` and `a_lat` in
+7.5 s after a 36 s mapping lap, comp 2021 in 34.3 s, Spa in 84.4 s. `v_max` and `a_lat` in
 `config/racer.yaml` are the knobs for more speed; the measured limits are in `vehicle.py`.
 
 ### Taking the racer to the real car: `calibrate_camera`

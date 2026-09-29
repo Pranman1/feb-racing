@@ -364,7 +364,7 @@ planned force through the inverse tyre curve. `python3 -m feb_cone_racer.bench <
 runs the controller against the modelled car offline in ten seconds, and
 `tools/oracle_race.py` runs it in the simulator on the true pose.
 
-Full pass, every run with its own mapping lap, `v_max` 5.9, `a_lat` 5.0:
+Full pass, every run with its own mapping lap, at `v_max` 5.9, `a_lat` 5.0:
 
 | track | mapping lap | racing laps | lap | plan | hits | nearest cone |
 |---|---|---|---|---|---|---|
@@ -396,8 +396,15 @@ regardless. The racing laps now hold the mapping lap's pace until the map match 
 look for the car on the map if it is not, and come up to pace over 2.5 s; the row above is the
 run after that change, and loop, comp 2021 and rectangle were rerun with it and are unchanged.
 
-Where more speed is: the bench says `v_max` 7.0 is clean (comp 2021 in 33.9 s), 8.0 starts to
-slide into corners. The mapping lap is now most of a short run (36 s against 7.7 s laps).
+`v_max` is now 7.0. A second full pass at 7.0 was also 17 of 17 clean with no cone touched and
+the same clearance, and 3 to 12% faster: loop 7.50 s, small track 9.2, rectangle 10.4, boa 10.6,
+peanut 11.9, esses 12.0, bone 13.4, FSI 21.1, circuit 25.5, FSG 28.1, comp 2021 34.3,
+Spielberg 52.3, Interlagos 54.0, Monza 66.3, Silverstone 70.9, Spa 84.4, hairpins 100.4.
+Video: `runs/videos/fs_comp_2021_mapping_plus_4_laps.mp4`.
+
+Where more speed is: on the bench 8.0 starts to slide into corners (the car arrives 0.6 m/s
+over the plan), so the next gain is in braking earlier or planning it gentler, not in the
+number. The mapping lap is now most of a short run (36 s against 7.5 s laps).
 
 ## 2026-09-28: what the car actually is, and why it was crashing
 
