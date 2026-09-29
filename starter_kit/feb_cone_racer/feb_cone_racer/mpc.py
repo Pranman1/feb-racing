@@ -50,7 +50,13 @@ class BicycleMPC:
         ar = -ca.atan((vy - lr * r) / vxs)
         Ff = p["tyre_D"] * ca.sin(p["tyre_C"] * ca.atan(p["tyre_B"] * af))
         Fr = p["tyre_D"] * ca.sin(p["tyre_C"] * ca.atan(p["tyre_B"] * ar))
-        ax = p["long_a"] * tau - p["long_b"] * vx - p["idle_brake"] * (1.0 - ca.tanh(40.0 * tau)) + ax_bias   # idle brake fades in as the throttle closes; ax_bias is what the car really does minus what this says
+        # The wheels can only put down what the tyres hold. Torque arrives instantly
+        # (VehicleController.Drive applies throttle x MotorTorque with no lag) and 85.6 N-m
+        # through a 0.059 m wheel on a 3.47 kg car is far past grip, so the car's transient gain
+        # is huge while its acceleration saturates. A model linear in throttle predicts 27 m/s^2
+        # where the car makes 4, and the optimiser rings chasing it: saturate instead.
+        drive = p["long_a"] * tau - p["long_b"] * vx
+        ax = p["ax_sat"] * ca.tanh(drive / p["ax_sat"]) - p["idle_brake"] * (1.0 - ca.tanh(40.0 * tau)) + ax_bias
         return ca.vertcat(vx * ca.cos(psi) - vy * ca.sin(psi),
                           vx * ca.sin(psi) + vy * ca.cos(psi),
                           r,
@@ -96,6 +102,14 @@ class BicycleMPC:
             g.append(Z[:, k + 1] - zn)
             lbg += [0] * 7
             ubg += [0] * 7
+            # the throttle lives in a band around what the reference speed needs in steady state.
+            # Zero throttle is not a coast in this simulator, it is full braking on all four
+            # wheels, so an optimiser free to reach it overshoots, lifts, brakes and winds up
+            # again about once a second. Bounding the trim removes the zero state entirely,
+            # which is what cured the same limit cycle in the team's RoboRacer stack.
+            g.append(U[1, k] - ref[3, k] / p["speed_per_throttle"])
+            lbg += [-p["tau_band"]]
+            ubg += [p["tau_band"]]
             # the inputs may only change as fast as the car can move them: hard bounds, so the
             # plan is something the servo and the motor can actually execute. Without the
             # steering one the solver buys tracking with lock-to-lock flicks it cannot perform,

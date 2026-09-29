@@ -83,6 +83,11 @@ racer:
                               # with better tracking and a faster lap (mpc_bench, fs_comp_2021)
     mpc_steer_tau: 0.15       # s, the steering servo's lag in the model
     w_dtau: 3.0
+    ax_sat: 9.8               # m/s^2 the tyres can put down. Torque arrives instantly and is far past grip,
+                              # so the model saturates rather than believing 27 m/s^2 is available
+    tau_band: 0.15            # how far the throttle may sit from what the reference speed needs in steady
+                              # state. Zero throttle is full braking here, so the optimiser is not allowed
+                              # to wander down to it and wind back up (the RoboRacer stack's bounded trim)
     dtau_max: 0.4             # throttle units per second, hard bound in the MPC
     dsteer_max: 3.2           # rad/s, the servo's own rate: a hard bound in the MPC, so the plan is executable
     w_tau: 0.0                # penalty on throttle. It must be zero: the simulator brakes with full motor
