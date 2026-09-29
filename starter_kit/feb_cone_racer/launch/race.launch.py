@@ -12,10 +12,14 @@ DEPS = "/home/autodrive_devkit/src/stack/.pydeps"
 
 def generate_launch_description():
     params = os.path.join(get_package_share_directory("feb_cone_racer"), "config", "racer.yaml")
+    # FEB_RACER_PARAMS names a second parameter file applied on top of the config, so a setting
+    # can be tried on the car without editing the one everyone else runs.
+    extra = os.environ.get("FEB_RACER_PARAMS", "")
+    files = [params] + ([extra] if extra and os.path.exists(extra) else [])
     actions = [
         SetEnvironmentVariable("PYTHONPATH", DEPS + ":" + os.environ.get("PYTHONPATH", "")),
         Node(package="feb_cone_racer", executable="racer", name="racer",
-             parameters=[params, {"use_sim_time": True}], output="screen", emulate_tty=True),
+             parameters=files + [{"use_sim_time": True}], output="screen", emulate_tty=True),
     ]
     try:                       # the team's cone ordering, when its package is in the stack too
         order = get_package_share_directory("feb_cone_ordering")

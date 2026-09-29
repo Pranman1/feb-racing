@@ -333,3 +333,68 @@ ghost, cones, the track menu, 2-car spawning with the RCT. All compile; expect s
 - Stripped from the racer at the user's request (2026-09-26 night): everything a real car cannot do. No reversing anywhere, no retrace, no `recovery` option; a car that does not move with the throttle on pushes once (0.16 for 1.5 s) and then stops for good, a car with nothing in view for two seconds on the mapping lap (twenty while racing) stops, and the log and `/feb/status` say why. No clean run today had used any of it.
 - Parallel validation (done): `FEB_DEVKIT_NAME` and `FEB_FOXGLOVE_PORT` in `feb-sim` let several devkits run side by side, one simulator window each on its own bridge port; three at once run at real-time factor 0.92-1.00 on this PC, so the 17-track pass takes about 70 minutes instead of 3.4 hours (scratchpad `run_pass.sh` / `racer_batch_par.sh`).
 - NEXT (agreed, once driving works everywhere): asphalt drawn as a ring between the two corridor edges instead of a strip along the centreline (the strip leaves notches at sharp corners on the Formula Student layouts).
+
+## 2026-09-28: what the car actually is, and why it was crashing
+
+Measured on the car rather than assumed. `starter_kit/feb_cone_racer/tools/longid.py` drives
+eleven bursts of held throttle from rest against the ground truth and `tools/fit_long.py` fits
+them; steady circles at held steering gave the cornering.
+
+| | the model believed | the car does |
+|---|---|---|
+| throttle response | 0.16 s | 0.59 s |
+| acceleration | 9.8 m/s^2 | 4.3 m/s^2 |
+| braking when you lift off | 16.5 m/s^2 | 0.31 m/s^2 |
+| steady speed per unit throttle | 24.95 m/s | 26.4 m/s |
+| lateral grip | 4.0 m/s^2 planned | 8 m/s^2 available |
+
+Two faults were found and named.
+
+**The position estimate slips one cone along the track.** Cones line the track, so a match
+against them says where the car is across the track precisely and where it is along it hardly
+at all: sliding the estimate back by one cone fits the boundary just as well. It slipped by the
+0.93 m cone spacing while the match still reported a 4 cm residual, the car turned in a metre
+late, and clipped the cone on the inside of the corner. Measured over a race the error is
+entirely along the track (0.22 m normally, 1.20 m when it slipped) and never across it (0.03 m).
+`localise()` now takes the across-track correction in full and the along-track one at 0.08, so
+dead reckoning holds the along-track position, which is what the unbiased wheel speed is good
+for. The worst cone clearance over thirteen laps went from 0.07 m, which is a hit, to 0.53 m.
+
+**The speed the controller believed was clamped by a number computed from itself.** The wheel
+speed was capped at what the map said the car was doing, and the map's speed is measured between
+successive corrected poses, which move at the capped speed. The controller saw 3.3 m/s while the
+wheels read 6.5, kept adding throttle, and ran off the first corner. Removing the cap outright
+was worse (the wheels do lie when the car is stopped against a cone), so it stays for now; this
+is the next thing to fix properly.
+
+**The speed plan was reading map error as corners.** Curvature is a second difference of points
+a quarter of a metre apart, so a centimetre of error reads as a tight corner: the loop had
+twenty-four separate slow-downs a lap, and three centimetres of map error turned an 8.9 s plan
+into a 17 s one. The signed curvature is now averaged over two metres first (`curv_window`).
+
+### What is not fixed
+
+The car still overshoots the planned speed by up to 2 m/s a tenth of the lap, and those peaks
+are what put it into the cones. The corridor is 2.3 m wide, the raceline keeps 0.84 m off the
+cones, so there is 0.3 m of slack against a position error that reaches 2 m. Until the
+along-track estimate is better the margin has to come from speed, so `race_speed_scale` and
+`corner_scale` are 0.85: ten and eleven clean laps at 10.6 s, against crashing inside two laps
+in nine runs out of eleven at 1.0. Over eight runs at 0.85, five finished ten or more laps and
+the last three in a row were clean and near identical (11 laps, 10.57 to 10.62 s, 0.50 to 0.63 m
+of cone clearance, at most 0.87 m of along-track error). Three in eight still fail, all of them
+by clipping a cone. Going back to 1.0 is worth about 1.7 s a lap once the estimate is fixed.
+
+The measured longitudinal model is in the table above but **not** in use. It was tried three
+times and the car was slower and crashed sooner every time; with the fast surrogate the
+optimiser behaves like a feed-forward speed law, which is stable here. Switching to the measured
+one needs the weights retuned (start with `w_speed`) and the reference fixed: the reference
+point is marched along the raceline at the plan's speed, so when the car is slower that point
+runs away and the gap grows down the horizon, which the optimiser answers with throttle. Paying
+for the across-track part of that error in full and the along-track part lightly (contouring
+control) is the standard cure and is the right next change.
+
+### Method note
+
+A single run tells you almost nothing here: the same code gave thirteen laps once and zero three
+times running. Judge a change on several runs, and on the continuous measures (cone clearance,
+along-track error) rather than the lap count.

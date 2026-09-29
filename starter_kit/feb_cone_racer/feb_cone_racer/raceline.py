@@ -117,9 +117,25 @@ def curvature(path):
     return num / den
 
 
-def speed_profile(path, v_max, a_lat, a_acc, a_brake, v_min=0.5):
+def smooth_loop(x, n):
+    """Moving average round a closed path."""
+    n = int(n)
+    if n < 3:
+        return x
+    if n % 2 == 0:
+        n += 1
+    return np.convolve(np.r_[x[-n:], x, x[:n]], np.ones(n) / n, mode="same")[n:-n]
+
+
+def speed_profile(path, v_max, a_lat, a_acc, a_brake, v_min=0.5, curv_window=2.0):
     ds = np.linalg.norm(np.roll(path, -1, axis=0) - path, axis=1)
-    kappa = np.abs(curvature(path))
+    # Curvature is a second difference of points a quarter of a metre apart, so a centimetre of
+    # map error reads as a tight corner. Left raw it puts a slow-down every metre and a half:
+    # twenty-four separate brake-and-accelerate events a lap on the loop, and three centimetres
+    # of map error turns an 8.9 s plan into a 17 s one. Averaging the signed curvature over
+    # about a car and a half leaves ten, and 9.2 s. Signed matters: averaging the magnitude
+    # rectifies the error instead of cancelling it and changes almost nothing.
+    kappa = np.abs(smooth_loop(curvature(path), round(curv_window / max(float(np.mean(ds)), 1e-6))))
     v = np.minimum(v_max, np.sqrt(a_lat / np.maximum(kappa, 1e-6)))
     N = len(v)
     for _ in range(2):

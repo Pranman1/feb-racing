@@ -61,7 +61,7 @@ DEFAULTS = dict(
     keyframe_dist=0.4, slam_range=6.0, loc_range=6.0, loc_corridor=2.5, dx_weight=2.0, z_weight=1.0, new_landmark_dist=0.6, icp_gate=1.5,
     solve_every=3, min_lap_length=15.0, order_timeout=10.0, closure_landmarks=10, lap_close_dist=2.0, min_seen=2, icp_min_matches=5, snap_radius=10.0, snap_gate=6.0,
     # raceline
-    sample_step=0.25, car_half_width=0.135, margin=0.7, curvature_reg=0.01,
+    sample_step=0.25, curv_window=2.0, car_half_width=0.135, margin=0.7, curvature_reg=0.01,
     v_max=5.9, a_lat=4.0, a_acc=9.0, a_brake=7.0,
     # mpc: model
     mass=3.9, inertia_z=0.10, lf=0.175, lr=0.175, tyre_B=8.0, tyre_C=1.4, tyre_D=18.0,   # L 0.35 m effective (yaw-rate fit)
@@ -70,6 +70,7 @@ DEFAULTS = dict(
     # mpc: problem
     mpc_horizon=12, mpc_dt=0.1, mpc_max_iter=60, mpc_steer_tau=0.15, mpc_substeps=3,
     w_pos=8.0, w_head=2.0, w_speed=10.0, w_vy=0.2, w_dsteer=15.0, w_dtau=3.0, w_tau=0.0, dtau_max=0.4, dsteer_max=MAX_STEER_RATE, ax_sat=9.8, tau_band=0.15,
+    loc_gain_along=0.08, loc_gain_across=0.5, loc_max_step=0.25,
     lost_after=1.5, loc_lost_after=3.0, recover_for=8.0, push_throttle=0.16, debug=False,
     pursuit_lookahead=1.2, race_speed_scale=1.0, corner_scale=1.0,
 )
@@ -517,7 +518,8 @@ class Racer(Node):
         # the speed scale is for the straights (v_max); corners keep the lateral limit that
         # every hairpin has been driven clean with (corner_scale on the speed, so squared on
         # the acceleration)
-        v, kappa = speed_profile(line, p["v_max"] * p["race_speed_scale"], p["a_lat"] * p["corner_scale"] ** 2, p["a_acc"], p["a_brake"])
+        v, kappa = speed_profile(line, p["v_max"] * p["race_speed_scale"], p["a_lat"] * p["corner_scale"] ** 2, p["a_acc"], p["a_brake"],
+                                 curv_window=p["curv_window"])
         self.track, self.raceline, self.race_v = track, line, v
         self.race_psi = heading_along(line)
         seg = np.linalg.norm(np.roll(line, -1, axis=0) - line, axis=1)
@@ -840,6 +842,7 @@ class Racer(Node):
         self.uprev = np.array([self.delta, 0.0])
 
     def localise(self, z_rel, colours):
+        p = self.p
         subset = self.landmarks_near()
         corrected, matched = self.slam.localise(self.pose, z_rel, colours, subset=subset)
         shift = float(np.linalg.norm(corrected - self.pose))
@@ -849,7 +852,29 @@ class Racer(Node):
             self.get_logger().info("no match: %d cones in view, %s candidate landmarks, nearest landmark per cone median %.2f m (min %.2f), speed %.1f"
                                    % (len(z_rel), "all" if subset is None else len(subset), float(np.median(d)), float(np.min(d)), self.speed))
         if matched >= 3:
-            self.pose = 0.5 * self.pose + 0.5 * corrected      # trust the map, but no jumps
+            # Cones line the track, so a match against them says where the car is across the
+            # track precisely and where it is along the track hardly at all: sliding the estimate
+            # back by one cone fits the boundary just as well. That is what went wrong. The
+            # estimate slipped a cone (0.93 m on the loop) while the match still reported a 4 cm
+            # residual, the car turned in a metre late, and clipped the cone on the inside of the
+            # corner. Measured over a race the error is entirely along the track: 0.22 m normally
+            # and 1.20 m when it slipped, against 0.03 m across it.
+            #
+            # Dead reckoning is the other way round: the wheel speed is unbiased, so it knows how
+            # far the car has gone, and it is the heading that walks it sideways. Each is trusted
+            # for what it is good at.
+            delta = corrected - self.pose
+            c, sn = math.cos(self.yaw), math.sin(self.yaw)
+            along, across = delta[0] * c + delta[1] * sn, -delta[0] * sn + delta[1] * c
+            if self.last_t - self.good_loc_t > p["loc_lost_after"]:
+                along, across = 0.5 * along, 0.5 * across      # match lost: the map is all there is
+            else:
+                along, across = p["loc_gain_along"] * along, p["loc_gain_across"] * across
+            step = np.array([along * c - across * sn, along * sn + across * c])
+            n = float(np.linalg.norm(step))
+            if n > p["loc_max_step"]:
+                step *= p["loc_max_step"] / n                  # the car cannot teleport
+            self.pose = self.pose + step
         # how fast the map says the car is moving: the distance between two well matched poses.
         # Only a confident match counts, so a poor one never slows the car by mistake.
         if matched >= 5 and self.last_dt > 0.01:
@@ -1006,7 +1031,8 @@ class Racer(Node):
             what, detail = "map closed, waiting for the cone ordering", "%d cones" % len(self.slam.lhat)
         else:
             what = "racing on " + ("the reactive follower (localisation lost)" if self.local_mode else ("MPC" if self.mpc else "pure pursuit"))
-            detail = "lap %d" % max(len(self.lap_times) - 1, 0)
+            asked = float(self.race_v[self.race_idx]) if self.race_v is not None and len(self.race_v) else 0.0
+            detail = "lap %d | %.1f of %.1f m/s" % (max(len(self.lap_times) - 1, 0), self.odo_speed, asked)
         flags = []
         if self.halted:
             flags.append("stopped")

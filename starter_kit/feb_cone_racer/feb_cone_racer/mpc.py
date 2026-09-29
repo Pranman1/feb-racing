@@ -141,6 +141,10 @@ class BicycleMPC:
         # variable bounds
         lbz = np.tile([-np.inf, -np.inf, -np.inf, 0.0, -5.0, -10.0, -p["max_steer"]], N + 1)
         ubz = np.tile([np.inf, np.inf, np.inf, p["v_cap"], 5.0, 10.0, p["max_steer"]], N + 1)
+        # the first column is the car as it is, pinned to the measurement by the first equality,
+        # not something to be shaped. Leaving the racing bounds on it makes the problem
+        # infeasible the moment the car is over the speed cap, which is when a plan matters most.
+        lbz[:7], ubz[:7] = -np.inf, np.inf
         lbu = np.tile([-p["max_steer"], 0.0], N)
         ubu = np.tile([p["max_steer"], p["tau_max"]], N)
         self.lbx, self.ubx = np.concatenate([lbz, lbu]), np.concatenate([ubz, ubu])
