@@ -265,7 +265,10 @@ class Racer(Node):
         if len(cones) >= 2 or sum(1 for x, y in clusters if x > -0.5 and math.hypot(x, y) < 6.0) >= 2:
             self.last_seen_t = t
         if self.mode == "ORDERING":
-            steer, throttle = self.follow_local(clusters, cones, dt)
+            # the wait is driven as the lap was: on the local path, whose rungs do not age now
+            # that the map is closed. (The reactive follower alone swerved here on a track whose
+            # lanes run side by side, and put the car on a cone before the race began.)
+            steer, throttle = self.follow_rungs(clusters, dt, p["order_timeout"]) or self.follow_local(clusters, cones, dt)
             self.ordering_step()
         elif self.mode == "MAPPING":
             self.mapping_step(z_rel, colours, weights)
@@ -605,14 +608,14 @@ class Racer(Node):
         self.rungs[side] = np.array([[q.position.x, q.position.y] for q in msg.poses]).reshape(-1, 2)
         self.rungs["t"] = self.last_t if self.last_t is not None else -1e9
 
-    def follow_rungs(self, clusters, dt):
+    def follow_rungs(self, clusters, dt, max_age=None):
         """Lap one the way the car does it: the cone ordering runs live on the growing map and
         its rungs give a local path (the rung midpoints, map frame). Pure pursuit on the first
         midpoint ahead of the car beyond the lookahead. None when the rungs are stale or empty,
         and the reactive follower takes over."""
         p = self.p
         b, y = self.rungs["blue"], self.rungs["yellow"]
-        if b is None or y is None or self.last_t - self.rungs["t"] > p["rung_max_age"]:
+        if b is None or y is None or self.last_t - self.rungs["t"] > (max_age or p["rung_max_age"]):
             return None
         n = self.corridor_prefix(b, y)
         if n < 2:
