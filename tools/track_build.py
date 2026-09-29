@@ -41,6 +41,8 @@ import cv2
 import numpy as np
 import yaml
 
+import track_paint
+
 FREE_THRESHOLD = 250      # grey level at or above which a pixel is drivable (ROS maps: 254 free, 205 unknown, 0 wall)
 MIN_ISLAND_AREA = 1.0     # square metres; smaller holes in the corridor are map noise and get filled
 SIMPLIFY_PX = 0.75        # polyline simplification tolerance in pixels
@@ -313,8 +315,6 @@ def build_track(folder):
         "spawn": spawn,
         "walls": [],
         "cones": [],
-        # the corridor's two edges, resampled: the app paints the asphalt between them
-        "edges": [frame.to_map(resample_closed(simplify(c), 0.25 / frame.res)).round(3).flatten().tolist() for c in (outer, hole)],
     }
     if "walls" in cfg:
         diameter = float(cfg["walls"].get("diameter", 0.33))
@@ -329,6 +329,12 @@ def build_track(folder):
         else:
             track["cones"] = build_cones(outer, hole, ccw, float(cfg["cones"].get("spacing", 1.0)), frame,
                                          finish=checkpoints[0], start_cones=bool(cfg["cones"].get("start_cones", True)))
+    # the asphalt: its two edges, from the cones or walls just placed (tools/track_paint.py)
+    left, right = track_paint.paint(track)
+    faults = track_paint.check(track, left, right)
+    if faults:
+        print("  paint: " + "; ".join(faults))
+    track["paint_left"], track["paint_right"] = left.round(3).flatten().tolist(), right.round(3).flatten().tolist()
     return track, mask, frame
 
 
