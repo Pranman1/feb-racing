@@ -334,6 +334,23 @@ ghost, cones, the track menu, 2-car spawning with the RCT. All compile; expect s
 - Parallel validation (done): `FEB_DEVKIT_NAME` and `FEB_FOXGLOVE_PORT` in `feb-sim` let several devkits run side by side, one simulator window each on its own bridge port; three at once run at real-time factor 0.92-1.00 on this PC, so the 17-track pass takes about 70 minutes instead of 3.4 hours (scratchpad `run_pass.sh` / `racer_batch_par.sh`).
 - NEXT (agreed, once driving works everywhere): asphalt drawn as a ring between the two corridor edges instead of a strip along the centreline (the strip leaves notches at sharp corners on the Formula Student layouts).
 
+## 2026-09-29 (afternoon): road paint, crowded cones, two racer fixes, simulator v0.4.0
+
+Simulator and tracks
+- The asphalt is drawn between two edges stored in each track file (`paint_left`, `paint_right`, written by `tools/track_paint.py` from the cones and walls themselves; `track_build.py` writes them for new tracks). All 28 tracks pass the tool's checks. `--no-hud` hides the lap panel for photographs.
+- Imported layouts had cones standing inside each other (a cone listed twice on `fs_bone`, `fsg`, `fsi`; pairs of start cones squeezed together by the scaling on five more). In the simulator they pushed each other over. `track_build.py` now keeps one of any such group (`standing_room`); 18 cones removed from 8 tracks. The `cones.json` sources are as they were.
+- Released as v0.4.0 for Linux, Mac and Windows.
+
+Racer
+- Waiting for the cone ordering (the half second between the map closing and the race) the car was handed to the reactive follower alone, which on hairpins swerved into a cone. It now drives on the local path, as on the lap.
+- Race start. Where the mapping lap closes the map has a seam (0.5 to 3 m on the 600 m hairpins track: the cones behind the start line are placed from the end of the lap, those ahead of it from the beginning), and the start straight there has cones at an even 1.25 m, so the map match sits as well one or two cones along. Measured against the truth, the car began the race 1.5 to 3 m behind where it believed in 4 of 5 starts, braked that much late and cleared the first corner by 0.2 m, or hit it (2 of 6 starts). After the map match is confirmed the car now keeps to the speed of the plan's slowest corner, which needs no braking point, until the raceline has turned 0.8 rad (`pin_turn`), then comes up to the plan over `start_ramp`. First corner cleared by 0.6 to 0.9 m since. The first racing lap is a few seconds slower (hairpins 108 s against 100 s).
+- A search for a unique place on the map at the start (cones within 0.25 m, no other placement close) was tried first and dropped: it found none in 8 s on two starts and a wrong one, 3.3 m off, on a third.
+- Full pass with both fixes, 17 of 17 clean, no cone touched, laps within 0.2 s of the plan: loop 7.5, small track 9.3, rectangle 10.4, boa 10.7, peanut 11.9, esses 12.0, bone 13.5, FSI 21.1, circuit 25.5, FSG 28.2, comp 2021 34.3, Spielberg 52.4, Interlagos 54.1, Monza 66.3, Silverstone 70.9, Spa 84.4, hairpins 100.3 s.
+
+Not fixed
+- Interlagos, mapping lap: at the hairpin where the neighbouring section runs 1.2 m outside it (blue cones facing blue cones) the reactive follower sometimes chains onto the neighbour's cones, drives straight on and cuts across; the map is then short and the race is on a bad line. 1 of 3 full runs today, 3 of 16 starts just before that corner on the new simulator, 0 of 16 on the previous release (not a significant difference; cone colours are read no worse on the new paint, 6% wrong against 10%).
+- Hairpins, racing laps: the same seam and even spacing let the match slip a cone forward on the start straight in some laps; the car then turns in early and passes the first corner's inside cone at 0.2 m instead of 0.9 m. No hit in any run so far. The cure is a loop closure that leaves no seam.
+
 ## 2026-09-29: the racing half rebuilt, 17 of 17 tracks clean
 
 The throttle hunting and the clipped cones were one fault. The wheel encoders measure the

@@ -28,9 +28,9 @@ The first build imports the whole project (30 to 90 minutes); later builds take 
 Logs are in `Logs/`. Package the players for the release page:
 
 ```bash
-tar -C Builds/linux --exclude=./runs -czf FEB-Simulator-linux.tar.gz .
+tar -C Builds/linux --exclude=./runs --exclude="./FEB Simulator_BurstDebugInformation_DoNotShip" -czf FEB-Simulator-linux.tar.gz .
 (cd Builds/mac && zip -qr ../../FEB-Simulator-mac.zip "FEB Simulator.app")
-(cd Builds/windows && zip -qr ../../FEB-Simulator-windows.zip .)
+(cd Builds/windows && zip -qr ../../FEB-Simulator-windows.zip . -x "FEB Simulator_BurstDebugInformation_DoNotShip/*")
 ```
 
 Upload the three archives to a GitHub release of `feb-racing`; `feb-sim setup` downloads
@@ -54,4 +54,5 @@ Command-line options of the built app (Unity's own `-batchmode -nographics -logF
 ```
 --track <name|folder>   --connect <host:port>   --mode manual|autonomous
 --lidar-hz <rate>       --cars <n>              --camera <name>         --look visual|simple
+--picker                --no-hud
 ```
