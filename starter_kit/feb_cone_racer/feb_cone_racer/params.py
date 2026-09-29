@@ -29,7 +29,7 @@ RACE = dict(
     mpc_a_lat=5.8,            # m/s^2 of cornering it may plan (soft)
     mpc_steer_rate=2.9,       # rad/s, nine tenths of the servo's
     max_steer=MAX_STEER,
-    v_cap=6.2,                # m/s ceiling on the planned speed; lowered to the plan's own top speed plus a margin
+    v_cap=12.0,               # m/s ceiling on the planned speed; lowered at startup to v_max plus a margin
     w_lat=12.0,               # error across the raceline
     w_lon=1.0,                # error along it
     w_head=4.0,
@@ -43,6 +43,6 @@ RACE = dict(
     w_slack=50.0,
     act_delay=ACT_DELAY,
     throttle_min=0.02,        # never zero while racing: zero locks the wheels
-    throttle_max=0.32,        # 8 m/s of wheel speed
+    throttle_max=0.45,        # 11 m/s of wheel speed
     pursuit_lookahead=0.9,
 )
