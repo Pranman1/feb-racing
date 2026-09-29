@@ -81,6 +81,7 @@ class RaceController:
         self.failures = 0
         self.solve_ms = 0.0
         self.speed_scale = 1.0           # share of the plan's speed to ask for (less while the car drives blind)
+        self.speed_cap = 99.0            # m/s, the most to ask for whatever the plan says (the start of the race)
         self.info = {}
 
     def set_raceline(self, line, speed):
@@ -120,7 +121,7 @@ class RaceController:
         ref = np.zeros((5, N))
         s, v = s0, v0
         for k in range(N):
-            v_plan = self.speed_scale * float(self.line.at(s + max(v, 0.5) * DT)[3])
+            v_plan = min(self.speed_scale * float(self.line.at(s + max(v, 0.5) * DT)[3]), self.speed_cap)
             v_next = float(np.clip(v_plan, v - p["mpc_a_brake"] * DT, v + p["mpc_a_acc"] * DT))
             v_next = max(v_next, 0.3)
             s += 0.5 * (v + v_next) * DT
@@ -175,7 +176,7 @@ class RaceController:
         c, s = math.cos(-z0[2]), math.sin(-z0[2])
         lx, ly = c * dx - s * dy, s * dx + c * dy
         steer = float(np.clip(math.atan(2.0 * WHEELBASE * ly / max(lx * lx + ly * ly, 0.09)), -MAX_STEER, MAX_STEER))
-        v_goal = 0.75 * self.speed_scale * float(v_plan)
+        v_goal = min(0.75 * self.speed_scale * float(v_plan), self.speed_cap)
         force = float(np.clip((v_goal - z0[3]) / 0.4, -self.p["mpc_a_brake"], self.p["mpc_a_acc"])) + DRAG * z0[3]
         throttle = float(np.clip(throttle_for(z0[3], force), self.p["throttle_min"], self.p["throttle_max"]))
         self.uprev = np.array([force, 0.0])

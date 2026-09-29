@@ -136,12 +136,10 @@ Parameters are in `config/racer.yaml` and, for the racing half, `feb_cone_racer/
 192 by 108 pixels and a cone beyond 4 m is a few pixels, so a blob only colours a cone for the map
 if it is brighter than the ground (a dark speck in the right hue used to hand a lidar cone the
 wrong colour one time in ten); dim blobs still colour cones for driving, votes carry per tracked
-cone, and a reading from far away counts for less. In testing it maps `loop_cones` in 31 s and then
-laps it in 22 to 23 s (it brushes a cone once or twice in a 6-minute run and backs off), and
-maps `spielberg_cones` (342 m, 292 cones) in 5 minutes and then laps it in about 200 s without
-touching one. `race_speed_scale` (0.6) is the knob to
-turn up, and where the work is: at 0.7 the map match starts slipping at speed and cones get
-touched, so faster laps mean better localisation and tracking, not a bigger number.
+cone, and a reading from far away counts for less. In testing (2026-09-29, every run with its own mapping lap) it laps
+all seventeen cone tracks without touching a cone, each lap within 0.2 s of its plan: the loop in
+7.6 s after a 36 s mapping lap, comp 2021 in 37.3 s, Spa in 96.4 s. `v_max` and `a_lat` in
+`config/racer.yaml` are the knobs for more speed; the measured limits are in `vehicle.py`.
 
 ### Taking the racer to the real car: `calibrate_camera`
 

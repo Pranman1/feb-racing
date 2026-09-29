@@ -334,6 +334,71 @@ ghost, cones, the track menu, 2-car spawning with the RCT. All compile; expect s
 - Parallel validation (done): `FEB_DEVKIT_NAME` and `FEB_FOXGLOVE_PORT` in `feb-sim` let several devkits run side by side, one simulator window each on its own bridge port; three at once run at real-time factor 0.92-1.00 on this PC, so the 17-track pass takes about 70 minutes instead of 3.4 hours (scratchpad `run_pass.sh` / `racer_batch_par.sh`).
 - NEXT (agreed, once driving works everywhere): asphalt drawn as a ring between the two corridor edges instead of a strip along the centreline (the strip leaves notches at sharp corners on the Formula Student layouts).
 
+## 2026-09-29: the racing half rebuilt, 17 of 17 tracks clean
+
+The throttle hunting and the clipped cones were one fault. The wheel encoders measure the
+wheels, the throttle sets the wheel speed at once, so the "speed" the MPC was regulating was its
+own throttle coming back a tick late, and a loop closed on that with a high gain oscillates.
+Everything else followed from it: the swinging throttle slipped the wheels, dead reckoning ran
+ahead and behind on them, the map match slipped a cone, the car turned in late.
+
+Measured on the car (`starter_kit/feb_cone_racer/tools/dynid.py` records, `tools/dynfit.py`
+checks the model in `feb_cone_racer/vehicle.py` against it):
+
+| | value |
+|---|---|
+| wheel speed per unit throttle | 25.1 m/s, at once |
+| tyre force along the car | 50 m/s^2 per unit of slip, peak 7.2 at 15% slip, 5.4 sliding |
+| lifting off or throttle zero | the same curve braking: 5.4 m/s^2 plus drag, not more |
+| body drag | 0.273 x speed |
+| cornering | kinematic to 1% (rear slip angle 0.2 degrees at 6.2 m/s^2), lets go at 6.3, ploughs at 5 |
+| steering | 3.2 rad/s slew |
+| command to effect | 0.12 s, steering and throttle alike |
+| `/odom` | is the simulator's truth (body velocity and pose): for test rigs only |
+
+What races now (tag `racer-works-2026-09-29`): body speed from the encoders
+through the tyre curve; dead reckoning of the rear axle corrected by the map match; an MPC on a
+kinematic bicycle with tyre-force and steering-rate inputs (the team's own formulation), with
+the actuation delay and a reference rolled out from the car's own speed; throttle from the
+planned force through the inverse tyre curve. `python3 -m feb_cone_racer.bench <track.json>`
+runs the controller against the modelled car offline in ten seconds, and
+`tools/oracle_race.py` runs it in the simulator on the true pose.
+
+Full pass, every run with its own mapping lap, `v_max` 5.9, `a_lat` 5.0:
+
+| track | mapping lap | racing laps | lap | plan | hits | nearest cone |
+|---|---|---|---|---|---|---|
+| loop | 36 s | 12 | 7.6 s | 7.7 | 0 | 0.73 m |
+| small track | 48 s | 10 | 9.7 s | 9.7 | 0 | 0.72 m |
+| rectangle | 54 s | 9 | 10.9 s | 11.0 | 0 | 0.69 m |
+| boa constrictor | 51 s | 9 | 11.1 s | 11.1 | 0 | 0.70 m |
+| peanut | 56 s | 8 | 11.9 s | 11.9 | 0 | 0.69 m |
+| esses | 69 s | 9 | 12.6 s | 12.6 | 0 | 0.70 m |
+| bone | 66 s | 8 | 13.6 s | 13.6 | 0 | 0.61 m |
+| FSI | 125 s | 6 | 22.6 s | 22.6 | 0 | 0.71 m |
+| circuit | 140 s | 5 | 26.9 s | 26.9 | 0 | 0.79 m |
+| FSG | 179 s | 5 | 30.7 s | 30.6 | 0 | 0.66 m |
+| comp 2021 | 190 s | 5 | 37.3 s | 37.2 | 0 | 0.72 m |
+| Spielberg | 358 s | 4 | 59.7 s | 59.8 | 0 | 0.71 m |
+| Interlagos | 357 s | 4 | 61.0 s | 61.0 | 0 | 0.75 m |
+| Monza | 461 s | 4 | 76.5 s | 76.5 | 0 | 0.70 m |
+| Silverstone | 480 s | 4 | 80.2 s | 80.2 | 0 | 0.80 m |
+| Spa | 588 s | 3 | 96.4 s | 96.5 | 0 | 0.72 m |
+| hairpins | 613 s | 3 | 111.7 s | 111.6 | 0 | 0.26 m |
+
+The loop was repeated six times: six clean, 10 to 13 laps each, 7.55 to 7.80 s. Two days ago
+the same laps were 9.0 to 9.2 s with most runs ending against a cone; comp 2021 was 69 s,
+Spa 215 s. Video of a whole loop run: `runs/videos/feb_loop_mapping_plus_12_laps.mp4`.
+
+Hairpins stopped at the race start on the first pass: the mapping lap had ended beside a cone
+with the map not matching (0 of 10 cones), and the racing laps set off at racing pace
+regardless. The racing laps now hold the mapping lap's pace until the map match is confirmed,
+look for the car on the map if it is not, and come up to pace over 2.5 s; the row above is the
+run after that change, and loop, comp 2021 and rectangle were rerun with it and are unchanged.
+
+Where more speed is: the bench says `v_max` 7.0 is clean (comp 2021 in 33.9 s), 8.0 starts to
+slide into corners. The mapping lap is now most of a short run (36 s against 7.7 s laps).
+
 ## 2026-09-28: what the car actually is, and why it was crashing
 
 Measured on the car rather than assumed. `starter_kit/feb_cone_racer/tools/longid.py` drives

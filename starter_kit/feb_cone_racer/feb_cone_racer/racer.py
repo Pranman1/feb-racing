@@ -71,6 +71,7 @@ DEFAULTS = dict(
     loc_lost_after=3.0,       # s without a map match before the car is looked for anywhere on the map
     blind_speed=0.5,          # share of the plan's speed driven while blind or unmatched
     give_up_after=8.0,        # s blind or unmatched before the car stops
+    start_ramp=2.5,           # s over which the racing laps come up to the plan's pace once the map match is confirmed
     debug=False,
     # racing: raceline, speed plan and MPC (params.py)
     **RACE,
@@ -127,6 +128,9 @@ class Racer(Node):
         self.race_yaw = None             # heading at the previous racing scan
         self.race_s = None               # progress along the raceline at the previous racing scan
         self.icp_track = []              # (time, position the map match gave): is the car going anywhere?
+        self.matched_run = 0             # racing scans in a row with a good map match
+        self.race_ready_t = None         # when the map match was first confirmed on the racing laps
+        self.still_since = None          # since when the lidar scene has stood still
         # control state
         self.steer = 0.0
         self.throttle = 0.0
@@ -479,6 +483,7 @@ class Racer(Node):
         self.ctl.set_raceline(line, v)
         self.body.v = max(self.speed, 0.0)
         self.enc_prev, self.race_yaw, self.race_s, self.icp_track = None, self.yaw, None, []
+        self.matched_run, self.race_ready_t, self.still_since = 0, None, None
         self.mode = "RACING"
         self.lap_start_t = self.last_t
         self.good_loc_t = self.last_seen_t = self.reloc_t = self.last_t
@@ -821,6 +826,11 @@ class Racer(Node):
         z_rel = np.array([[ahead[0] * x - ahead[1] * y, ahead[1] * x + ahead[0] * y] for x, y, c in obs]).reshape(-1, 2)
         colours = np.array([c for _, _, c in obs], dtype=int)
         matched = self.localise(t, z_rel, colours)
+        self.matched_run = self.matched_run + 1 if matched >= 4 else 0
+        if self.race_ready_t is None and self.matched_run >= 3:
+            self.race_ready_t = t
+            self.get_logger().info("map match confirmed: %d of %d cones, racing pace from here" % (matched, len(z_rel)))
+        self.still_since = (self.still_since or t) if self.scene_still() and self.body.v > 0.5 else None
         if len(cones) >= 2 or sum(1 for x, y in clusters if x > -0.5 and math.hypot(x, y) < 6.0) >= 2:
             self.last_seen_t = t
         if matched >= 3 or len(z_rel) < 3:
@@ -836,16 +846,24 @@ class Racer(Node):
         if self.stuck(t):
             self.halt("not moving with the wheels turning")
             return 0.0, 0.0
-        if lost > p["loc_lost_after"] and len(z_rel) >= 4 and t - self.reloc_t > 1.0:
-            self.reloc_t = t                        # look for the car anywhere on the map
-            found = self.slam.relocalise(z_rel, colours)
+        searching = self.race_ready_t is None and matched < 3       # the race has not found itself on the map yet
+        if (searching or lost > p["loc_lost_after"]) and len(z_rel) >= 4 and t - self.reloc_t > (0.3 if searching else 1.0):
+            self.reloc_t = t                        # look for the car on the map: near where it thinks it is first
+            found = self.slam.relocalise(z_rel, colours, near=self.pose, radius=3.0) if searching else self.slam.relocalise(z_rel, colours)
             if found is not None:
                 self.get_logger().info("relocalised: map position moved %.1f m" % np.linalg.norm(found - self.pose))
                 self.pose, self.good_loc_t = found, t
                 self.ctl.s = None
-        # all of the plan while the map is matching, a share of it while the car drives on dead
+        # how much of the plan to ask for. None of it beyond the mapping lap's pace until the map
+        # match is confirmed (the mapping lap can end beside a cone, a little off the map), then
+        # up to all of it over `start_ramp`; a share of it while the car drives on dead
         # reckoning alone
-        self.ctl.speed_scale = 1.0 if max(blind, lost) < p["lost_after"] else p["blind_speed"]
+        if self.race_ready_t is None:
+            self.ctl.speed_cap, self.ctl.speed_scale = p["map_speed"], 1.0
+        else:
+            self.ctl.speed_cap = 99.0
+            ramp = float(np.clip((t - self.race_ready_t) / p["start_ramp"], 0.0, 1.0))
+            self.ctl.speed_scale = (0.4 + 0.6 * ramp) * (1.0 if max(blind, lost) < p["lost_after"] else p["blind_speed"])
         rear = self.pose - AXLE_TO_LIDAR * ahead
         steer, throttle = self.ctl.step(t, rear[0], rear[1], self.yaw, v, self.delta)
         if self.ctl.info.get("Z") is not None:
@@ -880,11 +898,26 @@ class Racer(Node):
             self.icp_track = [e for e in self.icp_track if t - e[0] < 4.0]
         return matched
 
+    def scene_still(self):
+        """True when the lidar sees the same cones in the same places as a scan ago: most of
+        them within 4 cm. (Matching cones between scans says little about how fast the car
+        moves, at speed one cone is taken for the next; that nothing has moved at all is a
+        statement it can make.)"""
+        cur = np.array(self.clusters_now, float).reshape(-1, 2)
+        prev, self.prev_clusters = self.prev_clusters, cur
+        if prev is None or len(prev) < 3 or len(cur) < 3:
+            return False
+        near = np.min(np.linalg.norm(cur[:, None, :] - prev[None, :, :], axis=2), axis=1)
+        return bool(np.sum(near < 0.04) >= max(3, 0.7 * len(cur)))
+
     def stuck(self, t):
-        """True when the map match has placed the car within 0.3 m of the same spot for three
-        seconds while the wheels turn: it is against something."""
+        """True when the car is against something: the wheels turn, and either the lidar scene
+        has stood still for three seconds, or the map match has placed the car within 0.3 m of
+        the same spot for that long."""
         if self.body.v < 0.5 and self.throttle < 0.05:
             return False
+        if self.still_since is not None and t - self.still_since > 3.0:
+            return True
         old = [e for e in self.icp_track if t - e[0] > 3.0]
         recent = [e for e in self.icp_track if t - e[0] <= 3.0]
         if not old or len(recent) < 10:
