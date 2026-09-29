@@ -231,6 +231,23 @@ def build_walls(mask, radius_px, frame):
     return [w for w in loops if cv2.arcLength(w.astype(np.float32), True) >= MIN_WALL_LENGTH]
 
 
+CONE_PLATE = {"orange": 0.238}           # side of a cone's base plate (m): the big start cones, else
+SMALL_PLATE, CONE_GAP = 0.139, 0.02      # the small ones; and the least gap between two plates
+
+
+def standing_room(cones):
+    """The cones that have room to stand. A real layout scaled down to our corridor has cones
+    closer together than their plates are wide (its pairs of start cones, a cone listed twice),
+    and in the simulator those push each other over. Of cones in each other's way one is kept:
+    a start cone before a boundary cone, otherwise the first listed."""
+    plate = lambda c: CONE_PLATE.get(c["color"], SMALL_PLATE)      # noqa: E731
+    kept = []
+    for c in sorted(cones, key=lambda c: c["color"] != "orange"):
+        if all(math.hypot(c["x"] - k["x"], c["y"] - k["y"]) >= 0.5 * (plate(c) + plate(k)) + CONE_GAP for k in kept):
+            kept.append(c)
+    return [c for c in cones if any(c is k for k in kept)]
+
+
 def build_cones(outer, hole, ccw, spacing_m, frame, finish=None, start_cones=True):
     """Cones along both corridor edges: blue on the driver's left, yellow on the right, and,
     as in FSAE, two big orange cones on each side of the finish line (a metre apart along the
@@ -323,9 +340,10 @@ def build_track(folder):
         track["walls"] = [{"points": w.round(3).flatten().tolist()}
                           for w in build_walls(mask, diameter / 2 / frame.res, frame)]
     if "cones" in cfg:
-        if "from" in cfg["cones"]:          # a real layout: the cones exactly where they stand
+        if "from" in cfg["cones"]:          # a real layout: the cones where they stand, those that have the room
             given = json.loads((folder / cfg["cones"]["from"]).read_text())
-            track["cones"] = [{"x": round(float(c["x"]), 3), "y": round(float(c["y"]), 3), "color": str(c["color"])} for c in given]
+            track["cones"] = standing_room([{"x": round(float(c["x"]), 3), "y": round(float(c["y"]), 3), "color": str(c["color"])}
+                                            for c in given])
         else:
             track["cones"] = build_cones(outer, hole, ccw, float(cfg["cones"].get("spacing", 1.0)), frame,
                                          finish=checkpoints[0], start_cones=bool(cfg["cones"].get("start_cones", True)))
