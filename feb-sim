@@ -6,6 +6,8 @@
     ./feb-sim run --stack "..." --opponent normal    race the house racer (slow | normal | fast | map)
     ./feb-sim practice --stack "..."      scored attempt (warm-up + 10 laps, 10 s per collision)
     ./feb-sim submit                     post the latest practice result to the leaderboard
+    ./feb-sim ros                        the devkit as a plain ROS 2 workspace: no bridge, a shell
+    ./feb-sim ros --gui --apps turtlesim rviz2 and turtlesim on a desktop in the browser (localhost:6080)
     ./feb-sim shell                      a ROS 2 shell inside the running devkit container
     ./feb-sim stop                       stop the devkit container
     ./feb-sim setup                      check Docker and fetch the simulator app for this OS
@@ -41,6 +43,13 @@ PROXY = "feb-proxy"
 PORT = int(os.environ.get("FEB_DEVKIT_PORT", 4567))   # override when another bridge holds 4567 on this machine
 OPPONENT_PORT = 4566
 FOXGLOVE_PORT = int(os.environ.get("FEB_FOXGLOVE_PORT", 8765))   # foxglove_bridge inside the devkit: live topics for the Foxglove app on the laptop
+VNC_PORT = int(os.environ.get("FEB_VNC_PORT", 6080))             # the gui image's web desktop (noVNC's usual port)
+GUI_IMAGE = os.environ.get("FEB_DEVKIT_GUI_IMAGE", IMAGE.rsplit(":", 1)[0] + ":gui")
+APPS = {                                  # --apps shorthands; anything else is run as given
+    "rviz": "rviz2 -d /home/autodrive_devkit/rviz/default.rviz",
+    "turtlesim": "ros2 run turtlesim turtlesim_node",
+    "rqt": "rqt",
+}
 PROXY_PORT = 4565
 OPPONENT_SPEED = {"slow": 1.5, "normal": 2.0, "fast": 2.5}   # the lidar house racer's max_speed
 MAP_OPPONENT_SPEED = 2.5                                      # --opponent map: the map-following driver
@@ -78,6 +87,8 @@ def cmd_update(_):
     if (ROOT / ".git").exists():
         subprocess.run(["git", "-C", str(ROOT), "pull", "--ff-only"], check=False)
     subprocess.run(["docker", "pull", IMAGE], check=False)
+    if subprocess.run(["docker", "image", "inspect", GUI_IMAGE], capture_output=True).returncode == 0:
+        subprocess.run(["docker", "pull", GUI_IMAGE], check=False)      # only for those who use the desktop
     latest = latest_release_stamp()
     if latest is None:
         print("could not reach GitHub to check the app; kept the installed one")
@@ -269,6 +280,56 @@ def cmd_shell(_):
                          "source /opt/ros/humble/setup.bash; source install/setup.bash; exec bash"])
 
 
+# ------------------------------------------------------------------ ros: the devkit on its own
+
+def cmd_ros(args):
+    """The devkit as a plain ROS 2 workspace: no simulator, no bridge. Builds the mounted source
+    and either runs --launch or gives a shell. With --gui the gui image serves a desktop as a web
+    page (rviz2, rqt, turtlesim, anything with a window), the same on every OS."""
+    src = pathlib.Path(args.src).resolve() if args.src else STACK
+    if not src.is_dir():
+        fail(f"{src} is not a folder")
+    src.mkdir(exist_ok=True)
+    if container_running():
+        subprocess.run(["docker", "rm", "-f", CONTAINER], capture_output=True)
+    apps = []
+    for name in (args.apps or "").replace(",", " ").split():
+        apps.append(APPS.get(name, name))
+    if args.gui and "rviz2" not in " ".join(apps) and not args.no_rviz:
+        apps.insert(0, APPS["rviz"])
+    image = GUI_IMAGE if args.gui else IMAGE
+    cmd = ["docker", "run", "-d", "--rm", "--name", CONTAINER, "-p", f"{FOXGLOVE_PORT}:8765",
+           "-e", "ROS_LOCALHOST_ONLY=1", "-e", "FEB_BRIDGE=0",
+           "-v", f"{src}:/home/autodrive_devkit/src/stack",
+           "-e", f"FEB_LAUNCH={args.launch or ''}"]
+    if args.gui:
+        cmd += ["-p", f"{VNC_PORT}:6080", "-e", "FEB_GUI=1", "-e", "FEB_APPS=" + "; ".join(apps)]
+    cmd.append(image)
+    print(f"starting devkit ({image}), source {src} ...")
+    if subprocess.run(cmd, stdout=subprocess.DEVNULL).returncode != 0:
+        fail("docker run failed (see above)")
+    if args.gui:
+        url = f"http://localhost:{VNC_PORT}/vnc.html?autoconnect=1&resize=remote"
+        deadline = time.time() + 180
+        while time.time() < deadline:
+            if not container_running():
+                subprocess.run(["docker", "logs", CONTAINER])
+                fail("devkit container exited, see log above")
+            with socket.socket() as s:
+                s.settimeout(0.5)
+                if s.connect_ex(("127.0.0.1", VNC_PORT)) == 0:
+                    break
+            time.sleep(1)
+        print(f"desktop: {url}")
+        import webbrowser
+        webbrowser.open(url)
+    if args.launch:
+        print(f"running: {args.launch}   (feb-sim logs -f to watch, feb-sim stop to end)")
+        return
+    print("shell inside the devkit (exit leaves the container running; feb-sim stop ends it)")
+    cmd_shell(args)
+
+
 # ------------------------------------------------------------------ run
 
 def resolve_track(name):
@@ -404,6 +465,13 @@ def main():
     setup.add_argument("--team")
     sub.add_parser("update", help="git pull, newer devkit image, newer simulator app").set_defaults(func=cmd_update)
     setup.set_defaults(func=cmd_setup)
+    ros = sub.add_parser("ros", help="the devkit as a plain ROS 2 workspace (no simulator, no bridge)")
+    ros.add_argument("--gui", action="store_true", help="a desktop in the browser (rviz2, rqt, turtlesim): the gui image")
+    ros.add_argument("--apps", help='windows to open on the desktop: rviz, rqt, turtlesim, or any command; e.g. "turtlesim rqt"')
+    ros.add_argument("--no-rviz", action="store_true", help="do not open rviz2 on the desktop")
+    ros.add_argument("--launch", help='run this instead of giving a shell, e.g. "ros2 launch my_pkg thing.launch.py"')
+    ros.add_argument("--src", help="folder of packages to mount and build (default: ./stack)")
+    ros.set_defaults(func=cmd_ros)
     for name, func in (("shell", cmd_shell), ("stop", cmd_stop)):
         sub.add_parser(name).set_defaults(func=func)
     logs = sub.add_parser("logs", help="the devkit's log (build, bridge, your stack); -f follows")

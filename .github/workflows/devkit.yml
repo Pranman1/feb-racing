@@ -25,3 +25,14 @@ jobs:
           tags: ghcr.io/${{ steps.owner.outputs.owner }}/feb-devkit:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      # the gui tag: the image just pushed plus ros-humble-desktop and a desktop served as a web
+      # page (feb-sim ros --gui). Built second because its Dockerfile starts FROM :latest.
+      - uses: docker/build-push-action@v6
+        with:
+          context: devkit
+          file: devkit/Dockerfile.gui
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/${{ steps.owner.outputs.owner }}/feb-devkit:gui
+          cache-from: type=gha,scope=gui
+          cache-to: type=gha,mode=max,scope=gui

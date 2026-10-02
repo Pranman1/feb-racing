@@ -1,7 +1,7 @@
 # Plan: the devkit as a general ROS 2 environment
 
-Status: agreed in principle on 2026-10-01, not started. Nothing here changes how `feb-sim run`
-works today; the simulator and the league contract stay exactly as they are.
+Status: done on 2026-10-01; the how-to is `docs/ros-devkit.md`. Nothing here changed how `feb-sim run`
+works; the simulator and the league contract stay exactly as they were.
 
 ## What the devkit is now
 
