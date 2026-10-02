@@ -12,4 +12,4 @@ grep -q rootCommand ~/.fluxbox/init 2>/dev/null || echo 'session.screen0.rootCom
 fluxbox >/dev/null 2>&1 &
 x11vnc -display :1 -nopw -forever -shared -quiet -rfbport 5900 -localhost >/dev/null 2>&1 &
 websockify --web=/usr/share/novnc 6080 localhost:5900 >/dev/null 2>&1 &
-echo "web desktop on port 6080 (open http://localhost:6080/vnc.html?autoconnect=1&resize=remote)"
+echo "web desktop on port 6080 (open http://localhost:6080/vnc.html?autoconnect=1&resize=scale)"

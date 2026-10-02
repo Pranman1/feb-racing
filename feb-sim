@@ -309,7 +309,7 @@ def cmd_ros(args):
     if subprocess.run(cmd, stdout=subprocess.DEVNULL).returncode != 0:
         fail("docker run failed (see above)")
     if args.gui:
-        url = f"http://localhost:{VNC_PORT}/vnc.html?autoconnect=1&resize=remote"
+        url = f"http://localhost:{VNC_PORT}/vnc.html?autoconnect=1&resize=scale"
         deadline = time.time() + 180
         while time.time() < deadline:
             if not container_running():
