@@ -93,7 +93,7 @@ and flags the result. Everything must start from the container's entrypoint, not
 6. **Site and images.** Nothing to do: pushes to `main` rebuild the site and, when `devkit/`
    changes, the devkit image (`ghcr.io/pranman1/feb-devkit`) and its `gui` tag, the one with a
    desktop in the browser for rviz2, rqt and turtlesim (`feb-sim ros --gui`, see
-   `docs/ros-devkit.md`).
+   `docs/devkit.md`).
 
 ## Where things are on the organiser PC
 

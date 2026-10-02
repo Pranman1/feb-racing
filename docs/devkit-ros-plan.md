@@ -1,6 +1,6 @@
 # Plan: the devkit as a general ROS 2 environment
 
-Status: done on 2026-10-01; the how-to is `docs/ros-devkit.md`. Nothing here changed how `feb-sim run`
+Status: done on 2026-10-01; the how-to is `docs/devkit.md`. Nothing here changed how `feb-sim run`
 works; the simulator and the league contract stay exactly as they were.
 
 ## What the devkit is now
@@ -42,7 +42,7 @@ foxglove_bridge, run `FEB_LAUNCH`. Everything else is general.
 
 4. **A saved rviz layout** in `devkit/rviz/` so rviz opens already showing the usual topics.
 
-5. **`docs/ros-devkit.md`**: a one-page how-to for members.
+5. **`docs/devkit.md`**: a one-page how-to for members.
 
 ## How it looks to a member
 
