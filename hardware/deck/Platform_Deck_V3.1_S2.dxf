@@ -4468,78 +4468,6 @@ BB
 AcDbEntity
   8
 0
-CIRCLE
-5
-7A100
-100
-AcDbEntity
-8
-0
-100
-AcDbCircle
-10
-89.3684
-20
--28.4816
-30
-0.0
-40
-1.7000
-0
-CIRCLE
-5
-7A101
-100
-AcDbEntity
-8
-0
-100
-AcDbCircle
-10
-68.5184
-20
-7.6316
-30
-0.0
-40
-1.7000
-0
-CIRCLE
-5
-7A102
-100
-AcDbEntity
-8
-0
-100
-AcDbCircle
-10
-125.4816
-20
--7.6316
-30
-0.0
-40
-1.7000
-0
-CIRCLE
-5
-7A103
-100
-AcDbEntity
-8
-0
-100
-AcDbCircle
-10
-104.6316
-20
-28.4816
-30
-0.0
-40
-1.7000
-0
   6
 Continuous
  62
@@ -4562,6 +4490,78 @@ AcDbArc
 108.1274610083
  51
 126.1909445525
+  0
+CIRCLE
+  5
+7A100
+100
+AcDbEntity
+  8
+0
+100
+AcDbCircle
+ 10
+89.3684
+ 20
+-28.4816
+ 30
+0.0
+ 40
+1.7000
+  0
+CIRCLE
+  5
+7A101
+100
+AcDbEntity
+  8
+0
+100
+AcDbCircle
+ 10
+68.5184
+ 20
+7.6316
+ 30
+0.0
+ 40
+1.7000
+  0
+CIRCLE
+  5
+7A102
+100
+AcDbEntity
+  8
+0
+100
+AcDbCircle
+ 10
+125.4816
+ 20
+-7.6316
+ 30
+0.0
+ 40
+1.7000
+  0
+CIRCLE
+  5
+7A103
+100
+AcDbEntity
+  8
+0
+100
+AcDbCircle
+ 10
+104.6316
+ 20
+28.4816
+ 30
+0.0
+ 40
+1.7000
   0
 ENDSEC
   0
