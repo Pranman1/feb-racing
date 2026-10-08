@@ -100,6 +100,9 @@ rviz2 opens with the layout in `devkit/rviz/default.rviz` (the cone racer's topi
 otherwise). Because rviz subscribes to them, `ros2 topic list` shows `/feb/map`, `/feb/pose` and
 friends even with nothing publishing; that is normal.
 
+New to ROS 2? `docs/lab-ros-onboarding.md` is a two-session lab (packages, topics, services,
+turtlesim) that runs entirely in this desktop.
+
 ## Looking at topics without the desktop
 
 Foxglove: `feb-sim run` opens it on the devkit automatically if installed. By hand: Open
@@ -120,6 +123,7 @@ connection -> Foxglove WebSocket -> `ws://localhost:8765`. Any OS, no ROS on the
 
 | Symptom | Cause, fix |
 |---|---|
+| a package created in the container is read-only on a Linux laptop | the container runs as root: `sudo chown -R $USER stack` once |
 | `mounts denied` on a Mac | the clone is outside `/Users`; move it, or add the folder in Docker Desktop -> Resources -> File Sharing |
 | `port is already allocated` | another devkit is running: `./feb-sim stop`, or set `FEB_DEVKIT_PORT` |
 | the simulator says not connected | the bridge is not up yet: it starts after the build, give it a minute, watch `feb-sim logs -f` |
