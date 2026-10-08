@@ -303,7 +303,7 @@ def cmd_ros(args):
            "-v", f"{src}:/home/autodrive_devkit/src/stack",
            "-e", f"FEB_LAUNCH={args.launch or ''}"]
     if args.gui:
-        cmd += ["-p", f"{VNC_PORT}:6080", "-e", "FEB_GUI=1", "-e", "FEB_APPS=" + "; ".join(apps)]
+        cmd += ["-p", f"{VNC_PORT}:6080", "-e", "FEB_GUI=1", "-e", "DISPLAY=:1", "-e", "FEB_APPS=" + "; ".join(apps)]   # DISPLAY: windows opened from `feb-sim shell` land on the desktop too
     cmd.append(image)
     print(f"starting devkit ({image}), source {src} ...")
     if subprocess.run(cmd, stdout=subprocess.DEVNULL).returncode != 0:

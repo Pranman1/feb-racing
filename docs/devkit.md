@@ -96,6 +96,9 @@ turtlesim in two minutes:
 ros2 run turtlesim turtle_teleop_key     # arrow keys here move the turtle in the browser
 ```
 
+Anything with a window that you start from `./feb-sim shell` (`rqt_graph &`, `rviz2 &`) opens on
+that desktop too.
+
 rviz2 opens with the layout in `devkit/rviz/default.rviz` (the cone racer's topics, an empty grid
 otherwise). Because rviz subscribes to them, `ros2 topic list` shows `/feb/map`, `/feb/pose` and
 friends even with nothing publishing; that is normal.

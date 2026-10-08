@@ -35,7 +35,7 @@ listener), \texttt{turtle\_patrol\_interface} (the \texttt{Patrol} service defin
 You need Docker Desktop (Mac, Windows) or Docker Engine (Linux), git, and about 6~GB of disk.
 
 \begin{lstlisting}
-git clone git@github.com:Pranman1/feb-racing.git && cd feb-racing
+git clone https://github.com/Pranman1/feb-racing.git && cd feb-racing
 ./feb-sim setup --team "Your Name"
 \end{lstlisting}
 
@@ -195,8 +195,9 @@ grep depend bar/package.xml
 \texttt{ament\_cmake} a C++ one (or one that only holds message definitions, see
 section~\ref{sec:custom}). In \texttt{foo} you find \texttt{package.xml} (metadata,
 dependencies), \texttt{setup.py} (how to install the Python code, and where executables are
-registered), \texttt{resource/foo} (an empty marker file), and \texttt{foo/} (the Python module
-your nodes go in, with an empty \texttt{\_\_init\_\_.py}). Open them on your laptop: they are at
+registered), \texttt{setup.cfg}, \texttt{resource/foo} (an empty marker file), \texttt{foo/} (the
+Python module your nodes go in, with an empty \texttt{\_\_init\_\_.py}) and \texttt{test/} (style
+checks, ignore them). Open them on your laptop: they are at
 \texttt{feb-racing/stack/foo}.
 
 Build from the workspace root, not from inside the package:
@@ -248,7 +249,7 @@ Click into that terminal and use the arrow keys: the turtle in the browser moves
 \texttt{Twist} messages on \texttt{/turtle1/cmd\_vel}; the turtlesim node subscribes and moves
 the turtle.
 
-See the graph. In a third terminal (\texttt{./feb-sim shell}):
+See the graph. Leave the teleop running, and in a third terminal (\texttt{./feb-sim shell}):
 
 \begin{lstlisting}
 rqt_graph &
@@ -521,9 +522,10 @@ Requirements:
 \end{enumerate}
 
 What to change: the \texttt{.srv} (add \texttt{string turtle\_name}, \texttt{float32 x},
-\texttt{float32 y}, \texttt{float32 theta} to the request; choose the response, for instance
-\texttt{bool success} and \texttt{string message}), then rebuild the interface package before
-the Python one.
+\texttt{float32 y}, \texttt{float32 theta} to the request; add to the response, for instance
+\texttt{bool success} and \texttt{string message}, but keep \texttt{geometry\_msgs/Twist cmd} or
+the starter server and client stop working), then rebuild the interface package before the
+Python one.
 
 Hints:
 \begin{itemize}
@@ -580,7 +582,6 @@ Symptom & Cause, fix \\
 \texttt{Package 'x' not found} after building & this shell has not sourced the new build: \texttt{source install/setup.bash} \\
 \texttt{ros2 pkg create} made files you cannot edit (Linux) & root-owned: \texttt{sudo chown -R \$USER stack} on the laptop \\
 the browser desktop says not connected & reload the tab; still nothing, \texttt{./feb-sim logs -n 50} \\
-\texttt{port is already allocated} & a devkit is already running: \texttt{./feb-sim stop} \\
 \texttt{mounts denied} (Mac) & the clone is outside \texttt{/Users}: move it \\
 a package I created is gone after \texttt{stop} & it was created outside \texttt{src/stack}; recreate it there \\
 my node's first message never arrives & discovery: see section~\ref{sec:controller} \\

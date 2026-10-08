@@ -21,7 +21,7 @@ and a listener), `turtle_patrol_interface` (the `Patrol` service definition) and
 You need Docker Desktop (Mac, Windows) or Docker Engine (Linux), git, and about 6 GB of disk.
 
 ```
-git clone git@github.com:Pranman1/feb-racing.git && cd feb-racing
+git clone https://github.com/Pranman1/feb-racing.git && cd feb-racing
 ./feb-sim setup --team "Your Name"
 ```
 
@@ -162,8 +162,8 @@ grep depend bar/package.xml
 `ament` is ROS 2's build system; `ament_python` is a pure Python package, `ament_cmake` a C++
 one (or one that only holds message definitions, see section 8). In `foo` you find
 `package.xml` (metadata, dependencies), `setup.py` (how to install the Python code, and where
-executables are registered), `resource/foo` (an empty marker file), and `foo/` (the Python
-module your nodes go in, with an empty `__init__.py`). Open them on your laptop: they are at
+executables are registered), `setup.cfg`, `resource/foo` (an empty marker file), `foo/` (the Python
+module your nodes go in, with an empty `__init__.py`) and `test/` (style checks, ignore them). Open them on your laptop: they are at
 `feb-racing/stack/foo`.
 
 Build from the workspace root, not from inside the package:
@@ -211,7 +211,7 @@ Click into that terminal and use the arrow keys: the turtle in the browser moves
 `ros2 run <package> <executable>`: the teleop node reads your keys and publishes `Twist`
 messages on `/turtle1/cmd_vel`; the turtlesim node subscribes and moves the turtle.
 
-See the graph. In a third terminal (`./feb-sim shell`):
+See the graph. Leave the teleop running, and in a third terminal (`./feb-sim shell`):
 
 ```
 rqt_graph &
@@ -464,8 +464,9 @@ Requirements:
    the request from those arguments, calls the service and prints the response.
 
 What to change: the `.srv` (add `string turtle_name`, `float32 x`, `float32 y`,
-`float32 theta` to the request; choose the response, for instance `bool success` and
-`string message`), then rebuild the interface package before the Python one.
+`float32 theta` to the request; add to the response, for instance `bool success` and
+`string message`, but keep `geometry_msgs/Twist cmd` or the starter server and client stop
+working), then rebuild the interface package before the Python one.
 
 Hints:
 
@@ -518,7 +519,6 @@ it stays private.
 | `Package 'x' not found` after building | this shell has not sourced the new build: `source install/setup.bash` |
 | `ros2 pkg create` made files you cannot edit (Linux) | root-owned: `sudo chown -R $USER stack` on the laptop |
 | the browser desktop says not connected | reload the tab; still nothing, `./feb-sim logs -n 50` |
-| `port is already allocated` | a devkit is already running: `./feb-sim stop` |
 | `mounts denied` (Mac) | the clone is outside `/Users`: move it |
 | a package I created is gone after `stop` | it was created outside `src/stack`; recreate it there |
 | my node's first message never arrives | discovery: see section 9 |
