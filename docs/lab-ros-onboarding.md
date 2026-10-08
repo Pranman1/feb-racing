@@ -12,7 +12,9 @@ By the end you can:
 - write a publisher/subscriber pair with a custom message type;
 - write a service server and client, and a node that drives an existing one (turtlesim).
 
-Starter code is in `labs/onboarding/` of this repo. You type the rest.
+Starter code is in [`labs/onboarding/`](../labs/onboarding/) of this repo: `chatter` (a talker
+and a listener), `turtle_patrol_interface` (the `Patrol` service definition) and `turtle_patrol`
+(its server and client). Nothing else is needed. You type the rest.
 
 ## 0. Setup, once
 
@@ -22,6 +24,9 @@ You need Docker Desktop (Mac, Windows) or Docker Engine (Linux), git, and about 
 git clone git@github.com:Pranman1/feb-racing.git && cd feb-racing
 ./feb-sim setup --team "Your Name"
 ```
+
+Already have the clone? `./feb-sim update` instead: it pulls the repo (the `labs/` folder
+arrived on 2026-10-08), newer devkit images and the newer simulator app in one go.
 
 `setup` checks Docker, pulls the devkit image and downloads the simulator app. The simulator
 is not used in this lab. On a Mac, keep the clone under your home folder (`/Users/...`): Docker
