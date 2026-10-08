@@ -1,0 +1,601 @@
+\documentclass[11pt,a4paper]{article}
+\input{preamble}
+\usepackage{array}
+
+\begin{document}
+\emergencystretch=2em
+\febtitle{Lab: ROS~2 onboarding in the FEB devkit}{%
+  \textbf{Session 1} & The devkit, the workspace, packages, nodes, topics, services\\[3pt]
+  \textbf{Session 2} & A publisher/subscriber pair, a turtlesim controller, a patrol service\\[3pt]
+  \textbf{Source} & \texttt{docs/lab-ros-onboarding.md}; starter code in \texttt{labs/onboarding/}\\}
+
+\section*{About this lab}
+
+One lab, two sessions, adapted from EECS~C106A Labs~1 and~2 (Spring~2026) to run in our devkit
+instead of the course's instructional accounts and distrobox container. Every command below was
+run as written, in order, on 2026-10-08 on the \texttt{gui} devkit image. Do them in order. The
+commands are the same on Mac, Windows and Linux: everything ROS happens inside the container,
+and the launcher fills in the ports and paths for your machine.
+
+By the end you can:
+\begin{itemize}
+  \item start the devkit, open a shell in it and see its desktop in your browser;
+  \item create a workspace package with its dependencies, build it with \texttt{colcon}, run nodes with \texttt{ros2 run};
+  \item inspect nodes, topics and services with the \texttt{ros2} tools and \texttt{rqt\_graph};
+  \item write a publisher/subscriber pair with a custom message type;
+  \item write a service server and client, and a node that drives an existing one (turtlesim).
+\end{itemize}
+
+Starter code is in \texttt{labs/onboarding/} of the repo: \texttt{chatter} (a talker and a
+listener), \texttt{turtle\_patrol\_interface} (the \texttt{Patrol} service definition) and
+\texttt{turtle\_patrol} (its server and client). Nothing else is needed. You type the rest.
+
+\section{Setup, once}
+
+You need Docker Desktop (Mac, Windows) or Docker Engine (Linux), git, and about 6~GB of disk.
+
+\begin{lstlisting}
+git clone git@github.com:Pranman1/feb-racing.git && cd feb-racing
+./feb-sim setup --team "Your Name"
+\end{lstlisting}
+
+Already have the clone? \texttt{./feb-sim update} instead: it pulls the repo (the \texttt{labs/}
+folder arrived on 2026-10-08), newer devkit images and the newer simulator app in one go.
+
+\texttt{setup} checks Docker, pulls the devkit image and downloads the simulator app. The
+simulator is not used in this lab. On a Mac, keep the clone under your home folder
+(\texttt{/Users/...}): Docker can only mount folders from there.
+
+\section{What is ROS~2, in one page}
+
+ROS~2 is a set of libraries and tools for robot software. A robot's software is split into small
+programs called \textbf{nodes} (a lidar driver, a planner, a motor controller), each doing one
+job. Nodes find each other over the network with no central server and talk in three ways:
+
+\begin{itemize}
+  \item \textbf{Topics}: a node \emph{publishes} messages on a named topic, any number of nodes
+  \emph{subscribe}. A stream, asynchronous, like a broadcast. The lidar publishes \texttt{/scan};
+  the planner subscribes.
+  \item \textbf{Services}: one node \emph{calls} another and waits for the answer. One request, one
+  response, like ordering at a counter. ``Spawn a turtle at (2,~2).''
+  \item \textbf{Parameters}: a node's settings, readable and writable at run time.
+\end{itemize}
+
+A \textbf{message} is a typed data structure (a \texttt{String}, a \texttt{Twist} with linear and
+angular velocity). Nodes can be written in Python (\texttt{rclpy}) or C++ (\texttt{rclcpp}) and
+mix freely. Our racing stack is exactly this: a bridge node publishes the simulator's lidar and
+encoders as topics, the racer node subscribes, and it publishes steering and throttle topics
+back.
+
+\section{The devkit: our container}
+
+The course runs ROS~2 in a distrobox container on the lab machines. We run it in a Docker
+container on your laptop. Same idea, the ``sealed lunchbox'': Ubuntu, ROS~2 Humble, all our
+dependencies and tools are inside the image; your code stays on your laptop and is mounted in.
+Close the container and your laptop is untouched; start it again and it is identical.
+
+Start it with the turtle simulator and a desktop in your browser:
+
+\begin{lstlisting}
+./feb-sim ros --gui --apps turtlesim --no-rviz
+\end{lstlisting}
+
+What happens: the launcher starts the \texttt{gui} image (first time: a 2.7~GB download), mounts
+your \texttt{stack/} folder into it, builds whatever packages are there, starts a screen inside
+the container and serves it as a web page, opens \texttt{turtlesim} on that screen, and then
+drops you into a shell \textbf{inside the container}. Your browser opens
+\url{http://localhost:6080/vnc.html?autoconnect=1&resize=scale} with a turtle in a blue window.
+If the tab did not open, paste that URL.
+
+Your prompt now reads \texttt{root@<id>:/home/autodrive\_devkit\#}. You are inside. The
+commands you will use from your laptop's own terminal, from the repo folder:
+
+\noindent\begin{tabularx}{\linewidth}{>{\ttfamily\small}p{8.3cm}X}
+\toprule
+\normalfont Command & What it does \\
+\midrule
+./feb-sim ros --gui --apps turtlesim --no-rviz & start the devkit with a desktop and turtlesim, shell inside \\
+./feb-sim ros --gui --apps "turtlesim rqt" & the same with rviz2 and rqt open too \\
+./feb-sim ros & no desktop, no apps: a plain ROS~2 shell (the base image, smaller) \\
+./feb-sim shell & another terminal inside the running container; open as many as you like \\
+./feb-sim logs -f & what the container printed: the package build, every node it started \\
+./feb-sim stop & stop and remove the container; your \texttt{stack/} folder stays \\
+./feb-sim ros --src \textasciitilde{}/some/folder & mount a different folder instead of \texttt{stack/} \\
+./feb-sim run --track loop & later: the simulator plus the devkit, for the racing labs \\
+\bottomrule
+\end{tabularx}
+
+\smallskip
+You never type a \texttt{docker} command. Each of those is one \texttt{docker run} or
+\texttt{docker exec} that the launcher fills in with the right ports and the right folder for
+your machine; \texttt{docs/devkit.md} shows the underlying commands if you are curious.
+
+Two habits:
+\begin{itemize}
+  \item A terminal inside the container is one you opened with \texttt{./feb-sim ros} or
+  \texttt{./feb-sim shell}. \texttt{ros2} and \texttt{colcon} only exist there. If a command says
+  \texttt{ros2: command not found}, you are in a laptop terminal.
+  \item \texttt{exit} in a container shell leaves the container running; \texttt{./feb-sim stop}
+  ends it. Do that when you finish, or the next \texttt{./feb-sim ros} replaces it anyway.
+\end{itemize}
+
+\section{The workspace}
+
+Inside the container, run \texttt{pwd} and \texttt{ls}:
+
+\begin{lstlisting}
+/home/autodrive_devkit
+build  desktop.sh  install  log  rviz  src
+\end{lstlisting}
+
+This folder is the ROS workspace: the place \texttt{colcon} builds from. It is the same layout
+the course lab describes:
+
+\begin{itemize}
+  \item \texttt{src/} holds the source of every package. \texttt{src/stack} \textbf{is your laptop's
+  \texttt{feb-racing/stack/} folder}, mounted, not copied: a file you save on the laptop is there
+  at once, and a package you create inside the container appears on the laptop at once.
+  \texttt{src/autodrive\_devkit} and \texttt{src/feb\_tools} are the simulator bridge and house
+  tools, part of the image.
+  \item \texttt{build/} is where packages are compiled: the prep station.
+  \item \texttt{install/} is the result: executables, message code, and the \texttt{setup.bash} that
+  tells ROS where it all is. Sourcing it is how ROS finds \emph{your} packages.
+  \item \texttt{log/} is what every build printed, in case something fails.
+\end{itemize}
+
+\texttt{build/}, \texttt{install/} and \texttt{log/} live in the container and vanish on
+\texttt{stop}; that is fine, the container rebuilds \texttt{src/} every time it starts. Only
+\texttt{src/stack} is yours and persistent.
+
+\rulebox{\textbf{Linux only:} the container runs as root, so a package created \emph{inside} it is
+owned by root on your laptop and your editor cannot save it. Once, after creating packages, run
+on the laptop: \texttt{sudo chown -R \$USER stack}. Mac and Windows Docker Desktop map the
+ownership for you.}
+
+\section{Anatomy of a package}
+
+A \textbf{package} is the unit of ROS code: a folder with a \texttt{package.xml} describing it
+and its dependencies, plus source, launch files, message definitions. Look at the one we will
+play with:
+
+\begin{lstlisting}
+cd /opt/ros/humble/share/turtlesim
+ls
+cat package.xml
+\end{lstlisting}
+
+\texttt{package.xml} names the package, its maintainers and licence, and what it depends on:
+\texttt{<build\_depend>} at build time, \texttt{<exec\_depend>} at run time,
+\texttt{<depend>} both. \texttt{rclcpp} there is the C++ client library; Python packages depend on \texttt{rclpy}
+instead, and that is what we use.
+
+Tools that answer questions about packages (\texttt{--help} on any of them lists the options):
+
+\begin{lstlisting}
+ros2 pkg prefix turtlesim                          # where a package is installed
+ros2 pkg executables turtlesim                     # the programs it provides
+ros2 interface show example_interfaces/msg/String  # the fields of a message type
+ros2 pkg prefix autodrive_roboracer                # our simulator bridge, built into the image
+\end{lstlisting}
+
+\section{Creating and building packages}
+
+Every package you make goes in \texttt{src/stack} (anywhere else is inside the container's own
+disk and lost on stop). Create two: a bare one and one with dependencies declared.
+
+\begin{lstlisting}
+cd /home/autodrive_devkit/src/stack
+ros2 pkg create foo --build-type ament_python
+ros2 pkg create bar --build-type ament_python --dependencies rclpy std_msgs geometry_msgs turtlesim
+ls foo
+grep depend bar/package.xml
+\end{lstlisting}
+
+\texttt{ament} is ROS~2's build system; \texttt{ament\_python} is a pure Python package,
+\texttt{ament\_cmake} a C++ one (or one that only holds message definitions, see
+section~\ref{sec:custom}). In \texttt{foo} you find \texttt{package.xml} (metadata,
+dependencies), \texttt{setup.py} (how to install the Python code, and where executables are
+registered), \texttt{resource/foo} (an empty marker file), and \texttt{foo/} (the Python module
+your nodes go in, with an empty \texttt{\_\_init\_\_.py}). Open them on your laptop: they are at
+\texttt{feb-racing/stack/foo}.
+
+Build from the workspace root, not from inside the package:
+
+\begin{lstlisting}
+cd /home/autodrive_devkit
+echo $AMENT_PREFIX_PATH
+colcon build --symlink-install --packages-select foo bar
+source install/setup.bash
+echo $AMENT_PREFIX_PATH
+ros2 pkg prefix bar
+\end{lstlisting}
+
+\texttt{--packages-select} builds just the ones you name (a plain \texttt{colcon build} also
+rebuilds the bridge, which works but takes longer). \texttt{--symlink-install} links the
+installed Python files to your source, so an edit takes effect on the next \texttt{ros2 run}
+without rebuilding; you rebuild only when you add a package, an executable or a message.
+\texttt{source install/setup.bash} adds your packages to the paths ROS searches, which is the
+difference between the two \texttt{echo} lines. Every new shell needs it (\texttt{./feb-sim
+shell} does it for you).
+
+\rulebox{\textbf{Checkpoint 1.} Be able to explain the workspace layout and what \texttt{build},
+\texttt{install}, \texttt{log} and \texttt{src/stack} are; show the build; explain
+\texttt{package.xml}; find a package's path.}
+
+\section{Nodes, topics and services}
+
+turtlesim is already running on the desktop (section~3). Ask ROS what is there:
+
+\begin{lstlisting}
+ros2 node list
+ros2 node info /turtlesim
+\end{lstlisting}
+
+\texttt{/turtlesim} is the node. It subscribes to \texttt{/turtle1/cmd\_vel} (velocity
+commands), publishes \texttt{/turtle1/pose}, and serves \texttt{/spawn}, \texttt{/clear},
+\texttt{/kill} and more. (\texttt{/foxglove\_bridge} is the devkit's own node that lets the
+Foxglove app on your laptop see topics; ignore it.)
+
+Drive the turtle. In a \textbf{second} terminal on your laptop:
+
+\begin{lstlisting}
+./feb-sim shell
+ros2 run turtlesim turtle_teleop_key
+\end{lstlisting}
+
+Click into that terminal and use the arrow keys: the turtle in the browser moves. This is
+\texttt{ros2 run <package> <executable>}: the teleop node reads your keys and publishes
+\texttt{Twist} messages on \texttt{/turtle1/cmd\_vel}; the turtlesim node subscribes and moves
+the turtle.
+
+See the graph. In a third terminal (\texttt{./feb-sim shell}):
+
+\begin{lstlisting}
+rqt_graph &
+\end{lstlisting}
+
+It opens on the browser desktop next to the turtle (drag windows by their title bar; the
+desktop is 1600 by 900). Two ovals, one arrow, one topic. Under \emph{Hide}, untick \emph{Debug}
+and refresh: the terminals listening in appear too.
+
+Topics by hand:
+
+\begin{lstlisting}
+ros2 topic list
+ros2 topic list -v                       # with message types and counts
+ros2 topic type /turtle1/cmd_vel
+ros2 topic echo /turtle1/pose            # Ctrl+C to stop; drive the turtle and watch
+ros2 topic echo /turtle1/cmd_vel
+\end{lstlisting}
+
+Services are the other pattern: one request, one response.
+
+\begin{lstlisting}
+ros2 service list
+ros2 service type /clear
+ros2 service call /clear std_srvs/srv/Empty "{}"
+\end{lstlisting}
+
+The turtle's track is wiped. \texttt{/spawn} takes arguments; find out which:
+
+\begin{lstlisting}
+ros2 service type /spawn
+cat $(ros2 pkg prefix turtlesim)/share/turtlesim/srv/Spawn.srv
+\end{lstlisting}
+
+Above the \texttt{---} is the request (x, y, theta, name), below it the response (the name
+given).
+
+\begin{lstlisting}
+ros2 service call /spawn turtlesim/srv/Spawn "{x: 2.0, y: 2.0, theta: 1.2, name: 'new_turtle'}"
+\end{lstlisting}
+
+A second turtle appears, and \texttt{ros2 topic list} now has \texttt{/new\_turtle/...} topics.
+
+\rulebox{\textbf{Checkpoint 2.} Explain node, topic, message, service; drive the turtle; show a
+topic's type and echo it; spawn a turtle.}
+
+\section{A publisher and a subscriber}
+
+The starter package \texttt{chatter} is in the repo under \texttt{labs/}, which is not mounted
+into the container, so copy it on your \textbf{laptop}, in the repo folder:
+
+\begin{lstlisting}
+cp -r labs/onboarding/chatter stack/
+\end{lstlisting}
+
+Then inside the container:
+
+\begin{lstlisting}
+cd /home/autodrive_devkit
+colcon build --symlink-install --packages-select chatter
+source install/setup.bash
+ros2 pkg executables chatter
+\end{lstlisting}
+
+Two executables, \texttt{talker} and \texttt{listener}. Run the first in this terminal and the
+second in another (\texttt{./feb-sim shell}):
+
+\begin{lstlisting}
+ros2 run chatter talker
+ros2 run chatter listener
+\end{lstlisting}
+
+The talker prints \texttt{Publishing: "Hello World: n"} twice a second; the listener prints
+\texttt{I heard:} with the same text. Start a second listener: both hear every message. Start a
+second talker: the listener hears both, interleaved. Ctrl+C stops each.
+
+Read \path{stack/chatter/chatter/publisher_member_function.py} and
+\path{subscriber_member_function.py} on your laptop. A node is a class that inherits
+\texttt{rclpy.node.Node}; \path{create_publisher(type, topic, depth)} and
+\path{create_subscription(type, topic, callback, depth)} make the ends;
+\texttt{create\_timer(seconds, callback)} runs something regularly; \texttt{rclpy.spin(node)}
+keeps the node alive, running its timers and callbacks until Ctrl+C.
+
+Now \texttt{stack/chatter/setup.py}, at the bottom:
+
+\begin{lstlisting}
+entry_points={
+    'console_scripts': [
+        'talker = chatter.publisher_member_function:main',
+        'listener = chatter.subscriber_member_function:main',
+    ],
+},
+\end{lstlisting}
+
+This is what makes \texttt{ros2 run chatter talker} exist: executable name, then
+\texttt{module:function}. The file can be called anything; the executable name is what you
+declare here. Without an entry point there is nothing for \texttt{ros2 run} to run.
+
+\section{Write your own pair, with a custom message}
+\label{sec:custom}
+
+Build a talker that publishes what you type, with a timestamp, and a listener that prints it
+with the time it arrived. Read this whole section first.
+
+\textbf{The message type.} \texttt{std\_msgs/String} has one field; you need two (text and a
+timestamp). Custom messages are inconvenient in an \texttt{ament\_python} package, so the
+convention is a separate \texttt{ament\_cmake} \emph{interface package} that holds only message
+and service definitions:
+
+\begin{lstlisting}
+cd /home/autodrive_devkit/src/stack
+ros2 pkg create my_chatter_msgs --build-type ament_cmake
+mkdir my_chatter_msgs/msg
+\end{lstlisting}
+
+Create \path{my_chatter_msgs/msg/TimestampString.msg} with two lines, one field each: a
+\texttt{string} and an \texttt{int64}. Then tell the build about it. In
+\texttt{my\_chatter\_msgs/package.xml}, after the existing \texttt{<buildtool\_depend>} line, add:
+
+\begin{lstlisting}
+<buildtool_depend>rosidl_default_generators</buildtool_depend>
+<exec_depend>rosidl_default_runtime</exec_depend>
+<member_of_group>rosidl_interface_packages</member_of_group>
+\end{lstlisting}
+
+In \texttt{my\_chatter\_msgs/CMakeLists.txt}, before \texttt{ament\_package()}, add:
+
+\begin{lstlisting}
+find_package(rosidl_default_generators REQUIRED)
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/TimestampString.msg"
+)
+find_package(rosidl_default_runtime REQUIRED)
+ament_export_dependencies(rosidl_default_runtime)
+\end{lstlisting}
+
+Build and check ROS can see it:
+
+\begin{lstlisting}
+cd /home/autodrive_devkit
+colcon build --symlink-install --packages-select my_chatter_msgs
+source install/setup.bash
+ros2 interface show my_chatter_msgs/msg/TimestampString
+\end{lstlisting}
+
+\textbf{The nodes.} Create \texttt{my\_chatter} (\texttt{ament\_python}, dependencies
+\texttt{rclpy my\_chatter\_msgs}) in \texttt{src/stack}, and write two files in its module
+folder, using \texttt{chatter} as your model:
+
+\begin{itemize}
+  \item \texttt{my\_talker.py}: in a loop, \texttt{input()} a line from the terminal, make a
+  \texttt{TimestampString} with the text and \path{self.get_clock().now().nanoseconds},
+  publish it on \texttt{/user\_messages}. Import the type with
+  \path{from my_chatter_msgs.msg import TimestampString}.
+  \item \texttt{my\_listener.py}: subscribe to \texttt{/user\_messages} and print
+  \path{Message: <text>, Sent at: <stamp>, Received at: <stamp>}, where the second stamp
+  is the listener's own clock when the callback ran. It is not in the message; think about why
+  it can differ from the first.
+\end{itemize}
+
+Add entry points \texttt{my\_talker} and \texttt{my\_listener} to \texttt{setup.py}, build with
+\texttt{--packages-select my\_chatter}, source, and run each in its own \texttt{./feb-sim shell}:
+
+\begin{lstlisting}
+ros2 run my_chatter my_talker
+ros2 run my_chatter my_listener
+\end{lstlisting}
+
+Type lines into the talker; they appear in the listener with both stamps.
+
+\rulebox{\textbf{Checkpoint 3.} Explain everything in \texttt{stack/}; show the message definition
+and that both packages build; demonstrate the pair.}
+
+\section{A controller for turtlesim (Lab 2, part 1)}
+\label{sec:controller}
+
+Replace \texttt{turtle\_teleop\_key} with your own node. Create \texttt{lab2\_turtlesim}
+(\texttt{ament\_python}, dependencies \texttt{rclpy std\_msgs geometry\_msgs turtlesim}). Its
+node \texttt{turtle\_controller}:
+
+\begin{enumerate}
+  \item Takes the turtle's name on the command line:
+\begin{lstlisting}
+ros2 run lab2_turtlesim turtle_controller <name_of_turtle>
+\end{lstlisting}
+  Use \texttt{sys.argv}, after \path{rclpy.utilities.remove_ros_args(sys.argv)} strips ROS's
+  own flags.
+  \item Publishes \texttt{geometry\_msgs/msg/Twist} on that turtle's \texttt{cmd\_vel} topic when
+  the user presses keys. Reading single keystrokes from a terminal is fiddly; \texttt{input()}
+  plus Enter is fine (\texttt{w}/\texttt{a}/\texttt{s}/\texttt{d}, say). Bonus if you capture
+  keys directly.
+  \item Works for several turtles at once: spawn more with \texttt{/spawn} (section~7) and run one
+  controller per turtle in its own \texttt{./feb-sim shell}, each with a different name.
+\end{enumerate}
+
+One thing you will meet: a node that publishes within a few hundred milliseconds of starting
+can lose those first messages, because turtlesim has not yet discovered the new publisher.
+Typing is slower than that, so it does not matter here, but remember it when a node's first
+message ``disappears''.
+
+\rulebox{\textbf{Checkpoint 4.} Explain the package; show it builds; drive two turtles from two
+controllers.}
+
+\section{Services: a patrol server (Lab 2, part 2)}
+
+A \textbf{service} is a request and a response between two nodes: a client sends a request, the
+server's callback runs and fills in a response, the client gets it. For something you ask for
+once, on demand; topics are for streams.
+
+Three parts define one: a service type (\texttt{.srv} file), a server node, a client node. The
+starter has all three. On the laptop:
+
+\begin{lstlisting}
+cp -r labs/onboarding/turtle_patrol_interface labs/onboarding/turtle_patrol stack/
+\end{lstlisting}
+
+Read \path{stack/turtle_patrol_interface/srv/Patrol.srv}:
+
+\begin{lstlisting}
+float32 vel
+float32 omega
+---
+geometry_msgs/Twist cmd
+\end{lstlisting}
+
+Request above the line, response below. Note in its \texttt{CMakeLists.txt} the
+\texttt{DEPENDENCIES geometry\_msgs} line: a service that uses another package's message must say
+so, and \texttt{package.xml} must depend on that package.
+
+\path{stack/turtle_patrol/turtle_patrol/patrol_server.py} offers \texttt{/turtle1/patrol}:
+a request stores a \texttt{Twist} with the requested speed and turn rate, and a timer publishes
+it on \texttt{/turtle1/cmd\_vel} ten times a second, so the turtle circles.
+\texttt{patrol\_client.py} calls it once: \texttt{create\_client}, \texttt{wait\_for\_service},
+\texttt{call\_async}, then \texttt{spin\_until\_future\_complete} to wait for the answer. Build
+and run (server and client in separate shells):
+
+\begin{lstlisting}
+cd /home/autodrive_devkit
+colcon build --symlink-install --packages-select turtle_patrol_interface turtle_patrol
+source install/setup.bash
+ros2 run turtle_patrol patrol_server
+ros2 run turtle_patrol patrol_client
+\end{lstlisting}
+
+turtle1 circles. The service can also be called from the command line, with other values:
+
+\begin{lstlisting}
+ros2 service call /turtle1/patrol turtle_patrol_interface/srv/Patrol "{vel: 2.0, omega: 1.0}"
+\end{lstlisting}
+
+\textbf{Your extension: one server, many turtles, with teleport.} Change the system so that a
+single server controls any turtle by name, teleports it to a requested pose first, then patrols
+it:
+
+\begin{lstlisting}
+ros2 service call /turtle_patrol turtle_patrol_interface/srv/Patrol \
+  "{turtle_name: 'new_turtle', vel: 2.0, omega: 1.0, x: 1.0, y: 3.0, theta: 1.0}"
+\end{lstlisting}
+
+Requirements:
+\begin{enumerate}
+  \item One server process, \texttt{multi\_patrol\_server}, serving \texttt{/turtle\_patrol}. Not
+  one server per turtle. The request's \texttt{turtle\_name} says which turtle.
+  \item The request also carries \texttt{x}, \texttt{y}, \texttt{theta}. The server teleports that
+  turtle there with turtlesim's own teleport service, then starts its patrol with \texttt{vel}
+  and \texttt{omega}.
+  \item A client, \texttt{patrol\_client}, called as
+  \path{ros2 run turtle_patrol patrol_client <name> <x> <y> <theta> <vel> <omega>}, that
+  fills the request from those arguments, calls the service and prints the response.
+\end{enumerate}
+
+What to change: the \texttt{.srv} (add \texttt{string turtle\_name}, \texttt{float32 x},
+\texttt{float32 y}, \texttt{float32 theta} to the request; choose the response, for instance
+\texttt{bool success} and \texttt{string message}), then rebuild the interface package before
+the Python one.
+
+Hints:
+\begin{itemize}
+  \item Find the teleport service with \path{ros2 service list}, then its type with
+  \path{ros2 service type <name>} and its fields with \path{ros2 interface show <type>}.
+  Your server is a \emph{client} of it; model that part on \texttt{patrol\_client.py}.
+  \item Keep per-turtle state in a dictionary keyed by name: the publisher for
+  \texttt{/<name>/cmd\_vel} and the current \texttt{Twist}. The timer loops over the dictionary.
+  \item Do not wait for the teleport inside your service callback with
+  \texttt{spin\_until\_future\_complete}: the node is already spinning to run your callback, and
+  waiting there deadlocks. \texttt{call\_async} and carry on; the teleport completes a moment
+  later.
+\end{itemize}
+
+\rulebox{\textbf{Checkpoint 5.} Explain how a service call differs from a subscriber callback;
+show two turtles patrolling from different starting poses; explain why one server is enough.}
+
+\section{Keep your code in git}
+
+\texttt{stack/} is ignored by the \texttt{feb-racing} repo on purpose: it is yours. Make it a
+repo of its own and push it to a \textbf{private} GitHub repository.
+
+Once, set up a key (skip if GitHub already knows this laptop):
+
+\begin{lstlisting}
+git config --global user.name "Your Name"
+git config --global user.email you@berkeley.edu
+ssh-keygen -t ed25519 -C "you@berkeley.edu"       # Enter for the default file; a passphrase is wise
+cat ~/.ssh/id_ed25519.pub                           # paste into GitHub -> Settings -> SSH and GPG keys
+ssh -T git@github.com                               # "Hi <you>! You've successfully authenticated"
+\end{lstlisting}
+
+Create an empty private repository on github.com, then:
+
+\begin{lstlisting}
+cd stack
+git init
+git remote add origin git@github.com:<you>/<repo>.git
+git add .
+git commit -m "ROS onboarding lab"
+git push -u origin main
+\end{lstlisting}
+
+From then on: \texttt{git add}, \texttt{git commit -m "..."}, \texttt{git push}. Partners may
+share the repository; it stays private.
+
+\section{When something is wrong}
+
+\noindent\begin{tabularx}{\linewidth}{lX}
+\toprule
+Symptom & Cause, fix \\
+\midrule
+\texttt{ros2: command not found} & you are in a laptop terminal; \texttt{./feb-sim shell} \\
+\texttt{Package 'x' not found} after building & this shell has not sourced the new build: \texttt{source install/setup.bash} \\
+\texttt{ros2 pkg create} made files you cannot edit (Linux) & root-owned: \texttt{sudo chown -R \$USER stack} on the laptop \\
+the browser desktop says not connected & reload the tab; still nothing, \texttt{./feb-sim logs -n 50} \\
+\texttt{port is already allocated} & a devkit is already running: \texttt{./feb-sim stop} \\
+\texttt{mounts denied} (Mac) & the clone is outside \texttt{/Users}: move it \\
+a package I created is gone after \texttt{stop} & it was created outside \texttt{src/stack}; recreate it there \\
+my node's first message never arrives & discovery: see section~\ref{sec:controller} \\
+the build fails & \texttt{./feb-sim logs -n 100}, or run \texttt{colcon build} again and read the error \\
+\bottomrule
+\end{tabularx}
+
+\section*{Checkoff summary}
+
+\begin{enumerate}
+  \item Workspace, \texttt{colcon build}, \texttt{package.xml}, \texttt{ros2 pkg prefix}.
+  \item Node, topic, message, service; teleop, echo, spawn.
+  \item \texttt{my\_chatter\_msgs} and \texttt{my\_chatter} built and demonstrated.
+  \item \texttt{lab2\_turtlesim} driving two turtles.
+  \item \texttt{multi\_patrol\_server} patrolling two turtles from requested poses; code pushed.
+\end{enumerate}
+
+\end{document}
