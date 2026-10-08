@@ -94,14 +94,14 @@ commands you will use from your laptop's own terminal, from the repo folder:
 \toprule
 \normalfont Command & What it does \\
 \midrule
-./feb-sim ros --gui --apps turtlesim --no-rviz & start the devkit with a desktop and turtlesim, shell inside \\
-./feb-sim ros --gui --apps "turtlesim rqt" & the same with rviz2 and rqt open too \\
+./feb-sim ros -{}-gui -{}-apps turtlesim -{}-no-rviz & start the devkit with a desktop and turtlesim, shell inside \\
+./feb-sim ros -{}-gui -{}-apps "turtlesim rqt" & the same with rviz2 and rqt open too \\
 ./feb-sim ros & no desktop, no apps: a plain ROS~2 shell (the base image, smaller) \\
 ./feb-sim shell & another terminal inside the running container; open as many as you like \\
 ./feb-sim logs -f & what the container printed: the package build, every node it started \\
 ./feb-sim stop & stop and remove the container; your \texttt{stack/} folder stays \\
-./feb-sim ros --src \textasciitilde{}/some/folder & mount a different folder instead of \texttt{stack/} \\
-./feb-sim run --track loop & later: the simulator plus the devkit, for the racing labs \\
+./feb-sim ros -{}-src \textasciitilde{}/some/folder & mount a different folder instead of \texttt{stack/} \\
+./feb-sim run -{}-track loop & later: the simulator plus the devkit, for the racing labs \\
 \bottomrule
 \end{tabularx}
 
@@ -169,7 +169,7 @@ cat package.xml
 \texttt{<depend>} both. \texttt{rclcpp} there is the C++ client library; Python packages depend on \texttt{rclpy}
 instead, and that is what we use.
 
-Tools that answer questions about packages (\texttt{--help} on any of them lists the options):
+Tools that answer questions about packages (\texttt{-{}-help} on any of them lists the options):
 
 \begin{lstlisting}
 ros2 pkg prefix turtlesim                          # where a package is installed
@@ -210,8 +210,8 @@ echo $AMENT_PREFIX_PATH
 ros2 pkg prefix bar
 \end{lstlisting}
 
-\texttt{--packages-select} builds just the ones you name (a plain \texttt{colcon build} also
-rebuilds the bridge, which works but takes longer). \texttt{--symlink-install} links the
+\texttt{-{}-packages-select} builds just the ones you name (a plain \texttt{colcon build} also
+rebuilds the bridge, which works but takes longer). \texttt{-{}-symlink-install} links the
 installed Python files to your source, so an edit takes effect on the next \texttt{ros2 run}
 without rebuilding; you rebuild only when you add a package, an executable or a message.
 \texttt{source install/setup.bash} adds your packages to the paths ROS searches, which is the
@@ -283,7 +283,7 @@ ros2 service type /spawn
 cat $(ros2 pkg prefix turtlesim)/share/turtlesim/srv/Spawn.srv
 \end{lstlisting}
 
-Above the \texttt{---} is the request (x, y, theta, name), below it the response (the name
+Above the \texttt{-{}--} is the request (x, y, theta, name), below it the response (the name
 given).
 
 \begin{lstlisting}
@@ -410,7 +410,7 @@ folder, using \texttt{chatter} as your model:
 \end{itemize}
 
 Add entry points \texttt{my\_talker} and \texttt{my\_listener} to \texttt{setup.py}, build with
-\texttt{--packages-select my\_chatter}, source, and run each in its own \texttt{./feb-sim shell}:
+\texttt{-{}-packages-select my\_chatter}, source, and run each in its own \texttt{./feb-sim shell}:
 
 \begin{lstlisting}
 ros2 run my_chatter my_talker
