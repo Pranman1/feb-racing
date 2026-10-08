@@ -218,8 +218,10 @@ rqt_graph &
 ```
 
 It opens on the browser desktop next to the turtle (drag windows by their title bar; the
-desktop is 1600 by 900). Two ovals, one arrow, one topic. Under *Hide*, untick *Debug* and
-refresh: the terminals listening in appear too.
+desktop is 1600 by 900). Press the refresh button (the circular arrow, top left): rqt_graph
+does not update on its own, and its first picture is usually incomplete. You then see two
+ovals, one arrow, one topic. Under *Hide*, untick *Debug* and refresh again: the terminals
+listening in appear too.
 
 Topics by hand:
 
